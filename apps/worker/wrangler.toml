@@ -1,0 +1,27 @@
+name = "bloclawd-worker-staging"
+main = "build/worker/shim.mjs"
+# Pinned 2026-04-30: workers-rs 0.8.1 Rust-to-WASM build pipeline; no Node compatibility flag needed.
+compatibility_date = "2026-04-01"
+
+[build]
+command = "cargo install -q worker-build@0.8.1 && worker-build --release"
+
+[placement]
+mode = "smart"
+
+[[hyperdrive]]
+binding = "DB"
+id = "<staging-hyperdrive-id-from-cf-dashboard>"
+localConnectionString = "postgres://localhost:5432/bloclawd_dev"
+
+[[unsafe.bindings]]
+name = "RL_CHALLENGE"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 10, period = 60 }
+
+[[unsafe.bindings]]
+name = "RL_EVENT"
+type = "ratelimit"
+namespace_id = "1002"
+simple = { limit = 3, period = 60 }
