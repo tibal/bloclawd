@@ -1,10 +1,10 @@
 # ADR-001: PlanetScale Tier Confirmation
 
-<!-- PHASE-2-GATE: Phase 2 plan-checker verifies `! grep -F TBD-USER` in this file. Until then, this skeleton is a Phase-1-complete artifact but a Phase-2 blocker. -->
+<!-- PHASE-2-GATE: Phase 2 plan-checker verifies this file has no unfilled placeholders. -->
 
-**Status:** Pending user confirmation (skeleton committed; values land in Task 2 of phase 01-02; Task 2 is advisory for Phase 1 completion but blocking for Phase 2).
+**Status:** Accepted
 **Date proposed:** 2026-04-30
-**Date confirmed:** TBD-USER
+**Date confirmed:** 2026-04-30
 **Decider:** thibault.dalmon@cycliz.fr
 
 ## Context
@@ -20,16 +20,16 @@ D-21..D-23 in `.planning/phases/01-foundations/01-CONTEXT.md` require:
 
 | Field | Value |
 |-------|-------|
-| Tier name | TBD-USER (e.g., `Scaler`, `Scaler Pro`, ...) |
-| Monthly base cost (USD) | TBD-USER |
-| Billing alert threshold (USD) | TBD-USER |
+| Tier name | PlanetScale Postgres `PS-5` (HA / highly available) |
+| Monthly base cost (USD) | $15/month |
+| Billing alert threshold (USD) | $25 |
 | Alert recipient | thibault.dalmon@cycliz.fr |
-| Alert configured (link or screenshot path) | TBD-USER (e.g., `.planning/decisions/assets/ADR-001-billing-alert.png`) |
-| Date confirmed | TBD-USER (YYYY-MM-DD) |
+| Alert configured (link or screenshot path) | User confirmation in Codex session on 2026-04-30; no screenshot saved |
+| Date confirmed | 2026-04-30 |
 
 ## Consequences
 
-- Phase 2 plan-checker greps for `.planning/decisions/ADR-001-planetscale-tier.md` (filename match) AND for the absence of `TBD-USER` in the resulting file before greenlighting any DB-write task.
+- Phase 2 plan-checker greps for `.planning/decisions/ADR-001-planetscale-tier.md` (filename match) AND for the absence of unfilled placeholders before greenlighting any DB-write task.
 - Future infra-cost ADRs (Hyperdrive, Workers Paid, custom-domain SSL, Apple Developer account, ...) follow this `ADR-NNN-<topic>.md` naming convention under `.planning/decisions/`.
 - If actual PlanetScale spend exceeds the alert threshold, the alert fires to thibault.dalmon@cycliz.fr; we revisit budget here.
 
@@ -43,4 +43,5 @@ D-21..D-23 in `.planning/phases/01-foundations/01-CONTEXT.md` require:
 
 - `.planning/research/PITFALLS.md` Pitfall #7
 - `.planning/phases/01-foundations/01-CONTEXT.md` D-21, D-22, D-23
-- planetscale.com/pricing (canonical pricing page)
+- PlanetScale Postgres pricing: `PS-5` single-node is $5/month; `PS-5` highly available is $15/month
+- PlanetScale billing docs: spend email alerts are configured from the organization billing page

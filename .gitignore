@@ -13,6 +13,9 @@ node_modules/
 
 # Cloudflare Workers
 .wrangler/
+.env
+.env.*
+!.env.example
 .dev.vars
 .dev.vars.*
 
