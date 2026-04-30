@@ -122,6 +122,7 @@ pub fn solve(
 }
 
 /// Complete server-side check: HMAC + expiry + payload-hash binding + PoW.
+#[allow(clippy::too_many_arguments)]
 pub fn verify(
     secret: &[u8],
     cid: &ChallengeId,
