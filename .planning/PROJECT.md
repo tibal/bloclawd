@@ -42,7 +42,7 @@ bloclawd is an anonymous, community analytics service that tracks **when AI codi
 - [ ] Dashboard at `bloclawd.com/dashboard` renders timeseries of median tokens-per-window with vertical spread (e.g., p25–p75 / p10–p90) and filters for model, subscription tier, harness, region
 - [ ] Dashboard lazy-loads only the JSON buckets needed for the selected time window
 - [ ] `bloclawd.org` redirects to `bloclawd.com`
-- [ ] PoW invariant enforced by spec/pow-v1.md (72-byte byte-exact input: challenge_id || payload_hash || nonce) + spec/payload-canonical.md (RFC 8785 JCS) + spec/pow-fixtures.json (>=10 cross-language test vectors); CI runs cargo test -p pow + vitest run pow + xtask gen-fixtures --check (any failure blocks merge)
+- [ ] PoW invariant enforced by spec/pow-v1.md (72-byte byte-exact input: challenge_id || payload_hash || nonce) + spec/payload-canonical.md (RFC 8785 JCS) + spec/pow-fixtures.json (>=10 test vectors); CI runs the Rust PoW suite, fixture drift check, ts-rs binding drift check, log-boundary grep, and Worker WASM size gate (any failure blocks merge)
 - [ ] Anonymity defenses applied combinatorially at materialization (cron, not ingest): k-anonymity suppression of public-R2 cells with n<5; token counts binned to log-spaced buckets before public emission; `tz_offset` dropped from public R2; `event_id` and `nonce` never written to public R2; per-event timing never persisted
 
 ### Out of Scope
