@@ -11,30 +11,37 @@ Requirements for initial release. Each maps to roadmap phases. Auto-included fro
 
 - [ ] **SPEC-01**: spec/pow-v1.md defines the byte-exact 72-byte PoW input format (32B challenge_id || 32B payload_hash || 8B big-endian nonce, no separators), the stateless HMAC-SHA256 challenge issuance model (single WORKER_SECRET, 60s expiry, no KV), the verification ordering (HMAC → expiry → payload-hash binding → PoW → DB insert), and the difficulty algorithm (K=22 leading zero bits over SHA-256)
 - [ ] **SPEC-02**: spec/pow-fixtures.json contains ≥10 cross-language test vectors ({name, challenge_id_b64, payload_canonical_b64, payload_hash_b64, nonce_b64, expected_hash_b64, leading_zero_bits}) including edge cases (k=0, k=1, k=22, k=23, all-zero challenge, all-FF challenge, empty payload, unicode-NFC payload, key-ordering payload, number-formatting payload, max-size payload); generated deterministically by cargo xtask gen-fixtures with a CI drift gate via cargo xtask gen-fixtures --check
-- [ ] **SPEC-03**: spec/event-schema.md documents the canonical POST /event payload (model, harness, tier, region, per-window token counts), references spec/enums.json (machine-readable single source of truth for model/tier/harness/region enums), and excludes tz_offset / event_id / nonce / country / user_id / session_id / account_id / ip from the wire payload (region is derived client-side from tz_offset+country and is the only geographic field submitted)
-- [ ] **SPEC-04**: CI workflow runs both Rust (`cargo test -p pow`) and TypeScript (`vitest run pow`) fixture suites on every PR; either failure blocks merge
-- [ ] **SPEC-05**: spec/payload-canonical.md documents RFC 8785 JCS as the canonical payload form, names serde_jcs (Rust, used by CLI + xtask) and @rfc-8785/json-canonicalize (TS, used by Worker + /data page) as the two implementations, and identifies the JCS edge cases (Unicode-NFC, key-ordering, number-formatting) covered by the SPEC-02 fixture vectors
+- [ ] **SPEC-03**: spec/event-schema.md documents the canonical POST /event payload (model, harness, tier, region, per-window token counts), points to `crates/event-schema/src/enums.rs` as the Rust source of truth for model/tier/harness/region enums, points to `apps/web/src/generated/` as the ts-rs TypeScript binding output consumed by the SPA, and excludes tz_offset / event_id / nonce / country / user_id / session_id / account_id / ip from the wire payload (region is derived client-side from tz_offset+country and is the only geographic field submitted)
+- [ ] **SPEC-04**: CI workflow at `.github/workflows/pow.yml` runs the Rust PoW fixture suite (`cargo test -p pow`) plus the deterministic-fixture drift gate (`cargo xtask gen-fixtures --check`) plus the ts-rs binding drift gate (`cargo test --features ts-export -p event-schema --locked` and `git diff --exit-code apps/web/src/generated/`) plus the log-boundary grep gate (INGE-11) plus the WASM size gate (`worker-build --release` and size < 2,621,440 bytes) on every PR; any failure blocks merge. Pre-Phase-1.5 used a transitional TypeScript Worker verifier job; that verifier and job were retired in 01.5-04.
+- [ ] **SPEC-05**: spec/payload-canonical.md documents RFC 8785 JCS as the canonical payload form and names a single Rust JCS implementation: `serde_jcs = "0.2"` (workspace dependency). CLI, xtask, and the Rust Worker consume it through `crates/event-schema::canonical_bytes`. RFC 8785 conformance is gated by `crates/event-schema/tests/jcs_conformance.rs` using official cyberphone/json-canonicalization KAT vectors; on vector failure the workspace dependency flips mechanically to `serde_json_canonicalizer = "0.3"` per Phase 1.5 research. The frontend `/data` page renderer reads the same canonical bytes re-encoded for display; it does not reimplement JCS in TypeScript.
 
 ### Backend (Pricing & Schema)
 
 - [ ] **BACK-01**: PlanetScale tier confirmed and budget alert configured before any DB write (free tier deprecated 2024)
 - [ ] **BACK-02**: `events` table created in PlanetScale Postgres with `event_id UUID PRIMARY KEY`, `event_type TEXT`, `bucket_ts TIMESTAMPTZ` (server-assigned, floored to 15-min), `payload JSONB`, `received_at TIMESTAMPTZ DEFAULT now()`, split-out `model`, `tier`, `harness`, and `region` columns, plus an index on `(bucket_ts, model, tier, harness, region)`
 - [ ] **BACK-03**: Hyperdrive config attached to PlanetScale; ingest Worker bindings include Hyperdrive (DB), R2 (REPORTS), and a WORKER_SECRET secret (set via wrangler secret put; ≥256 bits of entropy; used to HMAC-sign PoW challenges per spec/pow-v1.md). No KV binding.
-- [ ] **BACK-04**: `compatibility_date` pinned with comment in `wrangler.toml`; `nodejs_compat` flag explicit; Worker placement set to `smart`
+- [ ] **BACK-04**: `compatibility_date` pinned with comment in `wrangler.toml` (rationale: workers-rs 0.8.1 build pipeline; Rust-to-WASM does not need Node compatibility flags). Worker placement set to `smart`. Build pipeline is `worker-build 0.8.1` matched 1:1 with `worker = 0.8.1`, producing the WASM artifact at `apps/worker/build/worker/index.wasm` for the size gate.
+
+### Worker Rust Migration (Phase 1.5)
+
+- [ ] **BACK-05**: `apps/worker/` is a Rust crate using the `worker` crate (workers-rs); `wrangler.toml` is configured for the Rust→WASM build (e.g., `worker-build`). The legacy TS scaffold (`apps/worker/src/*.ts`, `package.json`, `vitest.config.ts`, `test/*.ts`) is deleted in this phase. `worker::Router` (or equivalent) handles `GET /challenge` and `POST /event`; `#[event(scheduled)]` provides the cron stub.
+- [ ] **BACK-06**: `crates/event-schema` exports the canonical `EventPayload` Rust struct, `TokenCounts`, the model/tier/harness/region enums from `crates/event-schema/src/enums.rs`, and the JCS canonical-form helper. Both `crates/cli` (Phase 3) and `apps/worker/` consume it. TypeScript bindings are generated via ts-rs into `apps/web/src/generated/`; there is no parallel hand-written TypeScript schema or runtime JSON schema source.
+- [ ] **BACK-07**: `crates/pow` is consumed directly by the Worker for verification; the prior TypeScript verifier was deleted in 01.5-04. CI's `.github/workflows/pow.yml` is a Rust gate (`cargo test -p pow` + `cargo xtask gen-fixtures --check`) plus ts-rs drift, log-boundary, and WASM-size gates; the old TypeScript Worker test job is removed.
+- [ ] **BACK-08**: A staging Rust Worker deploys; `GET /db-ping` opens a `tokio-postgres` connection through the workers-rs 0.8.1 first-class `Hyperdrive` binding to a PlanetScale staging branch, runs `SELECT 1` with the upstream `tokio-postgres` `query_typed_one` API, returns `{ok: true}`, and closes the client before the response future resolves — proving the workers-rs + tokio-postgres + Hyperdrive triplet works before Phase 2 builds ingest endpoints on top.
 
 ### Ingest Worker
 
 - [ ] **INGE-01**: GET /challenge issues a 32-byte challenge_id (8B unix_ms_be || 24B crypto_random) plus a 32-byte HMAC-SHA256(WORKER_SECRET, challenge_id) signature, returns {challenge_id, sig, difficulty, expires_in: 60} — no KV write, stateless
 - [ ] **INGE-02**: POST /event validates the request body, recomputes HMAC over challenge_id with WORKER_SECRET (constant-time compare against received sig), rejects if signature invalid; decodes unix_ms_be from challenge_id[0..8] and rejects if (now - unix_ms_be) > 60s or unix_ms_be > now + 5s clock-skew
-- [ ] **INGE-03**: `POST /event` verifies PoW (TS verifier loads same fixture format as Rust)
+- [ ] **INGE-03**: `POST /event` verifies PoW by calling `crates/pow::verify` directly from the Rust Worker (`apps/worker/src/lib.rs`). The pre-Phase-1.5 TypeScript verifier was deleted in 01.5-04; there is no parallel TypeScript verifier and no parallel fixture loader.
 - [ ] **INGE-04**: POST /event recomputes payload_hash = SHA-256(JCS(payload)) server-side, rejects if it differs from the payload_hash bound into the PoW input; on PoW + payload-hash + signature + expiry success, inserts to PlanetScale Postgres via Hyperdrive with `ON CONFLICT (event_id) DO NOTHING` on `event_id UUID PRIMARY KEY` for idempotency
 - [ ] **INGE-05**: Worker decodes the top-level base64url `event_id` into a canonical Postgres `uuid`; insert uses PostgreSQL `INSERT ... ON CONFLICT (event_id) DO NOTHING` on `event_id` for idempotency
 - [ ] **INGE-06**: Server assigns `bucket_ts` with Postgres 15-minute bucketing, e.g. `date_bin('15 minutes', now(), '1970-01-01 00:00:00+00'::timestamptz)` — never trust client-provided timestamps
-- [ ] **INGE-07**: Payload validated with zod against canonical enum sets (model, harness, tier, region) before insert; unknown values rejected with informative error
-- [ ] **INGE-08**: Per-request `pg`/node-postgres client created from the Hyperdrive connection string and closed via `ctx.waitUntil(client.end())` (no global pool)
+- [ ] **INGE-07**: Payload validated by `crates/event-schema::EventPayload` (the shared workspace crate's strongly-typed serde struct + closed enum types from `crates/event-schema/src/enums.rs`) before insert. Validation order: (1) serde rejects unknown enum values natively with the offending variant; (2) `#[serde(deny_unknown_fields)]` on `EventPayload` and `TokenCounts` rejects unknown fields; (3) `EventPayload::validate()` rejects `v != 1` and any token field > 10_000_000. The validator is hand-rolled because closed enum sets plus bounded integer checks are smaller and clearer for WASM than a derive validation dependency.
+- [ ] **INGE-08**: Per-request `tokio-postgres` client opened from the workers-rs 0.8.1 first-class `Hyperdrive` binding (`env.get_binding::<Hyperdrive>("DB")?.connect()?` returns the bridged `Socket` directly) and closed before the Worker response future resolves; no global pool. The connection future is spawned on the wasm event loop via `wasm_bindgen_futures::spawn_local`. Plan 01.5-03 proved upstream `tokio-postgres` rev `35a85bdbfeeac465e092950f65a10d9192418175` works through Hyperdrive using `query_typed_one`; the earlier devsnek fork assumption is no longer current for this smoke path, but can be re-evaluated if Phase 2 needs APIs that cannot avoid prepared statements.
 - [ ] **INGE-09**: PoW input binds payload hash so a solved challenge cannot be reused with a different payload — this is the PRIMARY cryptographic replay defense (no KV consume-on-use exists); event_id PRIMARY KEY and 60s challenge expiry are the secondary database and temporal layers
-- [ ] **INGE-10**: Edge rate-limit per IP without persisting IP (in-memory token bucket only; no logs of IPs anywhere)
-- [ ] **INGE-11**: No `console.log` or persistent log writes per-event timing data, nonce values, or `event_id`
+- [ ] **INGE-10**: Edge rate-limit per IP via the workers-rs 0.8.1 first-class `RateLimiter` binding (`env.get_binding::<RateLimiter>("RL_CHALLENGE")?.limit(key).await -> RateLimitOutcome`). Two separate bindings declared in `wrangler.toml`: `RL_CHALLENGE` at 10 / 60s for `GET /challenge`, `RL_EVENT` at 3 / 60s for `POST /event`, both keyed on `cf-connecting-ip`. On exceed, return HTTP 429 with `Retry-After: <seconds>` and JSON body `{error: "rate_limited", route: "challenge|event", retry_after_s: N}`. No log line anywhere contains the IP.
+- [ ] **INGE-11**: No log emitter (`worker::console_log!`, structured tracing, or any other) writes per-event timing data, nonce values, `event_id`, IPs, `WORKER_SECRET`, the Hyperdrive connection string, or any field of the Hyperdrive typed binding (`host`, `port`, `user`, `password`, `database`) anywhere in the Worker or in Cron. The CI gate at `.github/workflows/pow.yml` runs a `log-boundary` grep over `apps/worker/` and `crates/` and fails on forbidden `console_log!` output.
 
 ### CLI (Rust)
 
@@ -70,7 +77,7 @@ Requirements for initial release. Each maps to roadmap phases. Auto-included fro
 - [ ] **AGGR-09**: R2 layout is tiered: `reports/v1/q15/<YYYY>/<MM>/<DD>/<HH>-<mm>.json` for past 24h, `reports/v1/h1/<YYYY>/<MM>/<DD>/<HH>.json` for past 7 days, `reports/v1/d1/<YYYY>/<MM>/<DD>.json` indefinitely
 - [ ] **AGGR-10**: Each bucket file contains dimension-pre-aggregated `cells[]` so the dashboard filters in-memory
 - [ ] **AGGR-11**: `manifest.json` lists available buckets per tier; updated last after all bucket files written (write-order matters)
-- [ ] **AGGR-12**: `enums.json` published listing canonical model/harness/tier/region values
+- [ ] **AGGR-12**: Frontend consumes enum sets via the ts-rs generated TypeScript bindings in `apps/web/src/generated/` (`Model.ts`, `Tier.ts`, `Harness.ts`, `Region.ts`, plus `EventPayload.ts`, `TokenCounts.ts`, and the hand-maintained `index.ts` barrel). No enums.json is published to R2; the Rust enum source of truth (`crates/event-schema/src/enums.rs`) is the single canonical list, kept in sync with the SPA by the ts-rs drift gate in CI. If a third-party non-SPA data consumer materializes in v2, an R2 enum manifest can be regenerated from the same Rust source via an `xtask gen-public-enums-json` command.
 - [ ] **AGGR-13**: Cache-Control headers set per-object on R2 put: rolled-over buckets get `public, max-age=31536000, immutable`; `manifest.json` gets `public, max-age=60, must-revalidate`
 - [ ] **AGGR-14**: Cron writes `_status.json` (last-cron-success-ts, ingest-health) for use by the dashboard
 
@@ -178,6 +185,10 @@ Explicitly excluded. Documented to prevent scope creep. Anti-features tied to bl
 | BACK-02 | Phase 2 | Pending |
 | BACK-03 | Phase 2 | Pending |
 | BACK-04 | Phase 2 | Pending |
+| BACK-05 | Phase 1.5 | Pending |
+| BACK-06 | Phase 1.5 | Pending |
+| BACK-07 | Phase 1.5 | Pending |
+| BACK-08 | Phase 1.5 | Pending |
 | INGE-01 | Phase 2 | Pending |
 | INGE-02 | Phase 2 | Pending |
 | INGE-03 | Phase 2 | Pending |
@@ -250,12 +261,13 @@ Explicitly excluded. Documented to prevent scope creep. Anti-features tied to bl
 | DIST-10 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 77 total
-- Mapped to phases: 77
+- v1 requirements: 81 total
+- Mapped to phases: 81
 - Unmapped: 0
 
 **By phase:**
 - Phase 1 (Foundations): 6 requirements (SPEC-01..05, BACK-01)
+- Phase 1.5 (Worker Rust Migration): 4 requirements (BACK-05..08)
 - Phase 2 (Ingest Backbone): 14 requirements (BACK-02..04, INGE-01..11)
 - Phase 3 (Rust CLI): 18 requirements (CLI-01..18)
 - Phase 4 (Aggregation + Dashboard): 31 requirements (AGGR-01..14, WEB-01..17)
@@ -264,3 +276,5 @@ Explicitly excluded. Documented to prevent scope creep. Anti-features tied to bl
 ---
 *Requirements defined: 2026-04-30*
 *Last updated: 2026-04-30 — Phase 1 doc-conflict resolution: SPEC-01/02/03 rewritten for 72-byte input + JCS; SPEC-05 added; INGE-01/02/04/09 rewritten for HMAC model; BACK-03 KV removed (5 phases, 77/77 mapped)*
+*2026-04-30 — Phase 1.5 inserted: SPEC-04, SPEC-05, BACK-04, INGE-03, INGE-07, INGE-08, INGE-10, INGE-11 rewritten for Rust Worker; BACK-05..08 added (6 phases, 81/81 mapped).*
+*2026-04-30 — Phase 1.5 complete: BACK-04, INGE-03, INGE-07, INGE-08, INGE-10, INGE-11, SPEC-04, SPEC-05, AGGR-12 rewritten for Rust Worker + crates/event-schema source of truth + ts-rs bindings + R2 enums.json drop.*
