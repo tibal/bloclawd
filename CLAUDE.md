@@ -21,7 +21,7 @@ See `.planning/PROJECT.md` for full project context.
 - **CLI:** Rust 1.86+ (2024 edition), `clap` (derive), `reqwest` (blocking + rustls-tls), `sha2`, `serde_json::Value` (defensive parsing), `uuid` v4 only, `sys-locale`, `chrono`, `zstd`. Distributed via cargo-dist 0.31+ → cargo / Homebrew tap / install.sh.
 - **Workers:** TypeScript on Cloudflare Workers + Hono 4.x. Single Worker exports both `fetch` (`/challenge`, `/event`) and `scheduled` (15-min cron) handlers.
 - **Database:** PlanetScale (MySQL/Vitess) via Hyperdrive + `mysql2 ≥ 3.13`. Per-request client + `ctx.waitUntil(client.end())`. No FKs (Vitess constraint).
-- **Storage:** Cloudflare KV (`CHALLENGES`, 90s TTL one-shot challenges); Cloudflare R2 (`bloclawd-reports`, custom domain `data.bloclawd.com`, tiered q15/h1/d1 layout).
+- **Storage:** Cloudflare R2 (`bloclawd-reports`, custom domain `data.bloclawd.com`, tiered q15/h1/d1 layout). PoW issuance is stateless HMAC-signed (single `WORKER_SECRET`, 60s expiry — no key-value store; see `spec/pow-v1.md`).
 - **Frontend:** Vite 6 + `@cloudflare/vite-plugin` 1.x + React 19 + TanStack Query v5 + uPlot 1.6.
 - **`compatibility_date`** pinned with rationale comment in `wrangler.toml`. `nodejs_compat` flag explicit. Worker placement `smart`.
 
@@ -31,11 +31,11 @@ See `.planning/research/STACK.md` for the full stack rationale.
 <!-- GSD:conventions-start source:CONVENTIONS.md -->
 ## Conventions
 
-- **PoW invariant:** Touching the PoW input format requires updating `spec/pow-v1.md`, regenerating `spec/pow-fixtures.json`, and verifying both `cargo test -p pow` and `vitest run pow` pass against the same vectors before merge.
+- **PoW invariant:** Touching the 72-byte PoW input format (`challenge_id || payload_hash || nonce`) or the canonical payload form (RFC 8785 JCS) requires updating `spec/pow-v1.md` / `spec/payload-canonical.md`, regenerating `spec/pow-fixtures.json` via `cargo xtask gen-fixtures`, and verifying `cargo test -p pow` + `vitest run pow` + `cargo xtask gen-fixtures --check` all pass before merge. CI's bilingual gate at `.github/workflows/pow.yml` blocks merge on any failure.
 - **Anonymity boundary:** Anything written to R2 is public. Strip `tz_offset`, `event_id`, `nonce`, sub-minute timestamps, and raw token counts (use log-spaced bins) at the cron-materialization step. Never at ingest, never afterwards.
 - **Server-assigned timestamps:** `bucket_ts = FLOOR(NOW(), 15 min)` is computed server-side. Never trust client-provided timestamps for the bucket key.
 - **Defensive parsing:** CC and Codex JSONL files are parsed line-by-line with `serde_json::Value` + `.get()` walks. Never strict serde structs. Surface a per-line parse-failure counter.
-- **Idempotency:** `INSERT IGNORE` / `ON DUPLICATE KEY UPDATE id=id` on `event_id` PK. KV consume-on-use is the first replay defense; the PK is the second.
+- **Idempotency:** `INSERT IGNORE` / `ON DUPLICATE KEY UPDATE id=id` on `event_id` PK. Cryptographic `payload_hash` binding into the 72-byte PoW input is the primary replay defense (see `spec/pow-v1.md`); the `event_id` PK is the second; the 60s challenge expiry is the third.
 - **Logging boundary:** No `console.log` of `event_id`, `nonce`, IP, or per-event timing — anywhere in the worker.
 - **Dry-run identity:** The CLI's `--dry-run` output and the bytes actually submitted on `--yes` MUST come from the same canonical formatter. The `/data` page on the website renders the same payload schema.
 - **License:** MIT or Apache-2.0 from day 1. Public data: CC BY 4.0.
