@@ -28,6 +28,18 @@ pub struct Hash(pub [u8; 32]);
 /// Difficulty constant. v1 = 22.
 pub const K_V1: u32 = 22;
 
+/// Inputs for complete server-side PoW verification.
+pub struct VerifyRequest<'a> {
+    pub secret: &'a [u8],
+    pub challenge_id: &'a ChallengeId,
+    pub sig: &'a Sig,
+    pub payload: &'a Value,
+    pub claimed_payload_hash: &'a PayloadHash,
+    pub nonce: &'a Nonce,
+    pub difficulty: u32,
+    pub now_ms: u64,
+}
+
 /// Issue a stateless challenge.
 pub fn issue_challenge(secret: &[u8], now_ms: u64, random_24: [u8; 24]) -> (ChallengeId, Sig) {
     let mut cid = [0_u8; 32];
@@ -122,28 +134,21 @@ pub fn solve(
 }
 
 /// Complete server-side check: HMAC + expiry + payload-hash binding + PoW.
-#[allow(clippy::too_many_arguments)]
-pub fn verify(
-    secret: &[u8],
-    cid: &ChallengeId,
-    sig: &Sig,
-    payload: &Value,
-    claimed_payload_hash: &PayloadHash,
-    nonce: &Nonce,
-    k: u32,
-    now_ms: u64,
-) -> Result<Hash, VerifyError> {
-    verify_challenge(secret, cid, sig, now_ms, 60_000)?;
+pub fn verify(req: VerifyRequest<'_>) -> Result<Hash, VerifyError> {
+    verify_challenge(req.secret, req.challenge_id, req.sig, req.now_ms, 60_000)?;
 
-    let recomputed = payload_hash(payload);
-    if !ct_eq(&recomputed.0, &claimed_payload_hash.0) {
+    let recomputed = payload_hash(req.payload);
+    if !ct_eq(&recomputed.0, &req.claimed_payload_hash.0) {
         return Err(VerifyError::PayloadHashMismatch);
     }
 
-    let hash = pow_hash(cid, &recomputed, nonce);
+    let hash = pow_hash(req.challenge_id, &recomputed, req.nonce);
     let got = leading_zero_bits(&hash);
-    if got < k {
-        return Err(VerifyError::PowInsufficient { got, need: k });
+    if got < req.difficulty {
+        return Err(VerifyError::PowInsufficient {
+            got,
+            need: req.difficulty,
+        });
     }
 
     Ok(hash)
@@ -260,5 +265,78 @@ mod tests {
             .expect("low difficulty solves quickly");
         assert_eq!(nonce.0.len(), 8);
         assert!(leading_zero_bits(&hash) >= 8);
+    }
+
+    #[test]
+    fn verify_accepts_matching_low_difficulty_request() {
+        let secret = b"test-secret-do-not-use-in-prod";
+        let now = 1_760_000_000_000_u64;
+        let payload = json!({ "a": 1 });
+        let (cid, sig) = issue_challenge(secret, now, [7_u8; 24]);
+        let ph = payload_hash(&payload);
+        let (nonce, expected_hash) =
+            solve(&cid, &ph, 8, 0, Instant::now() + Duration::from_secs(2))
+                .expect("low difficulty solves quickly");
+
+        let hash = verify(VerifyRequest {
+            secret,
+            challenge_id: &cid,
+            sig: &sig,
+            payload: &payload,
+            claimed_payload_hash: &ph,
+            nonce: &nonce,
+            difficulty: 8,
+            now_ms: now + 1_000,
+        })
+        .expect("valid request verifies");
+
+        assert_eq!(hash, expected_hash);
+    }
+
+    #[test]
+    fn verify_rejects_payload_hash_mismatch() {
+        let secret = b"test-secret-do-not-use-in-prod";
+        let now = 1_760_000_000_000_u64;
+        let payload = json!({ "a": 1 });
+        let (cid, sig) = issue_challenge(secret, now, [7_u8; 24]);
+        let nonce = Nonce([0_u8; 8]);
+
+        let err = verify(VerifyRequest {
+            secret,
+            challenge_id: &cid,
+            sig: &sig,
+            payload: &payload,
+            claimed_payload_hash: &PayloadHash([0_u8; 32]),
+            nonce: &nonce,
+            difficulty: 0,
+            now_ms: now + 1_000,
+        })
+        .expect_err("payload hash mismatch rejected");
+
+        assert!(matches!(err, VerifyError::PayloadHashMismatch));
+    }
+
+    #[test]
+    fn verify_rejects_insufficient_pow() {
+        let secret = b"test-secret-do-not-use-in-prod";
+        let now = 1_760_000_000_000_u64;
+        let payload = json!({ "a": 1 });
+        let (cid, sig) = issue_challenge(secret, now, [7_u8; 24]);
+        let ph = payload_hash(&payload);
+        let nonce = Nonce([0_u8; 8]);
+
+        let err = verify(VerifyRequest {
+            secret,
+            challenge_id: &cid,
+            sig: &sig,
+            payload: &payload,
+            claimed_payload_hash: &ph,
+            nonce: &nonce,
+            difficulty: 257,
+            now_ms: now + 1_000,
+        })
+        .expect_err("insufficient PoW rejected");
+
+        assert!(matches!(err, VerifyError::PowInsufficient { .. }));
     }
 }

@@ -46,7 +46,8 @@ Implemented the Rust side of the v1 PoW invariant and the deterministic fixture 
 - `pow_hash`: computes `SHA-256(challenge_id || payload_hash || nonce)` over exactly 72 bytes.
 - `leading_zero_bits`: counts leading zero bits from the SHA-256 output.
 - `solve`: finds a nonce before a deadline.
-- `verify`: runs HMAC, expiry, payload-hash binding, and PoW checks in order.
+- `VerifyRequest`: named input bundle for complete server-side verification.
+- `verify`: runs HMAC, expiry, payload-hash binding, and PoW checks in order from a `VerifyRequest`.
 - `VerifyError` / `PowError`: typed failure modes for verifier and solver paths.
 
 ## Fixture Vectors
