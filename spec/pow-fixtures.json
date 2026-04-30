@@ -5,7 +5,7 @@
     "payload_canonical_b64": "e30",
     "payload_hash_b64": "RBNvo1WzZ4oRRq0W9-hknpT7T8If536DEMBg9hyq_4o",
     "nonce_b64": "AAAAAAAAAAA",
-    "expected_hash_b64": "XRrY3lt49-TRB8HuhEmaWbtsQUHvD1s164tFmQ0s3NY",
+    "expected_hash_b64": "XRrY3lt49-TRB8HuhEmaWbtsQUHvD1s164tFmQ0s3NA",
     "leading_zero_bits": 1
   },
   {
