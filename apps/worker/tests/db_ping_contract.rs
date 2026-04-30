@@ -15,7 +15,7 @@ fn db_ping_handler_contract_is_wired() {
         "wasm_bindgen_futures::spawn_local",
         "connect_raw",
         "Hyperdrive",
-        "query_one(\"SELECT 1::int4 AS one\"",
+        "query_typed_one(\"SELECT 1::int4 AS one\"",
         "NoTls",
         "Response::from_json",
     ] {

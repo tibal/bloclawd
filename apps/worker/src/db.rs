@@ -38,7 +38,7 @@ pub async fn db_ping(_req: Request, ctx: RouteContext<()>) -> Result<Response> {
 
     // 7. Run the smoke query against the PlanetScale staging branch.
     let row = client
-        .query_one("SELECT 1::int4 AS one", &[])
+        .query_typed_one("SELECT 1::int4 AS one", &[])
         .await
         .map_err(|e| Error::RustError(format!("pg query: {e:?}")))?;
     let one: i32 = row.get("one");
