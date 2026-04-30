@@ -11,7 +11,7 @@ mode = "smart"
 
 [[hyperdrive]]
 binding = "DB"
-id = "<staging-hyperdrive-id-from-cf-dashboard>"
+id = "9e97e64d73c945cab3548a0dceb05c4b"
 localConnectionString = "postgres://localhost:5432/bloclawd_dev"
 
 [[unsafe.bindings]]
