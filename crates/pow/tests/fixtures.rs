@@ -1,5 +1,5 @@
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
-use pow::{leading_zero_bits, payload_hash, pow_hash, ChallengeId, Hash, Nonce, PayloadHash};
+use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
+use pow::{ChallengeId, Hash, Nonce, PayloadHash, leading_zero_bits, payload_hash, pow_hash};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
