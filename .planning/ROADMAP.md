@@ -32,12 +32,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   5. PlanetScale tier is confirmed in writing in the planning trail and a billing alert is configured before any production DB write is attempted.
 **Plans**: 6 plans
 Plans:
-- [ ] 01-01-PLAN.md — Write spec/pow-v1.md (72-byte HMAC PoW), spec/payload-canonical.md (RFC 8785 JCS), spec/event-schema.md, spec/enums.json
+- [x] 01-01-PLAN.md — Write spec/pow-v1.md (72-byte HMAC PoW), spec/payload-canonical.md (RFC 8785 JCS), spec/event-schema.md, spec/enums.json
 - [ ] 01-02-PLAN.md — ADR-001 PlanetScale tier (Phase 2 gate), LICENSE Apache-2.0, monorepo skeleton (Cargo + pnpm workspaces)
 - [ ] 01-03-PLAN.md — crates/pow Rust solver+verifier + xtask gen-fixtures + commit spec/pow-fixtures.json (≥10 vectors)
 - [ ] 01-04-PLAN.md — apps/worker/src/pow.ts TS verifier + vitest round-trip suite (workers-pool runtime)
 - [ ] 01-05-PLAN.md — .github/workflows/pow.yml bilingual CI gate (rust-test + ts-test + fixture-drift) + branch protection
-- [ ] 01-06-PLAN.md — Edit PROJECT.md / REQUIREMENTS.md / CLAUDE.md (remove KV; reflect 72-byte HMAC + JCS; add SPEC-05)
+- [x] 01-06-PLAN.md — Edit PROJECT.md / REQUIREMENTS.md / CLAUDE.md (remove KV; reflect 72-byte HMAC + JCS; add SPEC-05)
 
 ### Phase 2: Ingest Backbone
 **Goal**: A deployed Hono ingest Worker accepts validated, PoW-gated, idempotent events into a PlanetScale `events` table via Hyperdrive — without ever logging IPs, nonces, or per-event timing — so the CLI in the next phase has a real endpoint to submit against.
