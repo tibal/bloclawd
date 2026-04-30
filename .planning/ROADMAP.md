@@ -13,7 +13,7 @@ bloclawd ships a trustworthy, anonymous timeseries of "when do AI subscription u
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Foundations** - Pricing-confirmation gate, repo skeleton, cross-language PoW spec + fixtures + bilingual CI gate
-- [ ] **Phase 1.5: Worker Rust Migration (INSERTED)** - Replace the legacy TypeScript Worker scaffold with a Rust Worker built on `workers-rs`; make Rust the single source of truth for event payload + enums + JCS helpers in `crates/event-schema`, with `ts-rs` generating TypeScript bindings into `apps/web/src/generated/`; delete the former enum JSON artifact and any other parallel JSON/TS schema sources; retire the TypeScript PoW verifier in favour of a shared `crates/pow` consumer; collapse the bilingual CI gate to single-language Rust plus ts-rs/log/size gates; rewrite all stack/spec references
+- [x] **Phase 1.5: Worker Rust Migration (INSERTED)** - Replace the legacy TypeScript Worker scaffold with a Rust Worker built on `workers-rs`; make Rust the single source of truth for event payload + enums + JCS helpers in `crates/event-schema`, with `ts-rs` generating TypeScript bindings into `apps/web/src/generated/`; delete the former enum JSON artifact and any other parallel JSON/TS schema sources; retire the TypeScript PoW verifier in favour of a shared `crates/pow` consumer; collapse the bilingual CI gate to single-language Rust plus ts-rs/log/size gates; rewrite all stack/spec references
 - [ ] **Phase 2: Ingest Backbone** - PlanetScale Postgres schema, Hyperdrive bindings + WORKER_SECRET, Rust ingest Worker (`workers-rs`, `/challenge`, `/event`) with stateless HMAC challenges, payload validation, idempotency, server-assigned bucket_ts
 - [ ] **Phase 3: Rust CLI** - `crates/cli` with defensive CC + Codex JSONL parsers, per-window aggregation, PoW solve, dry-run/yes/json submit path
 - [ ] **Phase 4: Aggregation + Dashboard** - Cron worker (double-MAD trim, k-anonymity, log-binning, tiered R2 layout) + Vite/React/uPlot SPA (marketing, dashboard, methodology, data)
@@ -55,15 +55,15 @@ Plans:
 **Plans**: 5 plans (sequential per D-30/D-31 — each wave blocked on the previous)
 Plans:
 - [ ] **Wave 1**
-  - [ ] 01.5-01-PLAN.md — Shared workspace crate (`crates/event-schema`): EventPayload, enums, JCS helper, ts-rs derives, RFC 8785 conformance test
+  - [x] 01.5-01-PLAN.md — Shared workspace crate (`crates/event-schema`): EventPayload, enums, JCS helper, ts-rs derives, RFC 8785 conformance test
 - [ ] **Wave 2** *(blocked on Wave 1)*
-  - [ ] 01.5-02-PLAN.md — Rust Worker scaffold (`apps/worker/` as Rust crate with workers-rs 0.8.1; bindings declared; TS scaffold untouched until 01.5-04)
+  - [x] 01.5-02-PLAN.md — Rust Worker scaffold (`apps/worker/` as Rust crate with workers-rs 0.8.1; bindings declared; TS scaffold untouched until 01.5-04)
 - [ ] **Wave 3** *(blocked on Wave 2)*
-  - [ ] 01.5-03-PLAN.md — `GET /db-ping` smoke test (tokio-postgres over Hyperdrive against PlanetScale staging branch)
+  - [x] 01.5-03-PLAN.md — `GET /db-ping` smoke test (tokio-postgres over Hyperdrive against PlanetScale staging branch)
 - [ ] **Wave 4** *(blocked on Wave 3 — atomic cut-over; checkpoint:human-verify)*
-  - [ ] 01.5-04-PLAN.md — Atomic cut-over: delete TS scaffold + former enum JSON artifact; collapse pow CI gate to Rust-only; add ts-rs drift + log-boundary + WASM-size gates
+  - [x] 01.5-04-PLAN.md — Atomic cut-over: delete TS scaffold + former enum JSON artifact; collapse pow CI gate to Rust-only; add ts-rs drift + log-boundary + WASM-size gates
 - [ ] **Wave 5** *(blocked on Wave 4)*
-  - [ ] 01.5-05-PLAN.md — Documentation rewrites (CLAUDE.md, PROJECT.md, REQUIREMENTS.md, STACK.md, ARCHITECTURE.md, ROADMAP.md Phase 4 SC#2 amendment, spec/*.md)
+  - [x] 01.5-05-PLAN.md — Documentation rewrites (CLAUDE.md, PROJECT.md, REQUIREMENTS.md, STACK.md, ARCHITECTURE.md, ROADMAP.md Phase 4 SC#2 amendment, spec/*.md)
 
 **Cross-cutting constraints** (truths shared across multiple plans):
 - D-30/D-31: 5-atomic-plan sequence is locked; TS scaffold + bilingual PoW CI gate stay green between waves 1-3; only Wave 4 deletes TS files and collapses CI in a single atomic commit.
@@ -129,8 +129,8 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundations | 5/6 | Executing — awaiting GitHub branch-protection checkpoint | - |
-| 1.5. Worker Rust Migration (INSERTED) | 0/5 | Planned, ready to execute | - |
-| 2. Ingest Backbone | 0/TBD | Blocked on Phase 1.5 | - |
+| 1.5. Worker Rust Migration (INSERTED) | 5/5 | Complete | 2026-05-01 |
+| 2. Ingest Backbone | 0/TBD | Ready to discuss | - |
 | 3. Rust CLI | 0/TBD | Not started | - |
 | 4. Aggregation + Dashboard | 0/TBD | Not started | - |
 | 5. Launch | 0/TBD | Not started | - |
