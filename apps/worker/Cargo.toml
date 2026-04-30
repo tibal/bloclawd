@@ -1,0 +1,29 @@
+[package]
+name = "bloclawd-worker"
+version = "0.0.1"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+worker = { version = "0.8.1", features = ["http"] }
+# Plan 01.5-02 expected devsnek/rust-postgres@unnamed-statement, but that
+# repository returned "Repository not found" on 2026-04-30. Upstream 0.7.17
+# exposes the js feature and pooler-safe typed query APIs; pinned by rev for
+# reproducibility. Rev captured: 35a85bdbfeeac465e092950f65a10d9192418175 on 2026-04-30.
+tokio-postgres = { git = "https://github.com/rust-postgres/rust-postgres", rev = "35a85bdbfeeac465e092950f65a10d9192418175", features = ["js"], default-features = false }
+url = "2.5"
+wasm-bindgen-futures = "0.4"
+console_error_panic_hook = "0.1"
+serde = { workspace = true }
+serde_json = { workspace = true }
+event-schema = { path = "../../crates/event-schema" }
+pow = { path = "../../crates/pow" }
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = "symbols"
