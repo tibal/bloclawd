@@ -1,1 +1,27 @@
+# Planning artifacts (local-only)
 .planning/
+
+# Rust
+target/
+Cargo.lock.bak
+**/*.rs.bk
+
+# Node / pnpm
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+
+# Cloudflare Workers
+.wrangler/
+.dev.vars
+.dev.vars.*
+
+# Editor / OS
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Build output
+dist/
+build/
