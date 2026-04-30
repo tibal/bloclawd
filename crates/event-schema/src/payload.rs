@@ -29,7 +29,29 @@ pub struct TokenCounts {
 }
 
 impl EventPayload {
+    /// Hand-rolled bound checks. Per RESEARCH.md Don't Hand-Roll: garde adds 30+ kB
+    /// WASM weight for what is 8 lines of validation. INGE-07 is satisfied here plus
+    /// serde's native rejection of unknown enum values (closed enum sets).
     pub fn validate(&self) -> Result<(), String> {
+        const MAX: u32 = 10_000_000;
+        if self.v != 1 {
+            return Err(format!("unsupported v: {} (expected 1)", self.v));
+        }
+        let t = &self.tokens;
+        for (name, val) in [
+            ("input_5min", t.input_5min),
+            ("output_5min", t.output_5min),
+            ("cached_read_5min", t.cached_read_5min),
+            ("cached_write_5min", t.cached_write_5min),
+            ("input_5h", t.input_5h),
+            ("output_5h", t.output_5h),
+            ("cached_read_5h", t.cached_read_5h),
+            ("cached_write_5h", t.cached_write_5h),
+        ] {
+            if val > MAX {
+                return Err(format!("tokens.{name} = {val} exceeds {MAX}"));
+            }
+        }
         Ok(())
     }
 }

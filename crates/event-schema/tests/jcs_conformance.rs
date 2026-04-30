@@ -1,7 +1,7 @@
 //! RFC 8785 JCS conformance test against cyberphone/json-canonicalization official
 //! test vectors. If this fails, swap the workspace `serde_jcs = "0.2"` to
 //! `serde_json_canonicalizer = "0.3"` (single dep flip + import path change in
-//! src/jcs.rs); see RESEARCH.md § Common Pitfalls Pitfall 3.
+//! src/jcs.rs); see RESEARCH.md Common Pitfalls Pitfall 3.
 
 use std::path::Path;
 
