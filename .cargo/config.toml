@@ -1,0 +1,4 @@
+# Sets the ts-rs emit directory for `#[ts(export)]` derives in `crates/event-schema`.
+# Per D-24: bindings land in apps/web/src/generated/; consumed by Phase 4 SPA.
+[env]
+TS_RS_EXPORT_DIR = { value = "apps/web/src/generated", relative = true }
