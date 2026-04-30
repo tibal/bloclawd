@@ -1,0 +1,23 @@
+{
+  "name": "@bloclawd/worker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@rfc-8785/json-canonicalize": "npm:canonicalize@^3.0.0",
+    "hono": "^4.6.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "@cloudflare/vitest-pool-workers": "^0.5.0",
+    "vitest": "^2.1.0",
+    "typescript": "^5.6.3"
+  }
+}
