@@ -95,7 +95,7 @@ completed: 2026-04-30
 5. Rewrote BACK-03 to list Hyperdrive, R2, and `WORKER_SECRET` with no KV binding.
 6. Rewrote INGE-01 for stateless challenge issuance with 8B `unix_ms_be`, 24B random, signature, difficulty, and 60s expiry.
 7. Rewrote INGE-02 for HMAC verification, constant-time compare, expiry, and clock-skew rejection.
-8. Rewrote INGE-04 for server-side JCS payload hash recompute, payload-hash binding, PoW/signature/expiry success, and `INSERT IGNORE`.
+8. Rewrote INGE-04 for server-side JCS payload hash recompute, payload-hash binding, PoW/signature/expiry success, and database idempotency.
 9. Rewrote INGE-09 to classify payload_hash binding as the primary replay defense.
 10. Added the SPEC-05 traceability row.
 11. Updated coverage from 76/76 to 77/77.

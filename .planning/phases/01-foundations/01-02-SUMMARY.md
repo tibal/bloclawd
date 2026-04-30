@@ -54,7 +54,7 @@ Established the monorepo skeleton, Apache-2.0 licensing, and the PlanetScale pri
 
 ## Deviations
 
-- The confirmed PlanetScale endpoint uses PlanetScale Postgres (`pg.psdb.cloud`). The current Phase 2 planning docs still mention MySQL/Vitess + `mysql2`; that architecture mismatch must be resolved before implementing Phase 2 database code.
+- The confirmed PlanetScale endpoint uses PlanetScale Postgres (`pg.psdb.cloud`). Phase 2 source-of-truth docs now target Postgres, `pg`/node-postgres, `UUID`, `JSONB`, `TIMESTAMPTZ`, and `ON CONFLICT` idempotency.
 - No billing-alert screenshot was saved. The ADR records user confirmation instead.
 
 ## Self-Check: PASSED

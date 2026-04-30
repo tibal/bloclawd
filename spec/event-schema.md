@@ -46,7 +46,7 @@ The `payload` object is canonicalized via RFC 8785 JCS (see `spec/payload-canoni
 | `payload.harness` | Must match an entry in `enums.json#harness` | `spec/enums.json` |
 | `payload.region` | Must match an entry in `enums.json#region` (ISO continent code) | `spec/enums.json` |
 | `payload.tokens.*` | Unsigned integer, 0 <= x <= 10_000_000 | This document |
-| `event_id` | UUIDv4 (never v7) | `01-CONTEXT.md` carries forward CLI-09 |
+| `event_id` | UUIDv4 (never v7), base64url-encoded as 16 raw bytes on the wire and decoded by the Worker into a Postgres `uuid` | `01-CONTEXT.md` carries forward CLI-09 |
 
 ## 3. Fields that MUST NOT appear in the payload
 
@@ -63,8 +63,8 @@ These are permanently excluded. Worker `zod` schema rejects (with status 400) if
 
 The DB row also contains, populated by the Worker:
 
-- `bucket_ts TIMESTAMP(3)` - `bucket_ts = FLOOR(NOW(), 15 min)`. Client-supplied timestamps are never trusted. (Per BACK-02 + INGE-06.)
-- `received_at TIMESTAMP(3)` - `CURRENT_TIMESTAMP(3)` at insert.
+- `bucket_ts TIMESTAMPTZ` - server-assigned and floored to the 15-minute bucket, for example with `date_bin('15 minutes', now(), '1970-01-01 00:00:00+00'::timestamptz)`. Client-supplied timestamps are never trusted. (Per BACK-02 + INGE-06.)
+- `received_at TIMESTAMPTZ` - `now()` at insert.
 
 ## 5. Unknown enum value handling (D-20)
 

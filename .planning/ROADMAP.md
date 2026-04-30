@@ -13,7 +13,7 @@ bloclawd ships a trustworthy, anonymous timeseries of "when do AI subscription u
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [ ] **Phase 1: Foundations** - Pricing-confirmation gate, repo skeleton, cross-language PoW spec + fixtures + bilingual CI gate
-- [ ] **Phase 2: Ingest Backbone** - PlanetScale schema, Hyperdrive bindings + WORKER_SECRET, Hono ingest Worker (`/challenge`, `/event`) with stateless HMAC challenges, payload validation, idempotency, server-assigned bucket_ts
+- [ ] **Phase 2: Ingest Backbone** - PlanetScale Postgres schema, Hyperdrive bindings + WORKER_SECRET, Hono ingest Worker (`/challenge`, `/event`) with stateless HMAC challenges, payload validation, idempotency, server-assigned bucket_ts
 - [ ] **Phase 3: Rust CLI** - `crates/cli` with defensive CC + Codex JSONL parsers, per-window aggregation, PoW solve, dry-run/yes/json submit path
 - [ ] **Phase 4: Aggregation + Dashboard** - Cron worker (double-MAD trim, k-anonymity, log-binning, tiered R2 layout) + Vite/React/uPlot SPA (marketing, dashboard, methodology, data)
 - [ ] **Phase 5: Launch** - cargo-dist (cargo + brew + install.sh), notarization, DNS for `.com`/`api.`/`data.`/`.org`, HSTS, public repo with license + threat-model README
@@ -33,22 +33,22 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 6 plans
 Plans:
 - [x] 01-01-PLAN.md — Write spec/pow-v1.md (72-byte HMAC PoW), spec/payload-canonical.md (RFC 8785 JCS), spec/event-schema.md, spec/enums.json
-- [ ] 01-02-PLAN.md — ADR-001 PlanetScale tier (Phase 2 gate), LICENSE Apache-2.0, monorepo skeleton (Cargo + pnpm workspaces)
+- [x] 01-02-PLAN.md — ADR-001 PlanetScale tier (Phase 2 gate), LICENSE Apache-2.0, monorepo skeleton (Cargo + pnpm workspaces)
 - [x] 01-03-PLAN.md — crates/pow Rust solver+verifier + xtask gen-fixtures + commit spec/pow-fixtures.json (≥10 vectors)
 - [x] 01-04-PLAN.md — apps/worker/src/pow.ts TS verifier + vitest round-trip suite (workers-pool runtime)
 - [ ] 01-05-PLAN.md — .github/workflows/pow.yml bilingual CI gate (rust-test + ts-test + fixture-drift) + branch protection
 - [x] 01-06-PLAN.md — Edit PROJECT.md / REQUIREMENTS.md / CLAUDE.md (remove KV; reflect 72-byte HMAC + JCS; add SPEC-05)
 
 ### Phase 2: Ingest Backbone
-**Goal**: A deployed Hono ingest Worker accepts validated, PoW-gated, idempotent events into a PlanetScale `events` table via Hyperdrive — without ever logging IPs, nonces, or per-event timing — so the CLI in the next phase has a real endpoint to submit against.
+**Goal**: A deployed Hono ingest Worker accepts validated, PoW-gated, idempotent events into a PlanetScale Postgres `events` table via Hyperdrive — without ever logging IPs, nonces, or per-event timing — so the CLI in the next phase has a real endpoint to submit against.
 **Depends on**: Phase 1 (PoW spec + TS verifier)
 **Requirements**: BACK-02, BACK-03, BACK-04, INGE-01, INGE-02, INGE-03, INGE-04, INGE-05, INGE-06, INGE-07, INGE-08, INGE-09, INGE-10, INGE-11
 **Success Criteria** (what must be TRUE):
-  1. `GET /challenge` issues a stateless HMAC-signed challenge `{challenge_id_b64, sig_b64, difficulty, expires_in}` where `challenge_id (32B) = unix_ms_be (8B) || crypto_random (24B)` and `sig = HMAC-SHA256(WORKER_SECRET, challenge_id)` with a 60-second expiry; `POST /event` verifies HMAC + expiry + payload_hash binding via the Phase 1 verifier (no KV lookup), validates the payload against `spec/enums.json` with zod, and inserts into PlanetScale via Hyperdrive.
-  2. The `events` table exists with `event_id BINARY(16) PRIMARY KEY`, `bucket_ts TIMESTAMP(3)` server-assigned and floored to 15 minutes, `payload JSON`, `received_at`, no foreign keys, and an index on `(bucket_ts, model, tier, harness, region)`; duplicate `event_id` submissions are silently idempotent.
-  3. PoW input binds the payload hash so a solved challenge cannot be reused with a different payload; the per-request `mysql2` client is closed via `ctx.waitUntil(client.end())`; `compatibility_date` is pinned with a comment, `nodejs_compat` is explicit, and Worker placement is `smart`.
+  1. `GET /challenge` issues a stateless HMAC-signed challenge `{challenge_id_b64, sig_b64, difficulty, expires_in}` where `challenge_id (32B) = unix_ms_be (8B) || crypto_random (24B)` and `sig = HMAC-SHA256(WORKER_SECRET, challenge_id)` with a 60-second expiry; `POST /event` verifies HMAC + expiry + payload_hash binding via the Phase 1 verifier (no KV lookup), validates the payload against `spec/enums.json` with zod, and inserts into PlanetScale Postgres via Hyperdrive.
+  2. The `events` table exists with `event_id UUID PRIMARY KEY`, `bucket_ts TIMESTAMPTZ` server-assigned and floored to 15 minutes, `payload JSONB`, `received_at TIMESTAMPTZ DEFAULT now()`, split-out `model`/`tier`/`harness`/`region` columns, and an index on `(bucket_ts, model, tier, harness, region)`; duplicate `event_id` submissions are silently idempotent.
+  3. PoW input binds the payload hash so a solved challenge cannot be reused with a different payload; the per-request `pg`/node-postgres client is closed via `ctx.waitUntil(client.end())`; `compatibility_date` is pinned with a comment, `nodejs_compat` is explicit, and Worker placement is `smart`.
   4. Edge rate-limiting throttles abusive callers per IP via an in-memory token bucket without ever persisting an IP, and no log line anywhere contains `event_id`, `nonce`, or per-event timing.
-  5. An end-to-end happy-path test (KV write → PoW solve in test harness → `POST /event` → PlanetScale row visible) passes against a deployed staging Worker.
+  5. An end-to-end happy-path test (`GET /challenge` → PoW solve in test harness → `POST /event` → PlanetScale Postgres row visible) passes against a deployed staging Worker.
 **Plans**: TBD
 
 ### Phase 3: Rust CLI
@@ -96,7 +96,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundations | 0/6 | Not started | - |
+| 1. Foundations | 5/6 | Executing — awaiting GitHub branch-protection checkpoint | - |
 | 2. Ingest Backbone | 0/TBD | Not started | - |
 | 3. Rust CLI | 0/TBD | Not started | - |
 | 4. Aggregation + Dashboard | 0/TBD | Not started | - |

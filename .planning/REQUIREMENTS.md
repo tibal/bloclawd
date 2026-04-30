@@ -18,7 +18,7 @@ Requirements for initial release. Each maps to roadmap phases. Auto-included fro
 ### Backend (Pricing & Schema)
 
 - [ ] **BACK-01**: PlanetScale tier confirmed and budget alert configured before any DB write (free tier deprecated 2024)
-- [ ] **BACK-02**: `events` table created with `event_id BINARY(16) PRIMARY KEY`, `event_type VARCHAR(64)`, `bucket_ts TIMESTAMP(3)` (server-assigned, floored to 15-min), `payload JSON`, `received_at TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3)`, no foreign keys (Vitess constraint), index on `(bucket_ts, model, tier, harness, region)` materialized from JSON or split-out columns
+- [ ] **BACK-02**: `events` table created in PlanetScale Postgres with `event_id UUID PRIMARY KEY`, `event_type TEXT`, `bucket_ts TIMESTAMPTZ` (server-assigned, floored to 15-min), `payload JSONB`, `received_at TIMESTAMPTZ DEFAULT now()`, split-out `model`, `tier`, `harness`, and `region` columns, plus an index on `(bucket_ts, model, tier, harness, region)`
 - [ ] **BACK-03**: Hyperdrive config attached to PlanetScale; ingest Worker bindings include Hyperdrive (DB), R2 (REPORTS), and a WORKER_SECRET secret (set via wrangler secret put; ≥256 bits of entropy; used to HMAC-sign PoW challenges per spec/pow-v1.md). No KV binding.
 - [ ] **BACK-04**: `compatibility_date` pinned with comment in `wrangler.toml`; `nodejs_compat` flag explicit; Worker placement set to `smart`
 
@@ -27,11 +27,11 @@ Requirements for initial release. Each maps to roadmap phases. Auto-included fro
 - [ ] **INGE-01**: GET /challenge issues a 32-byte challenge_id (8B unix_ms_be || 24B crypto_random) plus a 32-byte HMAC-SHA256(WORKER_SECRET, challenge_id) signature, returns {challenge_id, sig, difficulty, expires_in: 60} — no KV write, stateless
 - [ ] **INGE-02**: POST /event validates the request body, recomputes HMAC over challenge_id with WORKER_SECRET (constant-time compare against received sig), rejects if signature invalid; decodes unix_ms_be from challenge_id[0..8] and rejects if (now - unix_ms_be) > 60s or unix_ms_be > now + 5s clock-skew
 - [ ] **INGE-03**: `POST /event` verifies PoW (TS verifier loads same fixture format as Rust)
-- [ ] **INGE-04**: POST /event recomputes payload_hash = SHA-256(JCS(payload)) server-side, rejects if it differs from the payload_hash bound into the PoW input; on PoW + payload-hash + signature + expiry success, inserts to PlanetScale via Hyperdrive with INSERT IGNORE on event_id BINARY(16) PRIMARY KEY for idempotency
-- [ ] **INGE-05**: Insert uses `INSERT IGNORE`/`ON DUPLICATE KEY UPDATE id=id` on `event_id` for idempotency
-- [ ] **INGE-06**: Server assigns `bucket_ts = FLOOR(NOW(), 15 min)` — never trust client-provided timestamps
+- [ ] **INGE-04**: POST /event recomputes payload_hash = SHA-256(JCS(payload)) server-side, rejects if it differs from the payload_hash bound into the PoW input; on PoW + payload-hash + signature + expiry success, inserts to PlanetScale Postgres via Hyperdrive with `ON CONFLICT (event_id) DO NOTHING` on `event_id UUID PRIMARY KEY` for idempotency
+- [ ] **INGE-05**: Worker decodes the top-level base64url `event_id` into a canonical Postgres `uuid`; insert uses PostgreSQL `INSERT ... ON CONFLICT (event_id) DO NOTHING` on `event_id` for idempotency
+- [ ] **INGE-06**: Server assigns `bucket_ts` with Postgres 15-minute bucketing, e.g. `date_bin('15 minutes', now(), '1970-01-01 00:00:00+00'::timestamptz)` — never trust client-provided timestamps
 - [ ] **INGE-07**: Payload validated with zod against canonical enum sets (model, harness, tier, region) before insert; unknown values rejected with informative error
-- [ ] **INGE-08**: Per-request `mysql2` client created and closed via `ctx.waitUntil(client.end())` (no global pool)
+- [ ] **INGE-08**: Per-request `pg`/node-postgres client created from the Hyperdrive connection string and closed via `ctx.waitUntil(client.end())` (no global pool)
 - [ ] **INGE-09**: PoW input binds payload hash so a solved challenge cannot be reused with a different payload — this is the PRIMARY cryptographic replay defense (no KV consume-on-use exists); event_id PRIMARY KEY and 60s challenge expiry are the secondary database and temporal layers
 - [ ] **INGE-10**: Edge rate-limit per IP without persisting IP (in-memory token bucket only; no logs of IPs anywhere)
 - [ ] **INGE-11**: No `console.log` or persistent log writes per-event timing data, nonce values, or `event_id`

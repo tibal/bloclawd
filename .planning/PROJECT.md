@@ -32,7 +32,7 @@ bloclawd is an anonymous, community analytics service that tracks **when AI codi
 - [ ] Ingest Cloudflare Worker exposes `GET /challenge` and `POST /event`
 - [ ] Ingest Worker issues stateless HMAC-signed PoW challenges (single WORKER_SECRET, 60s expiry, no KV) — see spec/pow-v1.md
 - [ ] Ingest Worker validates payload against enum sets (model, harness, tier, region) before insert
-- [ ] Ingest Worker writes events to PlanetScale MySQL via Hyperdrive with `PRIMARY KEY (id)` idempotency
+- [ ] Ingest Worker writes events to PlanetScale Postgres via Hyperdrive with `event_id UUID PRIMARY KEY` idempotency
 - [ ] Cron Worker runs every 15 min, queries PlanetScale, materializes JSON files to R2
 - [ ] Cron applies per-cohort double-MAD outlier trim (`3 × MAD` threshold, separate upper/lower MAD for skew, cohort = `(model, tier, harness, region)`) before aggregating; trim rate exposed as a metric
 - [ ] R2 layout is per-15-min-bucket JSON files (immutable once rolled over) plus an index file the dashboard uses to discover available buckets — enables CDN-friendly lazy loading
@@ -70,14 +70,14 @@ bloclawd is an anonymous, community analytics service that tracks **when AI codi
 - **Architecture lineage:** Lightweight CQRS — write path is rare, gated, validated, durable; read path is static, cached at edge, serves arbitrary traffic without touching the DB.
 - **Data sources:** CC and Codex both write structured session artifacts to disk locally (CC: `~/.claude/projects/<project>/sessions/*.jsonl`, Codex: equivalent). The CLI parses these to compute usage windows; no network access is required to derive the payload.
 - **Critical invariant:** PoW input format must match exactly between the Rust CLI and the TypeScript ingest Worker. They are written in different languages — they cannot share a library — so the format must be specified independently and tested with cross-language fixtures.
-- **Cloudflare-native stack:** Workers (ingest, cron, frontend), KV (challenges), R2 (materialized JSON), Hyperdrive (PlanetScale connection pool). Single vendor for the whole edge story; PlanetScale for source of truth.
+- **Cloudflare-native stack:** Workers (ingest, cron, frontend), R2 (materialized JSON), Hyperdrive (PlanetScale Postgres connection pool). Single vendor for the whole edge story; PlanetScale Postgres for source of truth.
 - **Domain assets:** User owns `bloclawd.com` and `bloclawd.org`. `.org` redirects to `.com`. Subdomains: `api.bloclawd.com` (ingest worker), `data.bloclawd.com` (R2 reports).
 
 ## Constraints
 
 - **Tech stack — CLI**: Rust. Reason: small static binaries, easy distribution via cargo + brew + curl-script; no Node runtime requirement for end users.
 - **Tech stack — Workers/Frontend**: TypeScript on Cloudflare Workers; Vite + React SPA. Reason: official Cloudflare DX path, smart placement near PlanetScale for ingest worker.
-- **Tech stack — Database**: PlanetScale (MySQL/Vitess) via Hyperdrive. Reason: durability, branch-based dev, integrates cleanly with Cloudflare.
+- **Tech stack — Database**: PlanetScale Postgres via Hyperdrive. Reason: durability, standard PostgreSQL driver compatibility, branch-based dev, integrates cleanly with Cloudflare.
 - **Privacy**: No long-lived identifiers, no IP-based geo, no accounts. Reason: anonymity is the trust contract with users.
 - **Volume budget**: ≤ 1 event per user per 5 hours. Reason: correlates with the lowest Anthropic limit window; defines write-path sizing.
 - **PoW difficulty**: `K = 22` bits initial target (~1s on a mid-range dev laptop). Reason: targets dev-laptop audience; tune via Worker env var.
@@ -92,7 +92,7 @@ bloclawd is an anonymous, community analytics service that tracks **when AI codi
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | CLI in Rust (not Node) | Small static binaries, easier distribution to non-Node users, faster PoW solver | — Pending |
-| Cloudflare-native stack (Workers + KV + R2 + Hyperdrive + PlanetScale) | Single-vendor edge story, smart placement available, free egress on R2 custom domain | — Pending |
+| Cloudflare-native stack (Workers + R2 + Hyperdrive + PlanetScale Postgres) | Single-vendor edge story, smart placement available, free egress on R2 custom domain, standard Postgres semantics | — Pending |
 | PoW gate via stateless HMAC-signed challenges (no KV); 72-byte input binds challenge_id, payload_hash, and nonce; 60s expiry | Removes KV consistency-race + state surface; payload_hash binding is the primary replay defense; event_id PK and 60s expiry are layered defenses | — Pending |
 | 15-min bucket JSON files in R2 (lazy loading) | CDN-friendly: old buckets are immutable so cache hits forever; dashboard fetches only what it needs | — Pending |
 | Per-cohort double-MAD outlier trim at 3 × MAD (cohort = (model, tier, harness, region)) before percentile aggregation | σ inflates with outliers and is wrong for right-skewed token data; double-MAD is robust per Leys et al. / Akinshin | — Pending |

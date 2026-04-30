@@ -9,7 +9,7 @@
 
 ## Context
 
-PlanetScale's Hobby (free) tier was deprecated in March 2024 (see `.planning/research/PITFALLS.md` Pitfall #7). New databases must start on a paid plan. bloclawd's `events` table will be the only PlanetScale database in the project at v1; capacity needed is small (a few rows/sec write peak, modest storage).
+PlanetScale's Hobby (free) tier was deprecated in March 2024 (see `.planning/research/PITFALLS.md` Pitfall #7). New databases must start on a paid plan. bloclawd's `events` table will be the only PlanetScale Postgres database in the project at v1; capacity needed is small (a few rows/sec write peak, modest storage).
 
 D-21..D-23 in `.planning/phases/01-foundations/01-CONTEXT.md` require:
 - This ADR exist before Phase 2 begins (grep gate on file existence in the plan-checker).
@@ -30,13 +30,14 @@ D-21..D-23 in `.planning/phases/01-foundations/01-CONTEXT.md` require:
 ## Consequences
 
 - Phase 2 plan-checker greps for `.planning/decisions/ADR-001-planetscale-tier.md` (filename match) AND for the absence of unfilled placeholders before greenlighting any DB-write task.
+- Phase 2 uses PlanetScale Postgres semantics: `pg`/node-postgres via Hyperdrive, `event_id UUID PRIMARY KEY`, `payload JSONB`, and `INSERT ... ON CONFLICT (event_id) DO NOTHING` for idempotency.
 - Future infra-cost ADRs (Hyperdrive, Workers Paid, custom-domain SSL, Apple Developer account, ...) follow this `ADR-NNN-<topic>.md` naming convention under `.planning/decisions/`.
 - If actual PlanetScale spend exceeds the alert threshold, the alert fires to thibault.dalmon@cycliz.fr; we revisit budget here.
 
 ## Alternatives considered
 
 - Cloudflare D1 (SQLite at edge): rejected -- PlanetScale is canonical per PROJECT.md.
-- Self-hosted MySQL on a VM: rejected -- ops burden inconsistent with edge-only stack.
+- Self-hosted Postgres on a VM: rejected -- ops burden inconsistent with edge-only stack.
 - Automated probe of the alert (PlanetScale API): rejected for v1 (deferred); manual confirmation is the v1 control.
 
 ## References

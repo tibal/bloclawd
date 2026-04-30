@@ -55,7 +55,7 @@ completed: 2026-04-30
 
 ## Accomplishments
 
-- Wrote `spec/pow-v1.md` with stateless HMAC-SHA256 challenge issuance, 60s expiry, exact 72-byte PoW input, K=22 difficulty, verification ordering, and `INSERT IGNORE` idempotency.
+- Wrote `spec/pow-v1.md` with stateless HMAC-SHA256 challenge issuance, 60s expiry, exact 72-byte PoW input, K=22 difficulty, verification ordering, and database idempotency.
 - Wrote `spec/payload-canonical.md` with RFC 8785 JCS as the canonical payload byte format and named Rust/TypeScript implementations.
 - Wrote `spec/enums.json` and `spec/event-schema.md` locking v1 model/tier/harness/region values and excluding `tz_offset`, `event_id`, and `nonce` from the canonical payload.
 
