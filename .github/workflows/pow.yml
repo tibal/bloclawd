@@ -1,0 +1,117 @@
+name: pow
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: pow-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  PNPM_VERSION: 9.12.0
+  NODE_VERSION: 20.18.0
+
+jobs:
+  rust-test:
+    name: rust — cargo test -p pow + clippy + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain (rust-toolchain.toml drives version)
+        run: rustup show
+      - name: Cache cargo registry + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', 'rust-toolchain.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      - name: cargo build --workspace
+        run: cargo build --workspace --locked
+      - name: cargo test -p pow
+        run: cargo test -p pow --locked
+      - name: cargo clippy -p pow -p xtask
+        run: cargo clippy -p pow -p xtask --locked -- -D warnings
+
+  ts-test:
+    name: ts — vitest pow round-trip
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - name: Install Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - name: pnpm install (frozen lockfile)
+        run: pnpm install --frozen-lockfile
+      - name: pnpm typecheck
+        run: pnpm --filter @bloclawd/worker typecheck
+      - name: pnpm vitest (workers pool)
+        run: pnpm --filter @bloclawd/worker test
+
+  fixture-drift:
+    name: fixture-drift — xtask gen-fixtures --check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        run: rustup show
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', 'rust-toolchain.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      - name: Build xtask
+        run: cargo build -p xtask --locked
+      - name: Run xtask gen-fixtures --check
+        run: cargo run -p xtask --quiet --locked -- gen-fixtures --check
+      - name: Verify spec/pow-fixtures.json is unchanged in working tree
+        run: |
+          if ! git diff --exit-code -- spec/pow-fixtures.json; then
+            echo "::error file=spec/pow-fixtures.json::Fixture file drifted from xtask output. Re-run cargo run -p xtask -- gen-fixtures and commit the result."
+            exit 1
+          fi
+
+  all-pass:
+    name: pow — all checks pass
+    runs-on: ubuntu-latest
+    needs: [rust-test, ts-test, fixture-drift]
+    if: always()
+    steps:
+      - name: Aggregate result
+        run: |
+          if [ "${{ needs.rust-test.result }}" != "success" ] \
+             || [ "${{ needs.ts-test.result }}" != "success" ] \
+             || [ "${{ needs.fixture-drift.result }}" != "success" ]; then
+            echo "One or more required jobs failed:"
+            echo "  rust-test     = ${{ needs.rust-test.result }}"
+            echo "  ts-test       = ${{ needs.ts-test.result }}"
+            echo "  fixture-drift = ${{ needs.fixture-drift.result }}"
+            exit 1
+          fi
+          echo "All required pow jobs passed."
