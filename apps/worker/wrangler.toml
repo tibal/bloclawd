@@ -1,7 +1,6 @@
-name = "bloclawd-worker-staging"
-main = "build/worker/shim.mjs"
 # Pinned 2026-04-30: workers-rs 0.8.1 Rust-to-WASM build pipeline; no Node compatibility flag needed.
 compatibility_date = "2026-04-01"
+main = "build/worker/shim.mjs"
 
 [build]
 command = "cargo install -q worker-build@0.8.1 && worker-build --release"
@@ -9,19 +8,67 @@ command = "cargo install -q worker-build@0.8.1 && worker-build --release"
 [placement]
 mode = "smart"
 
+# Top-level dev defaults (only used by `wrangler dev`). Real deploys go through
+# `wrangler deploy --env staging` / `wrangler deploy --env production`.
 [[hyperdrive]]
 binding = "DB"
 id = "9e97e64d73c945cab3548a0dceb05c4b"
 localConnectionString = "postgres://localhost:5432/bloclawd_dev"
 
-[[unsafe.bindings]]
-name = "RL_CHALLENGE"
-type = "ratelimit"
-namespace_id = "1001"
-simple = { limit = 10, period = 60 }
+# ---------- staging ----------
+# Deploy: wrangler deploy --env staging
+# PlanetScale branch: staging
+# Worker URL: bloclawd-worker-staging.<account>.workers.dev
+[env.staging]
+name = "bloclawd-worker-staging"
 
-[[unsafe.bindings]]
+[[env.staging.hyperdrive]]
+binding = "DB"
+id = "9e97e64d73c945cab3548a0dceb05c4b"
+localConnectionString = "postgres://localhost:5432/bloclawd_dev"
+
+[[env.staging.ratelimits]]
+name = "RL_CHALLENGE"
+namespace_id = "1001"
+
+  [env.staging.ratelimits.simple]
+  limit = 10
+  period = 60
+
+[[env.staging.ratelimits]]
 name = "RL_EVENT"
-type = "ratelimit"
 namespace_id = "1002"
-simple = { limit = 3, period = 60 }
+
+  [env.staging.ratelimits.simple]
+  limit = 3
+  period = 60
+
+# ---------- production ----------
+# Deploy: wrangler deploy --env production
+# PlanetScale branch: main
+# Worker URL: bloclawd-worker.<account>.workers.dev (custom domain attachment deferred to Phase 5 per D-39)
+# IMPORTANT: replace the production Hyperdrive placeholder before first production deploy.
+# See apps/worker/README.md section "Production Hyperdrive setup".
+[env.production]
+name = "bloclawd-worker"
+
+[[env.production.hyperdrive]]
+binding = "DB"
+id = "REPLACE_WITH_PROD_HYPERDRIVE_ID"
+localConnectionString = "postgres://localhost:5432/bloclawd_dev"
+
+[[env.production.ratelimits]]
+name = "RL_CHALLENGE"
+namespace_id = "2001"
+
+  [env.production.ratelimits.simple]
+  limit = 10
+  period = 60
+
+[[env.production.ratelimits]]
+name = "RL_EVENT"
+namespace_id = "2002"
+
+  [env.production.ratelimits.simple]
+  limit = 3
+  period = 60
