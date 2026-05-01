@@ -7,6 +7,7 @@ use pow::verify;
 mod db;
 mod errors;
 mod ratelimit;
+mod body;
 
 // INGE-03 compile-only witness: `crates/pow::verify` is reachable from the Rust Worker.
 // Phase 2 wires the actual call from the `POST /event` handler.
