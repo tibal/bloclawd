@@ -14,7 +14,7 @@ worker = { version = "0.8.1", features = ["http"] }
 # repository returned "Repository not found" on 2026-04-30. Upstream 0.7.17
 # exposes the js feature and pooler-safe typed query APIs; pinned by rev for
 # reproducibility. Rev captured: 35a85bdbfeeac465e092950f65a10d9192418175 on 2026-04-30.
-tokio-postgres = { git = "https://github.com/rust-postgres/rust-postgres", rev = "35a85bdbfeeac465e092950f65a10d9192418175", features = ["js"], default-features = false }
+tokio-postgres = { git = "https://github.com/rust-postgres/rust-postgres", rev = "35a85bdbfeeac465e092950f65a10d9192418175", features = ["js", "with-serde_json-1", "with-uuid-1"], default-features = false }
 url = "2.5"
 wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"

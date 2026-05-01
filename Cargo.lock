@@ -1181,6 +1181,9 @@ dependencies = [
  "bytes",
  "fallible-iterator",
  "postgres-protocol 0.6.11 (git+https://github.com/rust-postgres/rust-postgres?rev=35a85bdbfeeac465e092950f65a10d9192418175)",
+ "serde_core",
+ "serde_json",
+ "uuid",
 ]
 
 [[package]]
