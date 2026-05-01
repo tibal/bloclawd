@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 02-04-PLAN.md
-last_updated: "2026-05-01T14:14:03.488Z"
+status: verifying
+stopped_at: Completed 02-05-PLAN.md
+last_updated: "2026-05-01T14:28:51.772Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 6
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 16
-  completed_plans: 14
-  percent: 88
+  completed_plans: 15
+  percent: 94
 ---
 
 # Project State
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-30)
 
 Phase: 02 (ingest-backbone) — EXECUTING
 Plan: 5 of 5
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-05-01
 Resume file: None
 
@@ -57,6 +57,7 @@ Progress: [████████░░] 81%
 | Phase 02-ingest-backbone P02 | 10min | 5 tasks | 7 files |
 | Phase 02-ingest-backbone P03 | 7min | 1 tasks | 2 files |
 | Phase 02-ingest-backbone P04 | 11min | 2 tasks | 6 files |
+| Phase 02-ingest-backbone P05 | 9min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -84,6 +85,8 @@ Recent decisions affecting current work:
 - [Phase 02-ingest-backbone]: Enabled tokio-postgres with-uuid-1 and with-serde_json-1 because POST /event binds UUID and JSONB typed parameters.
 - [Phase 02-ingest-backbone]: Used cargo run -p xtask -- gen-fixtures --check as the local equivalent because the cargo-xtask shim is not installed in this runtime.
 - [Phase 02-ingest-backbone]: Verified worker-build size against apps/worker/build/index_bg.wasm because worker-build 0.8.1 emits that artifact path.
+- [Phase 02-ingest-backbone]: Read staging SELECT bucket_ts as SystemTime and format to second-precision RFC3339, matching the Worker path without adding a direct chrono dependency.
+- [Phase 02-ingest-backbone]: Kept the deployed staging happy_path test manual-only via staging-smoke and #[ignore]; it is not in CI.
 
 ### Pending Todos
 
@@ -105,6 +108,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-01T14:13:23.301Z
-Stopped at: Completed 02-04-PLAN.md
+Last session: 2026-05-01T14:28:51.765Z
+Stopped at: Completed 02-05-PLAN.md
 Resume file: .planning/phases/02-ingest-backbone/02-01-PLAN.md (run `/gsd-execute-phase 2` next)

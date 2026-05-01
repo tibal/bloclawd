@@ -87,7 +87,7 @@ Plans:
 - [x] 02-02-PLAN.md — Ingest plumbing (errors.rs 14-code envelope, ratelimit.rs, body.rs 8 KB cap, error_kinds.rs serde-prefix regression)
 - [x] 02-03-PLAN.md — GET /challenge handler (HMAC-signed challenge, RL_CHALLENGE 10/60s, base64url no-pad)
 - [x] 02-04-PLAN.md — POST /event handler (D-43 10-step chain, ON CONFLICT DO UPDATE RETURNING bucket_ts, pow::VerifyError::ClockSkew split)
-- [ ] 02-05-PLAN.md — End-to-end staging proof (#[ignore] + staging-smoke feature; manual cargo test only)
+- [x] 02-05-PLAN.md — End-to-end staging proof (#[ignore] + staging-smoke feature; manual cargo test only)
 
 ### Phase 3: Rust CLI
 **Goal**: A user who just hit a rate limit on Claude Code or Codex can run `bloclawd --5h --cc` (or `--codex`), see exactly what would be submitted, confirm with `[y/N]`, and have an anonymous, PoW-gated event accepted by the live ingest Worker — with defensive parsers that survive CC/Codex format drift.
