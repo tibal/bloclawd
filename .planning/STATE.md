@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-03-PLAN.md
-last_updated: "2026-05-01T13:55:37.071Z"
+stopped_at: Completed 02-04-PLAN.md
+last_updated: "2026-05-01T14:14:03.488Z"
 last_activity: 2026-05-01
 progress:
   total_phases: 6
   completed_phases: 1
   total_plans: 16
-  completed_plans: 13
-  percent: 81
+  completed_plans: 14
+  percent: 88
 ---
 
 # Project State
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-30)
 ## Current Position
 
 Phase: 02 (ingest-backbone) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-05-01
 Resume file: None
@@ -56,6 +56,7 @@ Progress: [████████░░] 81%
 | Phase 02-ingest-backbone P01 | 5min | 4 tasks | 4 files |
 | Phase 02-ingest-backbone P02 | 10min | 5 tasks | 7 files |
 | Phase 02-ingest-backbone P03 | 7min | 1 tasks | 2 files |
+| Phase 02-ingest-backbone P04 | 11min | 2 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,9 @@ Recent decisions affecting current work:
 - [Phase 02-ingest-backbone]: Added uuid's js feature because current uuid 1.x requires an explicit wasm randomness source for v4 on wasm32-unknown-unknown. — Required for cargo check on the Worker wasm target.
 - [Phase 02-ingest-backbone]: Added thiserror as a direct worker dependency because errors.rs derives Error in this crate. — Rust crates must declare direct dependencies for macros/types they use.
 - [Phase 02-ingest-backbone]: Used getrandom::fill for getrandom 0.4.2 because getrandom::getrandom is not exported in the pinned crate line. — Required for /challenge to compile while keeping CSPRNG behavior and handler call shape.
+- [Phase 02-ingest-backbone]: Enabled tokio-postgres with-uuid-1 and with-serde_json-1 because POST /event binds UUID and JSONB typed parameters.
+- [Phase 02-ingest-backbone]: Used cargo run -p xtask -- gen-fixtures --check as the local equivalent because the cargo-xtask shim is not installed in this runtime.
+- [Phase 02-ingest-backbone]: Verified worker-build size against apps/worker/build/index_bg.wasm because worker-build 0.8.1 emits that artifact path.
 
 ### Pending Todos
 
@@ -101,6 +105,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-05-01T13:53:33.248Z
-Stopped at: Completed 02-03-PLAN.md
+Last session: 2026-05-01T14:13:23.301Z
+Stopped at: Completed 02-04-PLAN.md
 Resume file: .planning/phases/02-ingest-backbone/02-01-PLAN.md (run `/gsd-execute-phase 2` next)

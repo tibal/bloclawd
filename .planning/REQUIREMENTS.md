@@ -32,14 +32,14 @@ Requirements for initial release. Each maps to roadmap phases. Auto-included fro
 ### Ingest Worker
 
 - [x] **INGE-01**: GET /challenge issues a 32-byte challenge_id (8B unix_ms_be || 24B crypto_random) plus a 32-byte HMAC-SHA256(WORKER_SECRET, challenge_id) signature, returns {challenge_id, sig, difficulty, expires_in: 60} — no KV write, stateless
-- [ ] **INGE-02**: POST /event validates the request body, recomputes HMAC over challenge_id with WORKER_SECRET (constant-time compare against received sig), rejects if signature invalid; decodes unix_ms_be from challenge_id[0..8] and rejects if (now - unix_ms_be) > 60s or unix_ms_be > now + 5s clock-skew
-- [ ] **INGE-03**: `POST /event` verifies PoW by calling `crates/pow::verify` directly from the Rust Worker (`apps/worker/src/lib.rs`). The pre-Phase-1.5 TypeScript verifier was deleted in 01.5-04; there is no parallel TypeScript verifier and no parallel fixture loader.
-- [ ] **INGE-04**: POST /event recomputes payload_hash = SHA-256(JCS(payload)) server-side, rejects if it differs from the payload_hash bound into the PoW input; on PoW + payload-hash + signature + expiry success, inserts to PlanetScale Postgres via Hyperdrive with `ON CONFLICT (event_id) DO NOTHING` on `event_id UUID PRIMARY KEY` for idempotency
-- [ ] **INGE-05**: Worker decodes the top-level base64url `event_id` into a canonical Postgres `uuid`; insert uses PostgreSQL `INSERT ... ON CONFLICT (event_id) DO NOTHING` on `event_id` for idempotency
-- [ ] **INGE-06**: Server assigns `bucket_ts` with Postgres 15-minute bucketing, e.g. `date_bin('15 minutes', now(), '1970-01-01 00:00:00+00'::timestamptz)` — never trust client-provided timestamps
-- [ ] **INGE-07**: Payload validated by `crates/event-schema::EventPayload` (the shared workspace crate's strongly-typed serde struct + closed enum types from `crates/event-schema/src/enums.rs`) before insert. Validation order: (1) serde rejects unknown enum values natively with the offending variant; (2) `#[serde(deny_unknown_fields)]` on `EventPayload` and `TokenCounts` rejects unknown fields; (3) `EventPayload::validate()` rejects `v != 1` and any token field > 10_000_000. The validator is hand-rolled because closed enum sets plus bounded integer checks are smaller and clearer for WASM than a derive validation dependency.
-- [ ] **INGE-08**: Per-request `tokio-postgres` client opened from the workers-rs 0.8.1 first-class `Hyperdrive` binding (`env.get_binding::<Hyperdrive>("DB")?.connect()?` returns the bridged `Socket` directly) and closed before the Worker response future resolves; no global pool. The connection future is spawned on the wasm event loop via `wasm_bindgen_futures::spawn_local`. Plan 01.5-03 proved upstream `tokio-postgres` rev `35a85bdbfeeac465e092950f65a10d9192418175` works through Hyperdrive using `query_typed_one`; the earlier devsnek fork assumption is no longer current for this smoke path, but can be re-evaluated if Phase 2 needs APIs that cannot avoid prepared statements.
-- [ ] **INGE-09**: PoW input binds payload hash so a solved challenge cannot be reused with a different payload — this is the PRIMARY cryptographic replay defense (no KV consume-on-use exists); event_id PRIMARY KEY and 60s challenge expiry are the secondary database and temporal layers
+- [x] **INGE-02**: POST /event validates the request body, recomputes HMAC over challenge_id with WORKER_SECRET (constant-time compare against received sig), rejects if signature invalid; decodes unix_ms_be from challenge_id[0..8] and rejects if (now - unix_ms_be) > 60s or unix_ms_be > now + 5s clock-skew
+- [x] **INGE-03**: `POST /event` verifies PoW by calling `crates/pow::verify` directly from the Rust Worker (`apps/worker/src/lib.rs`). The pre-Phase-1.5 TypeScript verifier was deleted in 01.5-04; there is no parallel TypeScript verifier and no parallel fixture loader.
+- [x] **INGE-04**: POST /event recomputes payload_hash = SHA-256(JCS(payload)) server-side, rejects if it differs from the payload_hash bound into the PoW input; on PoW + payload-hash + signature + expiry success, inserts to PlanetScale Postgres via Hyperdrive with `ON CONFLICT (event_id) DO NOTHING` on `event_id UUID PRIMARY KEY` for idempotency
+- [x] **INGE-05**: Worker decodes the top-level base64url `event_id` into a canonical Postgres `uuid`; insert uses PostgreSQL `INSERT ... ON CONFLICT (event_id) DO NOTHING` on `event_id` for idempotency
+- [x] **INGE-06**: Server assigns `bucket_ts` with Postgres 15-minute bucketing, e.g. `date_bin('15 minutes', now(), '1970-01-01 00:00:00+00'::timestamptz)` — never trust client-provided timestamps
+- [x] **INGE-07**: Payload validated by `crates/event-schema::EventPayload` (the shared workspace crate's strongly-typed serde struct + closed enum types from `crates/event-schema/src/enums.rs`) before insert. Validation order: (1) serde rejects unknown enum values natively with the offending variant; (2) `#[serde(deny_unknown_fields)]` on `EventPayload` and `TokenCounts` rejects unknown fields; (3) `EventPayload::validate()` rejects `v != 1` and any token field > 10_000_000. The validator is hand-rolled because closed enum sets plus bounded integer checks are smaller and clearer for WASM than a derive validation dependency.
+- [x] **INGE-08**: Per-request `tokio-postgres` client opened from the workers-rs 0.8.1 first-class `Hyperdrive` binding (`env.get_binding::<Hyperdrive>("DB")?.connect()?` returns the bridged `Socket` directly) and closed before the Worker response future resolves; no global pool. The connection future is spawned on the wasm event loop via `wasm_bindgen_futures::spawn_local`. Plan 01.5-03 proved upstream `tokio-postgres` rev `35a85bdbfeeac465e092950f65a10d9192418175` works through Hyperdrive using `query_typed_one`; the earlier devsnek fork assumption is no longer current for this smoke path, but can be re-evaluated if Phase 2 needs APIs that cannot avoid prepared statements.
+- [x] **INGE-09**: PoW input binds payload hash so a solved challenge cannot be reused with a different payload — this is the PRIMARY cryptographic replay defense (no KV consume-on-use exists); event_id PRIMARY KEY and 60s challenge expiry are the secondary database and temporal layers
 - [x] **INGE-10**: Edge rate-limit per IP via the workers-rs 0.8.1 first-class `RateLimiter` binding (`env.get_binding::<RateLimiter>("RL_CHALLENGE")?.limit(key).await -> RateLimitOutcome`). Two separate bindings declared in `wrangler.toml`: `RL_CHALLENGE` at 10 / 60s for `GET /challenge`, `RL_EVENT` at 3 / 60s for `POST /event`, both keyed on `cf-connecting-ip`. On exceed, return HTTP 429 with `Retry-After: <seconds>` and JSON body `{error: "rate_limited", route: "challenge|event", retry_after_s: N}`. No log line anywhere contains the IP.
 - [x] **INGE-11**: No log emitter (`worker::console_log!`, structured tracing, or any other) writes per-event timing data, nonce values, `event_id`, IPs, `WORKER_SECRET`, the Hyperdrive connection string, or any field of the Hyperdrive typed binding (`host`, `port`, `user`, `password`, `database`) anywhere in the Worker or in Cron. The CI gate at `.github/workflows/pow.yml` runs a `log-boundary` grep over `apps/worker/` and `crates/` and fails on forbidden `console_log!` output.
 
@@ -190,14 +190,14 @@ Explicitly excluded. Documented to prevent scope creep. Anti-features tied to bl
 | BACK-07 | Phase 1.5 | Pending |
 | BACK-08 | Phase 1.5 | Pending |
 | INGE-01 | Phase 2 | Complete |
-| INGE-02 | Phase 2 | Pending |
-| INGE-03 | Phase 2 | Pending |
-| INGE-04 | Phase 2 | Pending |
-| INGE-05 | Phase 2 | Pending |
-| INGE-06 | Phase 2 | Pending |
-| INGE-07 | Phase 2 | Pending |
-| INGE-08 | Phase 2 | Pending |
-| INGE-09 | Phase 2 | Pending |
+| INGE-02 | Phase 2 | Complete |
+| INGE-03 | Phase 2 | Complete |
+| INGE-04 | Phase 2 | Complete |
+| INGE-05 | Phase 2 | Complete |
+| INGE-06 | Phase 2 | Complete |
+| INGE-07 | Phase 2 | Complete |
+| INGE-08 | Phase 2 | Complete |
+| INGE-09 | Phase 2 | Complete |
 | INGE-10 | Phase 2 | Complete |
 | INGE-11 | Phase 2 | Complete |
 | CLI-01 | Phase 3 | Pending |
