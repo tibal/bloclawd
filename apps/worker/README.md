@@ -85,6 +85,7 @@ The test:
 - `POST /event` with the solved nonce + UUIDv4 event_id.
 - Asserts `200 {"ok": true, "bucket_ts": "<rfc3339>"}` per D-47.
 - SELECTs the row from PlanetScale staging via direct `tokio-postgres` (NOT Hyperdrive; Hyperdrive is Worker-only) to confirm persistence.
+- Re-POSTs the same `event_id` to verify D-47 idempotency: the duplicate must return `200 {"ok": true, "bucket_ts": "<same as first POST>"}` (no 409, no new row, no shape change). This validates the `ON CONFLICT DO UPDATE SET event_id = events.event_id RETURNING bucket_ts` idiom.
 
 ## Logging boundary (INGE-11)
 
