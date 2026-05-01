@@ -81,7 +81,13 @@ Plans:
   3. PoW input binds the payload hash so a solved challenge cannot be reused with a different payload; per-request `tokio-postgres` clients are opened from the Hyperdrive connection string and closed before the response future resolves; `compatibility_date` is pinned with a comment, Worker placement is `smart`, and the Rust→WASM build pipeline is the one defined in Phase 1.5.
   4. Edge rate-limiting throttles abusive callers per IP via the Cloudflare Rate Limiting binding (no IP persisted by us), and no log line anywhere contains `event_id`, `nonce`, or per-event timing.
   5. An end-to-end happy-path test (`GET /challenge` → PoW solve in test harness → `POST /event` → PlanetScale Postgres row visible) passes against a deployed staging Worker.
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+- [x] 02-01-PLAN.md — Schema bootstrap + per-env wrangler split (events DDL, [env.staging]/[env.production], README operator workflow)
+- [ ] 02-02-PLAN.md — Ingest plumbing (errors.rs 14-code envelope, ratelimit.rs, body.rs 8 KB cap, error_kinds.rs serde-prefix regression)
+- [ ] 02-03-PLAN.md — GET /challenge handler (HMAC-signed challenge, RL_CHALLENGE 10/60s, base64url no-pad)
+- [ ] 02-04-PLAN.md — POST /event handler (D-43 10-step chain, ON CONFLICT DO UPDATE RETURNING bucket_ts, pow::VerifyError::ClockSkew split)
+- [ ] 02-05-PLAN.md — End-to-end staging proof (#[ignore] + staging-smoke feature; manual cargo test only)
 
 ### Phase 3: Rust CLI
 **Goal**: A user who just hit a rate limit on Claude Code or Codex can run `bloclawd --5h --cc` (or `--codex`), see exactly what would be submitted, confirm with `[y/N]`, and have an anonymous, PoW-gated event accepted by the live ingest Worker — with defensive parsers that survive CC/Codex format drift.

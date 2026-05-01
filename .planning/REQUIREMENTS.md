@@ -18,9 +18,9 @@ Requirements for initial release. Each maps to roadmap phases. Auto-included fro
 ### Backend (Pricing & Schema)
 
 - [ ] **BACK-01**: PlanetScale tier confirmed and budget alert configured before any DB write (free tier deprecated 2024)
-- [ ] **BACK-02**: `events` table created in PlanetScale Postgres with `event_id UUID PRIMARY KEY`, `event_type TEXT`, `bucket_ts TIMESTAMPTZ` (server-assigned, floored to 15-min), `payload JSONB`, `received_at TIMESTAMPTZ DEFAULT now()`, split-out `model`, `tier`, `harness`, and `region` columns, plus an index on `(bucket_ts, model, tier, harness, region)`
-- [ ] **BACK-03**: Hyperdrive config attached to PlanetScale; ingest Worker bindings include Hyperdrive (DB), R2 (REPORTS), and a WORKER_SECRET secret (set via wrangler secret put; ≥256 bits of entropy; used to HMAC-sign PoW challenges per spec/pow-v1.md). No KV binding.
-- [ ] **BACK-04**: `compatibility_date` pinned with comment in `wrangler.toml` (rationale: workers-rs 0.8.1 build pipeline; Rust-to-WASM does not need Node compatibility flags). Worker placement set to `smart`. Build pipeline is `worker-build 0.8.1` matched 1:1 with `worker = 0.8.1`, producing the WASM artifact at `apps/worker/build/worker/index.wasm` for the size gate.
+- [x] **BACK-02**: `events` table created in PlanetScale Postgres with `event_id UUID PRIMARY KEY`, `event_type TEXT`, `bucket_ts TIMESTAMPTZ` (server-assigned, floored to 15-min), `payload JSONB`, `received_at TIMESTAMPTZ DEFAULT now()`, split-out `model`, `tier`, `harness`, and `region` columns, plus an index on `(bucket_ts, model, tier, harness, region)`
+- [x] **BACK-03**: Hyperdrive config attached to PlanetScale; ingest Worker bindings include Hyperdrive (DB), R2 (REPORTS), and a WORKER_SECRET secret (set via wrangler secret put; ≥256 bits of entropy; used to HMAC-sign PoW challenges per spec/pow-v1.md). No KV binding.
+- [x] **BACK-04**: `compatibility_date` pinned with comment in `wrangler.toml` (rationale: workers-rs 0.8.1 build pipeline; Rust-to-WASM does not need Node compatibility flags). Worker placement set to `smart`. Build pipeline is `worker-build 0.8.1` matched 1:1 with `worker = 0.8.1`, producing the WASM artifact at `apps/worker/build/worker/index.wasm` for the size gate.
 
 ### Worker Rust Migration (Phase 1.5)
 
@@ -182,9 +182,9 @@ Explicitly excluded. Documented to prevent scope creep. Anti-features tied to bl
 | SPEC-04 | Phase 1 | Pending |
 | SPEC-05 | Phase 1 | Pending |
 | BACK-01 | Phase 1 | Pending |
-| BACK-02 | Phase 2 | Pending |
-| BACK-03 | Phase 2 | Pending |
-| BACK-04 | Phase 2 | Pending |
+| BACK-02 | Phase 2 | Complete |
+| BACK-03 | Phase 2 | Complete |
+| BACK-04 | Phase 2 | Complete |
 | BACK-05 | Phase 1.5 | Pending |
 | BACK-06 | Phase 1.5 | Pending |
 | BACK-07 | Phase 1.5 | Pending |
