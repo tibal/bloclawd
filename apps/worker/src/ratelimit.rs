@@ -27,22 +27,12 @@ pub async fn check(
 
     let limiter = match env.get_binding::<RateLimiter>(binding) {
         Ok(limiter) => limiter,
-        Err(_) => {
-            return Err(IngestError::RateLimited {
-                route,
-                retry_after_s: WINDOW_SECONDS,
-            });
-        }
+        Err(_) => return Err(IngestError::Internal),
     };
 
     let outcome = match limiter.limit(ip).await {
         Ok(outcome) => outcome,
-        Err(_) => {
-            return Err(IngestError::RateLimited {
-                route,
-                retry_after_s: WINDOW_SECONDS,
-            });
-        }
+        Err(_) => return Err(IngestError::Internal),
     };
 
     if outcome.success {
