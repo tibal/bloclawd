@@ -18,30 +18,14 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use event_schema::{EventPayload, Harness, Model, Region, Tier, TokenCounts};
 use pow::{ChallengeId, K_V1, PayloadHash};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-fn sample_event_payload() -> EventPayload {
-    EventPayload {
-        v: 1,
-        model: Model::ClaudeSonnet45,
-        tier: Tier::Pro,
-        harness: Harness::ClaudeCode,
-        region: Region::Na,
-        tokens: TokenCounts {
-            input_5min: 12_345,
-            output_5min: 6_789,
-            cached_read_5min: 1_000,
-            cached_write_5min: 500,
-            input_5h: 123_456,
-            output_5h: 67_890,
-            cached_read_5h: 10_000,
-            cached_write_5h: 5_000,
-        },
-    }
-}
+#[path = "../../../crates/event-schema/tests/fixtures.rs"]
+mod event_schema_fixtures;
+
+use event_schema_fixtures::sample_event_payload;
 
 fn require_env(key: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| {

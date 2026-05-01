@@ -2,9 +2,9 @@
 //!
 //! Per RESEARCH Discretion 13: the canonical "sample event" used by
 //! integration tests across the workspace. Phase 2's apps/worker/tests/e2e_staging.rs
-//! reproduces a structurally-identical helper inline (cross-crate test reuse
-//! requires a [lib] extension we are not pursuing in v1); Phase 3's CLI tests
-//! should follow the same SHAPE.
+//! imports this file as a path module so the deployed staging proof and
+//! event-schema fixture tests share the same helper without adding a separate
+//! test-support crate.
 //!
 //! Constraint (Assumption A5 in RESEARCH): canonical_bytes(payload) MUST be
 //! < 4 KB so the test stays well under the 8 KB POST /event body cap (D-42)
