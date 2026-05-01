@@ -35,6 +35,7 @@ use crate::errors::IngestError;
 use crate::ratelimit;
 
 #[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
 struct WireRequest {
     event_id: String,
     challenge_id: String,
@@ -344,6 +345,23 @@ mod tests {
         let bytes = [42_u8; 16];
         let encoded = URL_SAFE_NO_PAD.encode(bytes);
         assert_eq!(decode_fixed::<16>(&encoded), Some(bytes));
+    }
+
+    #[test]
+    fn wire_request_rejects_unknown_top_level_field() {
+        let raw = serde_json::json!({
+            "event_id": "event",
+            "challenge_id": "challenge",
+            "sig": "sig",
+            "nonce": "nonce",
+            "payload": {},
+            "extra": true,
+        });
+        let err = match serde_json::from_value::<WireRequest>(raw) {
+            Ok(_) => panic!("expected top-level extra field to be rejected"),
+            Err(e) => e,
+        };
+        assert!(err.to_string().starts_with("unknown field"));
     }
 
     #[test]
