@@ -1,11 +1,9 @@
-//! Plan 01.5 Rust Worker scaffold.
-//! `db_ping` lives in db.rs so the Hyperdrive smoke path stays isolated.
+//! Plan 01.5 Rust Worker scaffold with Phase 2 ingest routes.
 
 use worker::*;
 
 mod body;
 mod challenge;
-mod db;
 mod errors;
 mod event;
 mod ratelimit;
@@ -19,7 +17,6 @@ fn start() {
 async fn fetch(req: Request, env: Env, _ctx: Context) -> Result<Response> {
     Router::new()
         .get("/", |_req, _ctx| Response::ok("ok"))
-        .get_async("/db-ping", db::db_ping)
         .get_async("/challenge", challenge::handle_challenge)
         .post_async("/event", event::handle_event)
         .run(req, env)
