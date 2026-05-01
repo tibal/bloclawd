@@ -84,7 +84,7 @@ Plans:
 **Plans**: 5 plans
 Plans:
 - [x] 02-01-PLAN.md — Schema bootstrap + per-env wrangler split (events DDL, [env.staging]/[env.production], README operator workflow)
-- [ ] 02-02-PLAN.md — Ingest plumbing (errors.rs 14-code envelope, ratelimit.rs, body.rs 8 KB cap, error_kinds.rs serde-prefix regression)
+- [x] 02-02-PLAN.md — Ingest plumbing (errors.rs 14-code envelope, ratelimit.rs, body.rs 8 KB cap, error_kinds.rs serde-prefix regression)
 - [ ] 02-03-PLAN.md — GET /challenge handler (HMAC-signed challenge, RL_CHALLENGE 10/60s, base64url no-pad)
 - [ ] 02-04-PLAN.md — POST /event handler (D-43 10-step chain, ON CONFLICT DO UPDATE RETURNING bucket_ts, pow::VerifyError::ClockSkew split)
 - [ ] 02-05-PLAN.md — End-to-end staging proof (#[ignore] + staging-smoke feature; manual cargo test only)

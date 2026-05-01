@@ -40,8 +40,8 @@ Requirements for initial release. Each maps to roadmap phases. Auto-included fro
 - [ ] **INGE-07**: Payload validated by `crates/event-schema::EventPayload` (the shared workspace crate's strongly-typed serde struct + closed enum types from `crates/event-schema/src/enums.rs`) before insert. Validation order: (1) serde rejects unknown enum values natively with the offending variant; (2) `#[serde(deny_unknown_fields)]` on `EventPayload` and `TokenCounts` rejects unknown fields; (3) `EventPayload::validate()` rejects `v != 1` and any token field > 10_000_000. The validator is hand-rolled because closed enum sets plus bounded integer checks are smaller and clearer for WASM than a derive validation dependency.
 - [ ] **INGE-08**: Per-request `tokio-postgres` client opened from the workers-rs 0.8.1 first-class `Hyperdrive` binding (`env.get_binding::<Hyperdrive>("DB")?.connect()?` returns the bridged `Socket` directly) and closed before the Worker response future resolves; no global pool. The connection future is spawned on the wasm event loop via `wasm_bindgen_futures::spawn_local`. Plan 01.5-03 proved upstream `tokio-postgres` rev `35a85bdbfeeac465e092950f65a10d9192418175` works through Hyperdrive using `query_typed_one`; the earlier devsnek fork assumption is no longer current for this smoke path, but can be re-evaluated if Phase 2 needs APIs that cannot avoid prepared statements.
 - [ ] **INGE-09**: PoW input binds payload hash so a solved challenge cannot be reused with a different payload — this is the PRIMARY cryptographic replay defense (no KV consume-on-use exists); event_id PRIMARY KEY and 60s challenge expiry are the secondary database and temporal layers
-- [ ] **INGE-10**: Edge rate-limit per IP via the workers-rs 0.8.1 first-class `RateLimiter` binding (`env.get_binding::<RateLimiter>("RL_CHALLENGE")?.limit(key).await -> RateLimitOutcome`). Two separate bindings declared in `wrangler.toml`: `RL_CHALLENGE` at 10 / 60s for `GET /challenge`, `RL_EVENT` at 3 / 60s for `POST /event`, both keyed on `cf-connecting-ip`. On exceed, return HTTP 429 with `Retry-After: <seconds>` and JSON body `{error: "rate_limited", route: "challenge|event", retry_after_s: N}`. No log line anywhere contains the IP.
-- [ ] **INGE-11**: No log emitter (`worker::console_log!`, structured tracing, or any other) writes per-event timing data, nonce values, `event_id`, IPs, `WORKER_SECRET`, the Hyperdrive connection string, or any field of the Hyperdrive typed binding (`host`, `port`, `user`, `password`, `database`) anywhere in the Worker or in Cron. The CI gate at `.github/workflows/pow.yml` runs a `log-boundary` grep over `apps/worker/` and `crates/` and fails on forbidden `console_log!` output.
+- [x] **INGE-10**: Edge rate-limit per IP via the workers-rs 0.8.1 first-class `RateLimiter` binding (`env.get_binding::<RateLimiter>("RL_CHALLENGE")?.limit(key).await -> RateLimitOutcome`). Two separate bindings declared in `wrangler.toml`: `RL_CHALLENGE` at 10 / 60s for `GET /challenge`, `RL_EVENT` at 3 / 60s for `POST /event`, both keyed on `cf-connecting-ip`. On exceed, return HTTP 429 with `Retry-After: <seconds>` and JSON body `{error: "rate_limited", route: "challenge|event", retry_after_s: N}`. No log line anywhere contains the IP.
+- [x] **INGE-11**: No log emitter (`worker::console_log!`, structured tracing, or any other) writes per-event timing data, nonce values, `event_id`, IPs, `WORKER_SECRET`, the Hyperdrive connection string, or any field of the Hyperdrive typed binding (`host`, `port`, `user`, `password`, `database`) anywhere in the Worker or in Cron. The CI gate at `.github/workflows/pow.yml` runs a `log-boundary` grep over `apps/worker/` and `crates/` and fails on forbidden `console_log!` output.
 
 ### CLI (Rust)
 
@@ -198,8 +198,8 @@ Explicitly excluded. Documented to prevent scope creep. Anti-features tied to bl
 | INGE-07 | Phase 2 | Pending |
 | INGE-08 | Phase 2 | Pending |
 | INGE-09 | Phase 2 | Pending |
-| INGE-10 | Phase 2 | Pending |
-| INGE-11 | Phase 2 | Pending |
+| INGE-10 | Phase 2 | Complete |
+| INGE-11 | Phase 2 | Complete |
 | CLI-01 | Phase 3 | Pending |
 | CLI-02 | Phase 3 | Pending |
 | CLI-03 | Phase 3 | Pending |
