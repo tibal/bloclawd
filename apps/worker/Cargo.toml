@@ -32,7 +32,15 @@ uuid = { version = "1", features = ["v4", "js"] }
 # Phase 2 plan 02-05 end-to-end staging proof (D-46). Manually invoked only:
 #   cargo test -p bloclawd-worker --features staging-smoke -- --ignored happy_path
 # NOT in CI (D-46 — manual to avoid per-PR row pollution and cold-start flakiness).
-staging-smoke = ["dep:reqwest", "dep:tokio", "dep:tokio-postgres-native", "dep:sha2"]
+staging-smoke = [
+  "dep:reqwest",
+  "dep:tokio",
+  "dep:tokio-postgres-native",
+  "dep:tokio-postgres-rustls",
+  "dep:rustls",
+  "dep:rustls-native-certs",
+  "dep:sha2",
+]
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 # Native (non-wasm) deps for the e2e integration test in tests/e2e_staging.rs.
@@ -44,6 +52,9 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"], optional = tr
 # to avoid colliding with the pinned-rev WASM tokio-postgres in [dependencies].
 # The two never coexist in a single binary because the worker is wasm32 and the test is native.
 tokio-postgres-native = { package = "tokio-postgres", version = "0.7", optional = true, default-features = false, features = ["with-chrono-0_4", "with-uuid-1", "runtime"] }
+tokio-postgres-rustls = { version = "0.13", optional = true }
+rustls = { version = "0.23", optional = true }
+rustls-native-certs = { version = "0.8", optional = true }
 sha2 = { workspace = true, optional = true }
 
 [dev-dependencies]

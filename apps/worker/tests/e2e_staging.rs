@@ -51,6 +51,21 @@ fn require_env(key: &str) -> String {
     })
 }
 
+fn tls_connector() -> tokio_postgres_rustls::MakeRustlsConnect {
+    let native_certs = rustls_native_certs::load_native_certs();
+    let mut root_store = rustls::RootCertStore::empty();
+    let (added, _ignored) = root_store.add_parsable_certificates(native_certs.certs);
+    assert!(
+        added > 0,
+        "native certificate store must include at least one trusted root"
+    );
+
+    let config = rustls::ClientConfig::builder()
+        .with_root_certificates(root_store)
+        .with_no_client_auth();
+    tokio_postgres_rustls::MakeRustlsConnect::new(config)
+}
+
 #[tokio::test]
 #[ignore]
 async fn happy_path() {
@@ -126,10 +141,9 @@ async fn happy_path() {
         "bucket_ts looks like second-precision RFC 3339 UTC: {bucket_ts_str}"
     );
 
-    let (pg_client, pg_conn) =
-        tokio_postgres_native::connect(&pg_url, tokio_postgres_native::NoTls)
-            .await
-            .expect("connect to PlanetScale staging branch");
+    let (pg_client, pg_conn) = tokio_postgres_native::connect(&pg_url, tls_connector())
+        .await
+        .expect("connect to PlanetScale staging branch");
     tokio::spawn(async move {
         let _ = pg_conn.await;
     });
