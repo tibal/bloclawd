@@ -9,7 +9,7 @@ pub(crate) fn worker_secret(env: &worker::Env) -> std::result::Result<String, In
 }
 
 fn validate_secret(secret: String) -> std::result::Result<String, IngestError> {
-    if secret.as_bytes().len() < 32 {
+    if secret.len() < 32 {
         return Err(IngestError::Internal);
     }
     Ok(secret)

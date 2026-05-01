@@ -139,11 +139,6 @@ impl IngestError {
             }
         } else if msg.contains("invalid value: integer") && msg.contains("expected u8") {
             Self::VersionInvalid
-        } else if msg.starts_with("missing field") {
-            Self::BadJson {
-                position: None,
-                message: Some(truncate(&msg, 200)),
-            }
         } else {
             Self::BadJson {
                 position: None,
