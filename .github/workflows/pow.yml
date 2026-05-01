@@ -20,7 +20,7 @@ env:
 
 jobs:
   rust-test:
-    name: rust — cargo test -p pow + clippy + build
+    name: rust — cargo test --workspace + clippy + build
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -39,10 +39,10 @@ jobs:
             ${{ runner.os }}-cargo-
       - name: cargo build --workspace
         run: cargo build --workspace --locked
-      - name: cargo test -p pow
-        run: cargo test -p pow --locked
-      - name: cargo clippy -p pow -p xtask
-        run: cargo clippy -p pow -p xtask --locked -- -D warnings
+      - name: cargo test --workspace
+        run: cargo test --workspace --locked
+      - name: cargo clippy --workspace
+        run: cargo clippy --workspace --locked -- -D warnings
       - name: cargo test --features ts-export -p event-schema (writes apps/web/src/generated/*.ts)
         run: cargo test --features ts-export -p event-schema --locked
       - name: ts-rs drift check
