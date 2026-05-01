@@ -42,7 +42,7 @@ tokio = { version = "1", features = ["macros", "rt-multi-thread"], optional = tr
 # Rename trick: native deps name `tokio-postgres-native` aliases crates.io tokio-postgres 0.7.x
 # to avoid colliding with the pinned-rev WASM tokio-postgres in [dependencies].
 # The two never coexist in a single binary because the worker is wasm32 and the test is native.
-tokio-postgres-native = { package = "tokio-postgres", version = "0.7", optional = true, default-features = false, features = ["with-chrono-0_4", "runtime"] }
+tokio-postgres-native = { package = "tokio-postgres", version = "0.7", optional = true, default-features = false, features = ["with-chrono-0_4", "with-uuid-1", "runtime"] }
 sha2 = { workspace = true, optional = true }
 
 [dev-dependencies]
