@@ -22,8 +22,3 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 event-schema = { path = "../../crates/event-schema" }
 pow = { path = "../../crates/pow" }
-
-[profile.release]
-opt-level = "s"
-lto = true
-strip = "symbols"
