@@ -24,6 +24,7 @@ use worker::{Date, Request, Response, Result, RouteContext};
 
 use crate::errors::IngestError;
 use crate::ratelimit;
+use crate::secret;
 
 /// Challenge expiry in seconds (D-41, spec/pow-v1.md). Echoed in the response
 /// body so the client knows the verification window.
@@ -50,9 +51,9 @@ pub async fn handle_challenge(req: Request, ctx: RouteContext<()>) -> Result<Res
     }
 
     // Step 4: WORKER_SECRET from per-env secret (D-38). Drops on return.
-    let secret = match ctx.env.secret("WORKER_SECRET") {
-        Ok(s) => s.to_string(),
-        Err(_) => return IngestError::Internal.into_response(),
+    let secret = match secret::worker_secret(&ctx.env) {
+        Ok(secret) => secret,
+        Err(e) => return e.into_response(),
     };
 
     // Step 5: produce (cid, sig) via the canonical helper. crates/pow lays out:

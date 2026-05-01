@@ -7,6 +7,7 @@ mod challenge;
 mod errors;
 mod event;
 mod ratelimit;
+mod secret;
 
 #[event(start)]
 fn start() {

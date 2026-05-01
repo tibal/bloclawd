@@ -33,6 +33,7 @@ use worker::{Date, Hyperdrive, Request, Response, Result, RouteContext};
 use crate::body::{self, BODY_CAP_EVENT};
 use crate::errors::IngestError;
 use crate::ratelimit;
+use crate::secret;
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -129,9 +130,9 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
     };
     let payload_hash_recomputed = pow::payload_hash(&wire.payload);
 
-    let secret = match ctx.env.secret("WORKER_SECRET") {
-        Ok(s) => s.to_string(),
-        Err(_) => return IngestError::Internal.into_response(),
+    let secret = match secret::worker_secret(&ctx.env) {
+        Ok(secret) => secret,
+        Err(e) => return e.into_response(),
     };
 
     let now_ms = Date::now().as_millis();
