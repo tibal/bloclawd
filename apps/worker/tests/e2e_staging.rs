@@ -8,7 +8,7 @@
 //
 // RUN:
 //   BLOCLAWD_STAGING_URL='https://bloclawd-worker-staging.<account>.workers.dev' \
-//   BLOCLAWD_STAGING_PG_URL='postgres://...staging-branch...' \
+//   PLANETSCALE_STAGING_URL='postgres://...staging-branch...' \
 //     cargo test -p bloclawd-worker --features staging-smoke -- --ignored happy_path
 //
 // NEVER in CI. Manual invocation by an operator after a staging deploy.
@@ -30,7 +30,7 @@ use event_schema_fixtures::sample_event_payload;
 fn require_env(key: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| {
         panic!(
-            "{key} not set. Run via:\n  BLOCLAWD_STAGING_URL='...' BLOCLAWD_STAGING_PG_URL='...' \\\n    cargo test -p bloclawd-worker --features staging-smoke -- --ignored happy_path"
+            "{key} not set. Run via:\n  BLOCLAWD_STAGING_URL='...' PLANETSCALE_STAGING_URL='...' \\\n    cargo test -p bloclawd-worker --features staging-smoke -- --ignored happy_path"
         )
     })
 }
@@ -53,10 +53,12 @@ fn tls_connector() -> tokio_postgres_rustls::MakeRustlsConnect {
 #[tokio::test]
 #[ignore]
 async fn happy_path() {
+    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
+
     let url = require_env("BLOCLAWD_STAGING_URL")
         .trim_end_matches('/')
         .to_string();
-    let pg_url = require_env("BLOCLAWD_STAGING_PG_URL");
+    let pg_url = require_env("PLANETSCALE_STAGING_URL");
 
     let client = reqwest::Client::new();
     let challenge: serde_json::Value = client

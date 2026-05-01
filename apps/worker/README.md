@@ -47,17 +47,18 @@ Per Pitfall 8 (RESEARCH.md): `wrangler secret put WORKER_SECRET` (no `--env`) se
 
 Rotation (manual; v2 will introduce key id + 2-key overlap per CONTEXT.md `<deferred>`): repeat the per-env command above when rotating; old challenges issued with the previous secret will fail HMAC verify within 60s and clients will get fresh ones.
 
-### 3. Production Hyperdrive setup (one-time)
+### 3. Hyperdrive configs (one-time per env)
 
-`apps/worker/wrangler.toml`'s `[[env.production.hyperdrive]] id` is a placeholder `REPLACE_WITH_PROD_HYPERDRIVE_ID`; the prod Hyperdrive config does not yet exist.
+Each PlanetScale branch needs its own Hyperdrive config. Both ids are pinned in `apps/worker/wrangler.toml`:
 
-1. In the Cloudflare dashboard: Workers & Pages -> Hyperdrive -> "Create configuration" pointing at `$PLANETSCALE_MAIN_URL`.
-2. Copy the resulting `id` (UUID-shape).
-3. Edit `apps/worker/wrangler.toml` and replace the placeholder with the real id.
-4. Commit the wrangler.toml change.
-5. A production dry-run deploy should now succeed.
+- staging Hyperdrive id `4d7287b7f8194d96a0a95163a29c0134` -> PlanetScale `staging` branch
+- production Hyperdrive id `9e97e64d73c945cab3548a0dceb05c4b` -> PlanetScale `main` branch
 
-The staging Hyperdrive id is `9e97e64d73c945cab3548a0dceb05c4b` (already in `wrangler.toml`).
+To add a new env (or rotate after a credential change):
+
+1. In the Cloudflare dashboard: Workers & Pages -> Hyperdrive -> "Create configuration" pointing at the matching PlanetScale branch URL.
+2. Copy the resulting `id` (UUID-shape) into the corresponding `[[env.<name>.hyperdrive]] id` in `apps/worker/wrangler.toml`.
+3. Commit the wrangler.toml change.
 
 Per Pitfall 7: if the PlanetScale branch URL changes (credential rotation), update the matching Hyperdrive config in the dashboard AND redeploy the Worker.
 
@@ -74,7 +75,7 @@ A native Rust integration test exercises the full PoW flow against a deployed st
 
 ```bash
 BLOCLAWD_STAGING_URL='https://bloclawd-worker-staging.<account>.workers.dev' \
-BLOCLAWD_STAGING_PG_URL='postgres://...staging-branch-direct-url...' \
+PLANETSCALE_STAGING_URL='postgres://...staging-branch-direct-url...' \
   cargo test -p bloclawd-worker --features staging-smoke -- --ignored happy_path
 ```
 
