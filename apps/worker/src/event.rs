@@ -27,7 +27,7 @@ use serde_json::json;
 use tokio_postgres::config::Config as PgConfig;
 use tokio_postgres::tls::NoTls;
 use tokio_postgres::types::Type;
-use uuid::Uuid;
+use uuid::{Uuid, Variant, Version};
 use worker::{Date, Hyperdrive, Request, Response, Result, RouteContext};
 
 use crate::body::{self, BODY_CAP_EVENT};
@@ -154,7 +154,9 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
             .into_response();
         }
     };
-    if event_id.get_version_num() != 4 {
+    if event_id.get_variant() != Variant::RFC4122
+        || event_id.get_version() != Some(Version::Random)
+    {
         return IngestError::BadJson {
             position: None,
             message: None,
