@@ -22,7 +22,7 @@ use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use event_schema::{EventPayload, canonical_bytes};
 use pow::{ChallengeId, K_V1, Nonce, Sig, VerifyRequest};
-use serde::Deserialize;
+use serde::{Deserialize, de::IntoDeserializer};
 use serde_json::json;
 use tokio_postgres::config::Config as PgConfig;
 use tokio_postgres::tls::NoTls;
@@ -68,9 +68,17 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
     };
 
     // Step 4: typed payload deserialize (closed enum plus deny_unknown_fields).
-    let payload: EventPayload = match serde_json::from_value(wire.payload.clone()) {
+    let deser = wire.payload.clone().into_deserializer();
+    let payload: EventPayload = match serde_path_to_error::deserialize(deser) {
         Ok(v) => v,
-        Err(e) => return IngestError::classify_serde_error(e).into_response(),
+        Err(e) => {
+            let msg = e.inner().to_string();
+            if msg.starts_with("unknown variant") {
+                let field = enum_invalid_field(&e.path().to_string());
+                return IngestError::EnumInvalid { field }.into_response();
+            }
+            return IngestError::classify_serde_error(e.into_inner()).into_response();
+        }
     };
 
     // Step 5: payload bounds and version.
@@ -154,8 +162,7 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
             .into_response();
         }
     };
-    if event_id.get_variant() != Variant::RFC4122
-        || event_id.get_version() != Some(Version::Random)
+    if event_id.get_variant() != Variant::RFC4122 || event_id.get_version() != Some(Version::Random)
     {
         return IngestError::BadJson {
             position: None,
@@ -302,6 +309,13 @@ fn extract_validate_field(msg: &str) -> String {
         .to_string()
 }
 
+fn enum_invalid_field(path: &str) -> String {
+    match path {
+        "model" | "tier" | "harness" | "region" => path.to_string(),
+        _ => "unknown".to_string(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -360,5 +374,15 @@ mod tests {
     #[test]
     fn validate_field_extraction_falls_back_on_empty() {
         assert_eq!(extract_validate_field(""), "unknown");
+    }
+
+    #[test]
+    fn enum_invalid_field_only_allows_payload_enum_fields() {
+        assert_eq!(enum_invalid_field("model"), "model");
+        assert_eq!(enum_invalid_field("tokens.input_5min"), "unknown");
+        assert_eq!(
+            enum_invalid_field("bogus-model-name-not-in-enum"),
+            "unknown"
+        );
     }
 }

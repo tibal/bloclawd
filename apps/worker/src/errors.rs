@@ -135,7 +135,7 @@ impl IngestError {
             }
         } else if msg.starts_with("unknown variant") {
             Self::EnumInvalid {
-                field: extract_backticked(&msg).unwrap_or_else(|| "<unknown>".into()),
+                field: "unknown".into(),
             }
         } else if msg.contains("invalid value: integer") && msg.contains("expected u8") {
             Self::VersionInvalid
@@ -175,6 +175,19 @@ fn truncate(s: &str, max: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde::Deserialize;
+
+    #[derive(Debug, Deserialize)]
+    #[allow(dead_code)]
+    struct EnumCarrier {
+        model: DemoEnum,
+    }
+
+    #[derive(Debug, Deserialize)]
+    enum DemoEnum {
+        #[serde(rename = "known")]
+        Known,
+    }
 
     #[test]
     fn extract_backticked_finds_first_token() {
@@ -194,5 +207,15 @@ mod tests {
         let long = "x".repeat(500);
         let truncated = truncate(&long, 200);
         assert_eq!(truncated.len(), 200);
+    }
+
+    #[test]
+    fn classify_unknown_variant_does_not_echo_value() {
+        let err =
+            serde_json::from_str::<EnumCarrier>(r#"{ "model": "attacker-value" }"#).unwrap_err();
+        match IngestError::classify_serde_error(err) {
+            IngestError::EnumInvalid { field } => assert_eq!(field, "unknown"),
+            other => panic!("expected enum_invalid, got {other:?}"),
+        }
     }
 }
