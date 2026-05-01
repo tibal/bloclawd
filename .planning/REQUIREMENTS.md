@@ -31,7 +31,7 @@ Requirements for initial release. Each maps to roadmap phases. Auto-included fro
 
 ### Ingest Worker
 
-- [ ] **INGE-01**: GET /challenge issues a 32-byte challenge_id (8B unix_ms_be || 24B crypto_random) plus a 32-byte HMAC-SHA256(WORKER_SECRET, challenge_id) signature, returns {challenge_id, sig, difficulty, expires_in: 60} — no KV write, stateless
+- [x] **INGE-01**: GET /challenge issues a 32-byte challenge_id (8B unix_ms_be || 24B crypto_random) plus a 32-byte HMAC-SHA256(WORKER_SECRET, challenge_id) signature, returns {challenge_id, sig, difficulty, expires_in: 60} — no KV write, stateless
 - [ ] **INGE-02**: POST /event validates the request body, recomputes HMAC over challenge_id with WORKER_SECRET (constant-time compare against received sig), rejects if signature invalid; decodes unix_ms_be from challenge_id[0..8] and rejects if (now - unix_ms_be) > 60s or unix_ms_be > now + 5s clock-skew
 - [ ] **INGE-03**: `POST /event` verifies PoW by calling `crates/pow::verify` directly from the Rust Worker (`apps/worker/src/lib.rs`). The pre-Phase-1.5 TypeScript verifier was deleted in 01.5-04; there is no parallel TypeScript verifier and no parallel fixture loader.
 - [ ] **INGE-04**: POST /event recomputes payload_hash = SHA-256(JCS(payload)) server-side, rejects if it differs from the payload_hash bound into the PoW input; on PoW + payload-hash + signature + expiry success, inserts to PlanetScale Postgres via Hyperdrive with `ON CONFLICT (event_id) DO NOTHING` on `event_id UUID PRIMARY KEY` for idempotency
@@ -189,7 +189,7 @@ Explicitly excluded. Documented to prevent scope creep. Anti-features tied to bl
 | BACK-06 | Phase 1.5 | Pending |
 | BACK-07 | Phase 1.5 | Pending |
 | BACK-08 | Phase 1.5 | Pending |
-| INGE-01 | Phase 2 | Pending |
+| INGE-01 | Phase 2 | Complete |
 | INGE-02 | Phase 2 | Pending |
 | INGE-03 | Phase 2 | Pending |
 | INGE-04 | Phase 2 | Pending |

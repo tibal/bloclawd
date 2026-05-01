@@ -85,7 +85,7 @@ Plans:
 Plans:
 - [x] 02-01-PLAN.md — Schema bootstrap + per-env wrangler split (events DDL, [env.staging]/[env.production], README operator workflow)
 - [x] 02-02-PLAN.md — Ingest plumbing (errors.rs 14-code envelope, ratelimit.rs, body.rs 8 KB cap, error_kinds.rs serde-prefix regression)
-- [ ] 02-03-PLAN.md — GET /challenge handler (HMAC-signed challenge, RL_CHALLENGE 10/60s, base64url no-pad)
+- [x] 02-03-PLAN.md — GET /challenge handler (HMAC-signed challenge, RL_CHALLENGE 10/60s, base64url no-pad)
 - [ ] 02-04-PLAN.md — POST /event handler (D-43 10-step chain, ON CONFLICT DO UPDATE RETURNING bucket_ts, pow::VerifyError::ClockSkew split)
 - [ ] 02-05-PLAN.md — End-to-end staging proof (#[ignore] + staging-smoke feature; manual cargo test only)
 
@@ -136,7 +136,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Foundations | 5/6 | Executing — awaiting GitHub branch-protection checkpoint | - |
 | 1.5. Worker Rust Migration (INSERTED) | 5/5 | Complete | 2026-05-01 |
-| 2. Ingest Backbone | 0/TBD | Ready to discuss | - |
+| 2. Ingest Backbone | 3/5 | In Progress | - |
 | 3. Rust CLI | 0/TBD | Not started | - |
 | 4. Aggregation + Dashboard | 0/TBD | Not started | - |
 | 5. Launch | 0/TBD | Not started | - |
