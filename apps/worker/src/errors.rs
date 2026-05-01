@@ -93,9 +93,10 @@ impl IngestError {
                 (400, json!({ "error": "unknown_field", "field": field }))
             }
             Self::VersionInvalid => (400, json!({ "error": "version_invalid" })),
-            Self::TokenOutOfRange { field } => {
-                (400, json!({ "error": "token_out_of_range", "field": field }))
-            }
+            Self::TokenOutOfRange { field } => (
+                400,
+                json!({ "error": "token_out_of_range", "field": field }),
+            ),
             Self::SignatureInvalid => (401, json!({ "error": "signature_invalid" })),
             Self::ChallengeExpired => (401, json!({ "error": "challenge_expired" })),
             Self::ClockSkew => (401, json!({ "error": "clock_skew" })),
@@ -117,6 +118,7 @@ impl IngestError {
         match e {
             pow::VerifyError::InvalidSig => Self::SignatureInvalid,
             pow::VerifyError::Expired => Self::ChallengeExpired,
+            pow::VerifyError::ClockSkew => Self::ClockSkew,
             pow::VerifyError::PayloadHashMismatch => Self::PayloadHashMismatch,
             pow::VerifyError::PowInsufficient { .. } => Self::PowInvalid,
             pow::VerifyError::MalformedChallenge => Self::Internal,

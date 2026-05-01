@@ -68,7 +68,7 @@ pub fn verify_challenge(
             .map_err(|_| VerifyError::MalformedChallenge)?,
     );
     if issued_ms > now_ms.saturating_add(5_000) {
-        return Err(VerifyError::Expired);
+        return Err(VerifyError::ClockSkew);
     }
     if now_ms.saturating_sub(issued_ms) > expiry_ms {
         return Err(VerifyError::Expired);
@@ -168,6 +168,8 @@ pub enum VerifyError {
     MalformedChallenge,
     #[error("invalid HMAC secret")]
     InvalidSecret,
+    #[error("clock skew: challenge issued in the future relative to verifier")]
+    ClockSkew,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -255,6 +257,30 @@ mod tests {
         let err = verify_challenge(secret, &cid, &sig, now + 60_001, 60_000)
             .expect_err("expired challenge rejected");
         assert!(matches!(err, VerifyError::Expired));
+    }
+
+    #[test]
+    fn challenge_rejects_clock_skew() {
+        // Challenge issued 10 seconds in the future relative to verifier.
+        let secret = b"test-secret-do-not-use-in-prod";
+        let now_ms = 1_760_000_000_000_u64;
+        let issued_ms = now_ms + 10_000;
+        let (cid, sig) = issue_challenge(secret, issued_ms, [0_u8; 24]);
+        let err = verify_challenge(secret, &cid, &sig, now_ms, 60_000).unwrap_err();
+        assert!(
+            matches!(err, VerifyError::ClockSkew),
+            "expected VerifyError::ClockSkew, got: {err:?}"
+        );
+    }
+
+    #[test]
+    fn challenge_accepts_within_clock_skew_tolerance() {
+        // Challenge issued 3 seconds in the future, within the 5s tolerance.
+        let secret = b"test-secret-do-not-use-in-prod";
+        let now_ms = 1_760_000_000_000_u64;
+        let issued_ms = now_ms + 3_000;
+        let (cid, sig) = issue_challenge(secret, issued_ms, [0_u8; 24]);
+        verify_challenge(secret, &cid, &sig, now_ms, 60_000).expect("3s skew is within tolerance");
     }
 
     #[test]
