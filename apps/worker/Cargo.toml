@@ -20,6 +20,7 @@ wasm-bindgen-futures = "0.4"
 console_error_panic_hook = "0.1"
 serde = { workspace = true }
 serde_json = { workspace = true }
+thiserror = { workspace = true }
 event-schema = { path = "../../crates/event-schema" }
 pow = { path = "../../crates/pow" }
 base64 = { workspace = true }

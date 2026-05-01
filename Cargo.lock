@@ -83,6 +83,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "thiserror 1.0.69",
  "tokio",
  "tokio-postgres 0.7.17 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio-postgres 0.7.17 (git+https://github.com/rust-postgres/rust-postgres?rev=35a85bdbfeeac465e092950f65a10d9192418175)",
