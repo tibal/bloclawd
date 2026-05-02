@@ -1,1 +1,33 @@
-SENTINEL_CC_DRYRUN
+bloclawd dry-run - group 10000000... - 1 events
+
++------------------------+------------+-------------+------------------+-------------------+------------+------------+-----------------+-----------------+
+| model                  | input_5min | output_5min | cached_read_5min | cached_write_5min |   input_5h |  output_5h |  cached_read_5h | cached_write_5h |
++------------------------+------------+-------------+------------------+-------------------+------------+------------+-----------------+-----------------+
+| claude-sonnet-4-5      |        150 |         275 |               14 |                 8 |        150 |        275 |              14 |               8 |
++------------------------+------------+-------------+------------------+-------------------+------------+------------+-----------------+-----------------+
+
+--- event 1/1 ---
+{
+    "challenge_id": "",
+    "event_id": "IAAAAAAAQACAAAAAAAAAAQ",
+    "nonce": "",
+    "payload": {
+        "harness": "claude-code",
+        "model": "claude-sonnet-4-5",
+        "region": "NA",
+        "tier": "max20",
+        "tokens": {
+            "cached_read_5h": 14,
+            "cached_read_5min": 14,
+            "cached_write_5h": 8,
+            "cached_write_5min": 8,
+            "input_5h": 150,
+            "input_5min": 150,
+            "output_5h": 275,
+            "output_5min": 275
+        },
+        "v": 1
+    },
+    "sig": "",
+    "submission_group_id": "EAAAAAAAQACAAAAAAAAAAQ"
+}
