@@ -2,9 +2,9 @@
 
 pub mod aggregate;
 pub mod api;
+pub mod canonical;
 pub mod cli;
 pub mod config;
-pub mod canonical;
 pub mod min_version;
 pub mod parsers;
 pub mod probe;

@@ -1,16 +1,53 @@
-//! Rate-limit signature classifiers.
+//! Rate-limit signature classifiers (D-78 + RESEARCH sections 3 and 4).
+//!
+//! Matching uses the lowercased union of stdout and stderr. Do not log inputs:
+//! they may contain user prompt content.
 
-pub static CC_RATE_LIMIT_TOKENS: &[&str] = &[];
-pub static CC_RATE_LIMIT_EXCLUSIONS: &[&str] = &[];
-pub static CODEX_RATE_LIMIT_TOKENS: &[&str] = &[];
-pub static CODEX_RATE_LIMIT_EXCLUSIONS: &[&str] = &[];
+pub static CC_RATE_LIMIT_TOKENS: &[&str] = &[
+    "usage limit reached",
+    "5-hour limit reached",
+    "weekly limit reached",
+    "limit reached",
+    "rate limit reached",
+];
 
-pub fn cc_is_rate_limited(_stdout: &str, _stderr: &str) -> bool {
-    false
+pub static CC_RATE_LIMIT_EXCLUSIONS: &[&str] =
+    &["server is temporarily limiting", "anthropic_api_key"];
+
+pub static CODEX_RATE_LIMIT_TOKENS: &[&str] = &[
+    "hit your usage limit",
+    "usage limit reached",
+    "rate limit reached",
+];
+
+pub static CODEX_RATE_LIMIT_EXCLUSIONS: &[&str] = &["openai_api_key"];
+
+pub fn cc_is_rate_limited(stdout: &str, stderr: &str) -> bool {
+    let combined = format!("{stdout}\n{stderr}").to_lowercase();
+    if CC_RATE_LIMIT_EXCLUSIONS
+        .iter()
+        .any(|token| combined.contains(token))
+    {
+        return false;
+    }
+
+    CC_RATE_LIMIT_TOKENS
+        .iter()
+        .any(|token| combined.contains(token))
 }
 
-pub fn codex_is_rate_limited(_stdout: &str, _stderr: &str) -> bool {
-    false
+pub fn codex_is_rate_limited(stdout: &str, stderr: &str) -> bool {
+    let combined = format!("{stdout}\n{stderr}").to_lowercase();
+    if CODEX_RATE_LIMIT_EXCLUSIONS
+        .iter()
+        .any(|token| combined.contains(token))
+    {
+        return false;
+    }
+
+    CODEX_RATE_LIMIT_TOKENS
+        .iter()
+        .any(|token| combined.contains(token))
 }
 
 #[cfg(test)]
@@ -27,7 +64,10 @@ mod tests {
 
     #[test]
     fn cc_matches_five_hour_limit_reached() {
-        assert!(cc_is_rate_limited("5-hour limit reached - resets 14:30", ""));
+        assert!(cc_is_rate_limited(
+            "5-hour limit reached - resets 14:30",
+            ""
+        ));
     }
 
     #[test]
