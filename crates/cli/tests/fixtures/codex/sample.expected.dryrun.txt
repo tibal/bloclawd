@@ -1,0 +1,34 @@
+bloclawd dry-run - group 10000000... - 1 events
+
++------------------------+------------+-------------+------------------+-------------------+------------+------------+-----------------+-----------------+
+| model                  | input_5min | output_5min | cached_read_5min | cached_write_5min |   input_5h |  output_5h |  cached_read_5h | cached_write_5h |
++------------------------+------------+-------------+------------------+-------------------+------------+------------+-----------------+-----------------+
+| gpt-5.5                |        500 |          90 |               48 |                 0 |        500 |         90 |              48 |               0 |
++------------------------+------------+-------------+------------------+-------------------+------------+------------+-----------------+-----------------+
+
+--- event 1/1 ---
+{
+    "challenge_id": "",
+    "event_id": "IAAAAAAAQACAAAAAAAAAAg",
+    "limit_type": "5h",
+    "nonce": "",
+    "payload": {
+        "harness": "codex",
+        "model": "gpt-5.5",
+        "region": "NA",
+        "tier": "max20",
+        "tokens": {
+            "cached_read_5h": 48,
+            "cached_read_5min": 48,
+            "cached_write_5h": 0,
+            "cached_write_5min": 0,
+            "input_5h": 500,
+            "input_5min": 500,
+            "output_5h": 90,
+            "output_5min": 90
+        },
+        "v": 1
+    },
+    "sig": "",
+    "submission_group_id": "EAAAAAAAQACAAAAAAAAAAg"
+}

@@ -1,0 +1,96 @@
+# Pinned 2026-04-30: workers-rs 0.8.1 Rust-to-WASM build pipeline; no Node compatibility flag needed.
+name = "bloclawd-worker"
+compatibility_date = "2026-04-01"
+main = "build/worker/shim.mjs"
+
+[build]
+command = "cargo install -q worker-build@0.8.1 && worker-build --release"
+
+[placement]
+mode = "smart"
+
+# Phase 4 cron triggers - Workers Paid plan REQUIRED ($5/mo).
+# Free plan caps cron CPU at 10ms - insufficient for ridge fits + R2 writes.
+# See apps/worker/README.md "Phase 4 Cloudflare Workers Paid plan requirement".
+[triggers]
+crons = ["0 3 * * *"]   # daily 03:00 UTC for `wrangler dev` defaults (matches production cadence)
+
+# Top-level dev defaults (only used by `wrangler dev`). Real deploys go through
+# `wrangler deploy --env staging` / `wrangler deploy --env production`.
+[[hyperdrive]]
+binding = "DB"
+id = "4d7287b7f8194d96a0a95163a29c0134"
+localConnectionString = "postgres://localhost:5432/bloclawd_dev"
+
+# ---------- staging ----------
+# Deploy: wrangler deploy --env staging
+# PlanetScale branch: staging
+# Worker URL: bloclawd-worker-staging.<account>.workers.dev
+[env.staging]
+name = "bloclawd-worker-staging"
+
+[[env.staging.hyperdrive]]
+binding = "DB"
+id = "4d7287b7f8194d96a0a95163a29c0134"
+localConnectionString = "postgres://localhost:5432/bloclawd_dev"
+
+[[env.staging.r2_buckets]]
+binding = "BUCKET"
+bucket_name = "bloclawd-reports-staging"
+preview_bucket_name = "bloclawd-reports-staging"
+
+[env.staging.triggers]
+crons = ["*/15 * * * *"]   # 15-min ticks for staging UAT (D-87 - staging gets faster cadence to surface bugs)
+
+[[env.staging.ratelimits]]
+name = "RL_CHALLENGE"
+namespace_id = "1001"
+
+  [env.staging.ratelimits.simple]
+  limit = 10
+  period = 60
+
+[[env.staging.ratelimits]]
+name = "RL_EVENT"
+namespace_id = "1002"
+
+  [env.staging.ratelimits.simple]
+  limit = 3
+  period = 60
+
+# ---------- production ----------
+# Deploy: wrangler deploy --env production
+# PlanetScale branch: main
+# Worker URL: bloclawd-worker.<account>.workers.dev (custom domain attachment deferred to Phase 5 per D-39)
+# IMPORTANT: replace the production Hyperdrive placeholder before first production deploy.
+# See apps/worker/README.md section "Production Hyperdrive setup".
+[env.production]
+name = "bloclawd-worker"
+
+[[env.production.hyperdrive]]
+binding = "DB"
+id = "9e97e64d73c945cab3548a0dceb05c4b"
+localConnectionString = "postgres://localhost:5432/bloclawd_dev"
+
+[[env.production.r2_buckets]]
+binding = "BUCKET"
+bucket_name = "bloclawd-reports"
+
+[env.production.triggers]
+crons = ["0 3 * * *"]   # daily 03:00 UTC; v1 cadence (D-87 AGGR-01 amendment)
+
+[[env.production.ratelimits]]
+name = "RL_CHALLENGE"
+namespace_id = "2001"
+
+  [env.production.ratelimits.simple]
+  limit = 10
+  period = 60
+
+[[env.production.ratelimits]]
+name = "RL_EVENT"
+namespace_id = "2002"
+
+  [env.production.ratelimits.simple]
+  limit = 3
+  period = 60

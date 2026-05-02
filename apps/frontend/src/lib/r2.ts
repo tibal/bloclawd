@@ -1,0 +1,163 @@
+/// <reference types="vite/client" />
+import { useQueries, useQuery } from "@tanstack/react-query";
+
+const DEFAULT_R2_BASE_URL = "https://bloclawd-reports-staging.example.r2.dev";
+const REPORTS_ROOT = "reports/v1";
+const R2_BASE_URL = (
+  import.meta.env.VITE_R2_BASE_URL || DEFAULT_R2_BASE_URL
+).replace(/\/+$/, "");
+
+class PromisePool {
+  private active = 0;
+  private queue: Array<() => void> = [];
+
+  constructor(private cap: number) {}
+
+  async run<T>(fn: () => Promise<T>): Promise<T> {
+    if (this.active >= this.cap) {
+      await new Promise<void>((resolve) => this.queue.push(resolve));
+    }
+    this.active++;
+    try {
+      return await fn();
+    } finally {
+      this.active--;
+      this.queue.shift()?.();
+    }
+  }
+}
+
+const pool = new PromisePool(8);
+
+export type Tier = "q15" | "h1" | "d1";
+export type IngestHealth = "healthy" | "degraded" | "down";
+export type WeightSource = "cohort" | "tier+harness" | "tier" | "prior";
+
+export type Percentiles = {
+  p10: number;
+  p25: number;
+  p50: number;
+  p75: number;
+  p90: number;
+};
+
+export type PercentileEncoding =
+  | { Mean: Percentiles }
+  | { Bin: Percentiles };
+
+export type ModelCell = {
+  model: string;
+  n_with_model: number;
+  weights: readonly number[];
+  weight_source: WeightSource;
+  tokens_to_limit_if_only: PercentileEncoding | null;
+};
+
+export type BucketCell = {
+  tier: string;
+  harness: string;
+  region: string;
+  limit_type: "5h" | "weekly";
+  n_submissions: number;
+  trim_rate: number;
+  trim_rate_alert: boolean;
+  unified_cost: PercentileEncoding | null;
+  models: ModelCell[];
+  insufficient_data: boolean;
+};
+
+export type BucketEnvelope = {
+  schema_version: "v1";
+  bucket_ts: string;
+  tier_resolution: Tier;
+  bin_edges: readonly number[];
+  cells: BucketCell[];
+};
+
+export type Manifest = {
+  schema_version: "v1";
+  last_updated_ts: string;
+  tiers: Record<Tier, string[]>;
+};
+
+export type StatusJson = {
+  schema_version: "v1";
+  last_cron_success_ts: string;
+  last_cron_attempted_ts: string;
+  ingest_health: IngestHealth;
+  total_events_lifetime: number;
+  approximate_contributors_30d: number;
+  approximate_contributors_window_days: number;
+};
+
+export type BucketResult = {
+  data: BucketEnvelope | undefined;
+  isLoading: boolean;
+  error: Error | null;
+};
+
+export async function fetchR2<T>(url: string): Promise<T> {
+  return pool.run(async () => {
+    const response = await fetch(url, {
+      headers: { accept: "application/json" },
+    });
+    if (!response.ok) {
+      throw new Error(`r2 ${response.status} ${url}`);
+    }
+    return (await response.json()) as T;
+  });
+}
+
+export function useManifest() {
+  const url = reportUrl("manifest.json");
+  return useQuery({
+    queryKey: ["r2", url],
+    queryFn: () => fetchR2<Manifest>(url),
+    staleTime: 60_000,
+  });
+}
+
+export function useBucket(tier: Tier, path: string) {
+  const url = bucketUrl(tier, path);
+  return useQuery({
+    queryKey: ["r2", url],
+    queryFn: () => fetchR2<BucketEnvelope>(url),
+    staleTime: Infinity,
+  });
+}
+
+export function useStatus() {
+  const url = reportUrl("_status.json");
+  return useQuery({
+    queryKey: ["r2", url],
+    queryFn: () => fetchR2<StatusJson>(url),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useBuckets(tier: Tier, paths: string[]): BucketResult[] {
+  const queries = useQueries({
+    queries: paths.map((path) => {
+      const url = bucketUrl(tier, path);
+      return {
+        queryKey: ["r2", url],
+        queryFn: () => fetchR2<BucketEnvelope>(url),
+        staleTime: Infinity,
+      };
+    }),
+  });
+
+  return queries.map((query) => ({
+    data: query.data,
+    isLoading: query.isLoading,
+    error: (query.error as Error | null) ?? null,
+  }));
+}
+
+function reportUrl(path: string): string {
+  return `${R2_BASE_URL}/${REPORTS_ROOT}/${path.replace(/^\/+/, "")}`;
+}
+
+function bucketUrl(tier: Tier, path: string): string {
+  return reportUrl(`${tier}/${path}`);
+}

@@ -1,0 +1,15 @@
+{
+  "limit_type": "5h",
+  "tokens": {
+    "claude-sonnet-4-5": {
+      "cached_read_5h": 14,
+      "cached_read_5min": 14,
+      "cached_write_5h": 8,
+      "cached_write_5min": 8,
+      "input_5h": 150,
+      "input_5min": 150,
+      "output_5h": 275,
+      "output_5min": 275
+    }
+  }
+}

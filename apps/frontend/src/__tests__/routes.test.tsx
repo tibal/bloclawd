@@ -1,0 +1,78 @@
+import { createMemoryHistory, createRouter, RouterProvider } from "@tanstack/react-router";
+import { flushSync } from "react-dom";
+import { createRoot } from "react-dom/client";
+import { describe, expect, it, vi } from "vitest";
+
+import { routeTree } from "@/routeTree.gen";
+
+vi.mock("@/lib/dashboard-data", () => ({
+  useChartData: () => ({
+    data: null,
+    compareData: null,
+    loading: false,
+    error: null,
+    bucketsLoaded: 0,
+    bucketsTotal: 0,
+  }),
+  useDelayedLoading: () => false,
+}));
+
+vi.mock("@/lib/r2", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/r2")>();
+  return {
+    ...actual,
+    useStatus: () => ({
+      data: {
+        schema_version: "v1",
+        last_cron_success_ts: new Date().toISOString(),
+        last_cron_attempted_ts: new Date().toISOString(),
+        ingest_health: "healthy",
+        total_events_lifetime: 0,
+        approximate_contributors_30d: 0,
+        approximate_contributors_window_days: 30,
+      },
+      isLoading: false,
+      error: null,
+    }),
+  };
+});
+
+async function renderPath(path: string) {
+  const history = createMemoryHistory({ initialEntries: [path] });
+  const router = createRouter({ history, routeTree });
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  flushSync(() => {
+    root.render(<RouterProvider router={router} />);
+  });
+  await router.load();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  return {
+    container,
+    cleanup: () => {
+      root.unmount();
+      container.remove();
+    },
+  };
+}
+
+describe("frontend routes", () => {
+  it.each([
+    ["/", "When do AI subscription users actually hit limits?"],
+    ["/dashboard", "Pick a tier"],
+    ["/methodology", "How bloclawd computes what you see"],
+    ["/methodology/changelog", "Methodology changelog"],
+    ["/data", "What your CLI submits"],
+  ])("renders %s", async (path, heading) => {
+    const { container, cleanup } = await renderPath(path);
+
+    try {
+      expect(container.textContent).toContain(heading);
+    } finally {
+      cleanup();
+    }
+  });
+});

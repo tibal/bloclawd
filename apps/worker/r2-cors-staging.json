@@ -1,0 +1,16 @@
+{
+  "rules": [
+    {
+      "allowed": {
+        "origins": [
+          "https://bloclawd-frontend-staging.<account-subdomain>.workers.dev",
+          "https://bloclawd-frontend.<account-subdomain>.workers.dev"
+        ],
+        "methods": ["GET", "HEAD"],
+        "headers": ["accept"]
+      },
+      "exposeHeaders": ["cache-control", "content-type", "etag", "last-modified"],
+      "maxAgeSeconds": 3000
+    }
+  ]
+}

@@ -1,0 +1,51 @@
+# Cargo workspace for the bloclawd Rust members.
+# Members are added as plans implement them: crates/pow (Plan 03), xtask (Plan 03).
+# crates/cli arrives in Phase 3.
+
+[workspace]
+resolver = "3"
+members = [
+  "crates/pow",
+  "crates/event-schema",
+  "crates/cli",
+  "apps/worker",
+  "xtask",
+]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.86"
+license = "Apache-2.0"
+repository = "https://github.com/tibal/bloclawd"
+authors = ["bloclawd maintainers"]
+
+[workspace.dependencies]
+# Pinned shared dependency versions; per-crate Cargo.toml files reference these via `workspace = true`.
+sha2 = "0.10"
+hmac = "0.12"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_jcs = "0.2"
+ts-rs = "12"
+base64 = "0.22"
+hex = "0.4"
+anyhow = "1"
+thiserror = "1"
+clap = { version = "4", features = ["derive"] }
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
+sys-locale = "0.3"
+chrono = "0.4"
+zstd = "0.13"
+uuid = { version = "1", features = ["v4"] }
+toml = "0.8"
+tokio = { version = "1", default-features = false, features = ["macros", "process", "time", "rt"] }
+indicatif = "0.18"
+
+[profile.release]
+opt-level = "s"
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
+
+[profile.release.package.bloclawd-worker]
+opt-level = "s"

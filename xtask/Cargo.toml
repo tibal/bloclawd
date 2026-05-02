@@ -1,0 +1,24 @@
+[package]
+name = "xtask"
+version = "0.0.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[[bin]]
+name = "xtask"
+path = "src/main.rs"
+
+[dependencies]
+event-schema = { path = "../crates/event-schema" }
+pow = { path = "../crates/pow" }
+sha2 = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_jcs = { workspace = true }
+base64 = { workspace = true }
+hex = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+zstd = { workspace = true }

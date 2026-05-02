@@ -1,0 +1,24 @@
+-- apps/worker/sql/0004_add_limit_type.sql
+-- Phase 4 D-84 / D-86 amendment: add limit_type wire envelope column.
+-- Purpose: persist the per-invocation `limit_type` flag (5h | weekly)
+-- alongside each event so Phase 4 cron can split each cohort
+-- ((tier, harness, region)) into per-limit-type cells (AGGR-04 amendment).
+-- Stored alongside other dimension columns; serde-side closed-enum
+-- validation in apps/worker/src/event.rs (LimitType from crates/event-schema).
+--
+-- Apply manually per branch (per Phase 2 D-39 per-env split):
+--   psql "$PLANETSCALE_STAGING_URL" < apps/worker/sql/0004_add_limit_type.sql
+--   psql "$PLANETSCALE_MAIN_URL"    < apps/worker/sql/0004_add_limit_type.sql
+--
+-- NOT NULL safe at v1: Phase 2 only proved staging via the D-46 e2e test;
+-- Phase 3 D-69 added staging-smoke rows from the CLI fixture path. Both
+-- sets must be cleared/re-seeded before applying — `TRUNCATE TABLE events`
+-- on staging is acceptable since fixtures regenerate. Production has no
+-- rows. If rows DO exist on a future branch, use the safe-migration
+-- pattern: ADD ... NULL, backfill, ALTER ... SET NOT NULL.
+--
+-- Allowed values are enforced application-side by crates/event-schema's
+-- LimitType closed enum (D-84). DB-side this is plain TEXT (matches the
+-- existing model/tier/harness/region pattern in 0001_events.sql).
+
+ALTER TABLE events ADD COLUMN limit_type TEXT NOT NULL;

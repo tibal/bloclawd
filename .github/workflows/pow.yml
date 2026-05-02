@@ -1,0 +1,261 @@
+name: pow
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: pow-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  rust-test:
+    name: rust — cargo test --workspace + clippy + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain (rust-toolchain.toml drives version)
+        run: rustup show
+      - name: Cache cargo registry + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', 'rust-toolchain.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      - name: cargo build --workspace
+        run: cargo build --workspace --locked
+      - name: cargo test --workspace
+        run: cargo test --workspace --locked
+      - name: cargo clippy --workspace
+        run: cargo clippy --workspace --locked -- -D warnings
+      - name: cargo test --features ts-export -p event-schema (writes apps/web/src/generated/*.ts)
+        run: cargo test --features ts-export -p event-schema --locked
+      - name: ts-rs drift check
+        run: |
+          if ! git diff --exit-code -- apps/web/src/generated/; then
+            echo "::error file=apps/web/src/generated/::ts-rs output drift. Re-run cargo test --features ts-export -p event-schema and commit the result."
+            exit 1
+          fi
+
+  fixture-drift:
+    name: fixture-drift — xtask gen-fixtures --check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        run: rustup show
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', 'rust-toolchain.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+      - name: Build xtask
+        run: cargo build -p xtask --locked
+      - name: Run xtask gen-fixtures --check
+        run: cargo run -p xtask --quiet --locked -- gen-fixtures --check
+      - name: Verify spec/pow-fixtures.json is unchanged in working tree
+        run: |
+          if ! git diff --exit-code -- spec/pow-fixtures.json; then
+            echo "::error file=spec/pow-fixtures.json::Fixture file drifted from xtask output. Re-run cargo run -p xtask -- gen-fixtures and commit the result."
+            exit 1
+          fi
+
+  log-boundary:
+    name: log-boundary — INGE-11 + Pitfall 6 grep gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Forbidden console_log content
+        run: |
+          if git grep -nE 'console_log!.*(event_id|nonce|submission_group_id|limit_type|cf-connecting-ip|elapsed|password|conn_string|hyperdrive\.connection_string)' apps/worker/ crates/; then
+            echo "::error::Forbidden log content detected. INGE-11 + Pitfall 6 violation."
+            exit 1
+          fi
+          # CLI-side emitters (Phase 3 introduces crates/cli/) - same forbidden tokens.
+          if git grep -nE '(eprintln!|println!|tracing::(info|warn|error|debug|trace)!).*(event_id|nonce|submission_group_id|limit_type|cf-connecting-ip|password|conn_string)' apps/worker/ crates/; then
+            echo "::error::Forbidden log content detected. INGE-11 + Pitfall 6 violation."
+            exit 1
+          fi
+
+  size-check:
+    name: size-check — WASM bundle under 2.5 MiB (Pitfall 2)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain
+        run: rustup show
+      - name: Install worker-build
+        run: cargo +stable install -q worker-build@0.8.1
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', 'rust-toolchain.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-wasm-
+      - name: worker-build --release
+        run: cd apps/worker && worker-build --release
+      - name: Normalize worker-build artifact path
+        run: |
+          if [ ! -f apps/worker/build/worker/index.wasm ] && [ -f apps/worker/build/index_bg.wasm ]; then
+            mkdir -p apps/worker/build/worker
+            cp apps/worker/build/index_bg.wasm apps/worker/build/worker/index.wasm
+          fi
+      - name: WASM size budget
+        run: |
+          size=$(wc -c < apps/worker/build/worker/index.wasm)
+          echo "WASM size: $size bytes"
+          if [ "$size" -ge 2621440 ]; then
+            echo "::error::WASM bundle $size bytes exceeds 2.5 MiB budget (Pitfall 2)."
+            exit 1
+          fi
+
+  strip-at-cron:
+    name: strip-at-cron — AGGR-07/08 grep gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Forbidden anonymity strings in cron emission
+        run: |
+          if git grep -nE '(submission_group_id|tz_offset|event_id|nonce)' apps/worker/src/cron/r2_emit.rs; then
+            echo "::error::Anonymity boundary leak: PII string in r2_emit.rs (AGGR-07/08)"
+            exit 1
+          fi
+          if git grep -nE '(submission_group_id|tz_offset|event_id|nonce)' apps/worker/src/cron/tests/fixtures/*.json; then
+            echo "::error::Anonymity boundary leak: PII string in committed R2 fixture"
+            exit 1
+          fi
+
+          SQL_LINE_COUNT=$(grep -c 'SELECT COUNT(DISTINCT submission_group_id)' apps/worker/src/cron/health.rs || true)
+          TOTAL_MENTIONS=$(grep -c 'submission_group_id' apps/worker/src/cron/health.rs || true)
+          if [ "$SQL_LINE_COUNT" -lt 1 ]; then
+            echo "::error::Expected SQL literal 'SELECT COUNT(DISTINCT submission_group_id)' missing from cron::health.rs"
+            exit 1
+          fi
+          if [ "$TOTAL_MENTIONS" -ne "$SQL_LINE_COUNT" ]; then
+            echo "::error::submission_group_id appears outside the SQL literal in cron::health.rs (total=$TOTAL_MENTIONS, sql_lit=$SQL_LINE_COUNT)"
+            exit 1
+          fi
+
+          for file in \
+            apps/worker/src/cron/aggregate.rs \
+            apps/worker/src/cron/percentile.rs \
+            apps/worker/src/cron/ridge.rs \
+            apps/worker/src/cron/state.rs \
+            apps/worker/src/cron/tick.rs \
+            apps/worker/src/cron/mod.rs
+          do
+            if git grep -nE 'tz_offset' "$file" 2>/dev/null; then
+              echo "::error::tz_offset must be stripped at ingest; should not appear in cron"
+              exit 1
+            fi
+          done
+
+  frontend-build-test:
+    name: frontend — build + test (WEB-01)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter ./apps/frontend test:run
+      - run: pnpm --filter ./apps/frontend build
+      - run: |
+          test -f apps/frontend/dist/index.html
+          test -d apps/frontend/dist/assets
+
+  r2-schema-drift:
+    name: r2-schema-drift — frozen R2 v1 fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p bloclawd-worker --lib cron::r2_emit::tests::schema_fixture --locked
+      - run: |
+          if ! git diff --exit-code -- apps/worker/src/cron/tests/fixtures/r2_v1_schema.json; then
+            echo "::error::R2 schema fixture drift. Re-run the test with regen mode and commit."
+            exit 1
+          fi
+
+  cron-integration:
+    name: cron — integration test (synthetic events to R2 envelope)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test -p bloclawd-worker --lib cron::tests::integration --locked
+
+  all-pass:
+    name: pow — all checks pass
+    runs-on: ubuntu-latest
+    needs:
+      - rust-test
+      - fixture-drift
+      - log-boundary
+      - size-check
+      - strip-at-cron
+      - frontend-build-test
+      - r2-schema-drift
+      - cron-integration
+    if: always()
+    steps:
+      - name: Aggregate result
+        run: |
+          if [ "${{ needs.rust-test.result }}" != "success" ] \
+             || [ "${{ needs.fixture-drift.result }}" != "success" ] \
+             || [ "${{ needs.log-boundary.result }}" != "success" ] \
+             || [ "${{ needs.size-check.result }}" != "success" ] \
+             || [ "${{ needs.strip-at-cron.result }}" != "success" ] \
+             || [ "${{ needs.frontend-build-test.result }}" != "success" ] \
+             || [ "${{ needs.r2-schema-drift.result }}" != "success" ] \
+             || [ "${{ needs.cron-integration.result }}" != "success" ]; then
+            echo "One or more required jobs failed:"
+            echo "  rust-test            = ${{ needs.rust-test.result }}"
+            echo "  fixture-drift        = ${{ needs.fixture-drift.result }}"
+            echo "  log-boundary         = ${{ needs.log-boundary.result }}"
+            echo "  size-check           = ${{ needs.size-check.result }}"
+            echo "  strip-at-cron        = ${{ needs.strip-at-cron.result }}"
+            echo "  frontend-build-test  = ${{ needs.frontend-build-test.result }}"
+            echo "  r2-schema-drift      = ${{ needs.r2-schema-drift.result }}"
+            echo "  cron-integration     = ${{ needs.cron-integration.result }}"
+            exit 1
+          fi
+          echo "All required pow jobs passed."

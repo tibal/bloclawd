@@ -1,0 +1,25 @@
+# Frontend Worker - static assets only; no Hyperdrive, no PoW, no cron.
+# Independent deploy from apps/worker (D-106). Custom domain attaches in Phase 5 (DIST-07).
+name = "bloclawd-frontend"
+compatibility_date = "2026-04-01"
+
+[assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
+
+[placement]
+mode = "smart"
+
+[env.staging]
+name = "bloclawd-frontend-staging"
+
+[env.staging.assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
+
+[env.production]
+name = "bloclawd-frontend"
+
+[env.production.assets]
+directory = "./dist"
+not_found_handling = "single-page-application"
