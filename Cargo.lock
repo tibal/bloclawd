@@ -3374,11 +3374,13 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "base64",
+ "chrono",
  "pow",
  "serde",
  "serde_jcs",
  "serde_json",
  "sha2 0.10.9",
+ "zstd",
 ]
 
 [[package]]

@@ -1,3 +1,199 @@
+use anyhow::{Context, Result, bail};
+use chrono::{SecondsFormat, TimeZone, Utc};
+use serde_json::Value;
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Write};
+use std::path::Path;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InputHarness {
+    Cc,
+    Codex,
+}
+
+pub fn parse_harness(value: &str) -> Result<InputHarness> {
+    match value {
+        "cc" => Ok(InputHarness::Cc),
+        "codex" => Ok(InputHarness::Codex),
+        other => bail!("--harness must be cc or codex; got {other}"),
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct Anonymizer {
+    uuid_map: HashMap<String, String>,
+    path_map: HashMap<String, String>,
+    prompt_idx: u32,
+    toolarg_idx: u32,
+    time_anchor: Option<chrono::DateTime<Utc>>,
+}
+
+impl Anonymizer {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn rewrite_uuid(&mut self, original: &str) -> String {
+        if let Some(existing) = self.uuid_map.get(original) {
+            return existing.clone();
+        }
+        let replacement = format!("00000000-0000-4000-8000-{:012}", self.uuid_map.len() + 1);
+        self.uuid_map
+            .insert(original.to_string(), replacement.clone());
+        replacement
+    }
+
+    pub fn rewrite_path(&mut self, original: &str) -> String {
+        if let Some(existing) = self.path_map.get(original) {
+            return existing.clone();
+        }
+        let replacement = format!("/path/redacted/{}", self.path_map.len() + 1);
+        self.path_map
+            .insert(original.to_string(), replacement.clone());
+        replacement
+    }
+
+    pub fn rewrite_timestamp(&mut self, original: &str) -> Option<String> {
+        let parsed = chrono::DateTime::parse_from_rfc3339(original)
+            .ok()?
+            .with_timezone(&Utc);
+        let anchor = *self.time_anchor.get_or_insert(parsed);
+        let delta = parsed - anchor;
+        let base = Utc.with_ymd_and_hms(2026, 1, 1, 0, 0, 0).single()?;
+        Some((base + delta).to_rfc3339_opts(SecondsFormat::Secs, true))
+    }
+
+    fn prompt_placeholder(&mut self) -> String {
+        self.prompt_idx += 1;
+        format!("PROMPT_REDACTED_{}", self.prompt_idx)
+    }
+
+    fn toolarg_placeholder(&mut self) -> String {
+        self.toolarg_idx += 1;
+        format!("TOOL_ARG_REDACTED_{}", self.toolarg_idx)
+    }
+
+    pub fn anonymize_value(&mut self, value: &mut Value) {
+        match value {
+            Value::Object(map) => {
+                let keys: Vec<String> = map.keys().cloned().collect();
+                let mut recurse_later = Vec::new();
+                for key in keys {
+                    let Some(child) = map.get_mut(&key) else {
+                        continue;
+                    };
+                    match key.as_str() {
+                        "timestamp" if child.is_string() => {
+                            let original = child.as_str().unwrap().to_string();
+                            if let Some(rewritten) = self.rewrite_timestamp(&original) {
+                                *child = Value::String(rewritten);
+                            }
+                        }
+                        "requestId"
+                        | "sessionId"
+                        | "session_id"
+                        | "id"
+                        | "uuid"
+                        | "event_id"
+                        | "submission_group_id"
+                            if child.is_string() =>
+                        {
+                            let original = child.as_str().unwrap().to_string();
+                            if looks_like_uuid_or_token(&original) {
+                                *child = Value::String(self.rewrite_uuid(&original));
+                            }
+                        }
+                        "cwd" | "path" | "file_path" | "file" if child.is_string() => {
+                            let original = child.as_str().unwrap().to_string();
+                            *child = Value::String(self.rewrite_path(&original));
+                        }
+                        "prompt" | "text" | "content" | "output" | "stdout" | "stderr"
+                            if child.is_string() =>
+                        {
+                            *child = Value::String(self.prompt_placeholder());
+                        }
+                        "tool_args" | "tool_input" | "arguments" if child.is_string() => {
+                            *child = Value::String(self.toolarg_placeholder());
+                        }
+                        _ if child.is_array() || child.is_object() => recurse_later.push(key),
+                        _ => {}
+                    }
+                }
+                for key in recurse_later {
+                    if let Some(child) = map.get_mut(&key) {
+                        self.anonymize_value(child);
+                    }
+                }
+            }
+            Value::Array(items) => {
+                for item in items {
+                    self.anonymize_value(item);
+                }
+            }
+            Value::String(s) => {
+                if looks_like_absolute_path(s) {
+                    let original = s.clone();
+                    *s = self.rewrite_path(&original);
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
+fn looks_like_uuid_or_token(value: &str) -> bool {
+    (value.len() == 36
+        && value.chars().filter(|ch| *ch == '-').count() == 4
+        && value.chars().all(|ch| ch.is_ascii_hexdigit() || ch == '-'))
+        || (value.len() >= 22
+            && value
+                .chars()
+                .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_'))
+}
+
+fn looks_like_absolute_path(value: &str) -> bool {
+    value.starts_with("/Users/") || value.starts_with("/home/") || value.starts_with("/tmp/")
+}
+
+pub fn run(harness: &str, input: &Path, output: &Path) -> Result<()> {
+    let _harness = parse_harness(harness)?;
+    let input = std::fs::canonicalize(input)
+        .with_context(|| format!("canonicalize {}", input.display()))?;
+    let file = File::open(&input).with_context(|| format!("open {}", input.display()))?;
+    let reader: Box<dyn BufRead> = if input.extension().and_then(|ext| ext.to_str()) == Some("zst")
+    {
+        Box::new(BufReader::new(zstd::stream::Decoder::new(file)?))
+    } else {
+        Box::new(BufReader::new(file))
+    };
+
+    if let Some(parent) = output.parent() {
+        std::fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
+    }
+    let tmp_path = output.with_extension("tmp");
+    let mut tmp =
+        File::create(&tmp_path).with_context(|| format!("create {}", tmp_path.display()))?;
+    let mut anonymizer = Anonymizer::new();
+
+    for line in reader.lines() {
+        let line = line?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let mut value: Value =
+            serde_json::from_str(&line).with_context(|| "parse JSONL line before anonymizing")?;
+        anonymizer.anonymize_value(&mut value);
+        tmp.write_all(serde_json::to_string(&value)?.as_bytes())?;
+        tmp.write_all(b"\n")?;
+    }
+    tmp.flush()?;
+    drop(tmp);
+    std::fs::rename(&tmp_path, output)
+        .with_context(|| format!("rename {} to {}", tmp_path.display(), output.display()))?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
