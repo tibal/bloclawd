@@ -404,4 +404,103 @@ mod tests {
             "unknown"
         );
     }
+
+    fn sample_payload_value() -> serde_json::Value {
+        serde_json::json!({
+            "v": 1,
+            "model": "claude-sonnet-4-5",
+            "tier": "pro",
+            "harness": "claude-code",
+            "region": "NA",
+            "tokens": {
+                "input_5min": 1,
+                "output_5min": 2,
+                "cached_read_5min": 3,
+                "cached_write_5min": 4,
+                "input_5h": 5,
+                "output_5h": 6,
+                "cached_read_5h": 7,
+                "cached_write_5h": 8
+            }
+        })
+    }
+
+    fn encoded_uuid(seed: u128) -> String {
+        use base64::Engine as _;
+
+        let mut bytes = seed.to_be_bytes();
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        URL_SAFE_NO_PAD.encode(bytes)
+    }
+
+    fn valid_wire_json() -> serde_json::Value {
+        serde_json::json!({
+            "event_id": encoded_uuid(1),
+            "challenge_id": URL_SAFE_NO_PAD.encode([2_u8; 32]),
+            "sig": URL_SAFE_NO_PAD.encode([3_u8; 32]),
+            "nonce": URL_SAFE_NO_PAD.encode([4_u8; 8]),
+            "submission_group_id": encoded_uuid(5),
+            "payload": sample_payload_value(),
+        })
+    }
+
+    #[test]
+    fn wire_request_accepts_submission_group_id() {
+        let raw = valid_wire_json();
+        let parsed = serde_json::from_value::<WireRequest>(raw);
+
+        assert!(parsed.is_ok());
+    }
+
+    #[test]
+    fn wire_request_rejects_missing_submission_group_id() {
+        let mut raw = valid_wire_json();
+        raw.as_object_mut()
+            .unwrap()
+            .remove("submission_group_id");
+
+        let err = match serde_json::from_value::<WireRequest>(raw) {
+            Ok(_) => panic!("expected missing submission_group_id to fail"),
+            Err(e) => e,
+        };
+
+        assert!(err.to_string().contains("missing field"));
+        assert!(err.to_string().contains("submission_group_id"));
+    }
+
+    #[test]
+    fn wire_request_rejects_extra_top_level_field_after_submission_group_id() {
+        let mut raw = valid_wire_json();
+        raw.as_object_mut()
+            .unwrap()
+            .insert("extra_xyz".into(), serde_json::json!(true));
+
+        let err = match serde_json::from_value::<WireRequest>(raw) {
+            Ok(_) => panic!("expected extra top-level field to fail"),
+            Err(e) => e,
+        };
+
+        assert!(err.to_string().contains("unknown field"));
+        assert!(err.to_string().contains("extra_xyz"));
+    }
+
+    #[test]
+    fn invalid_submission_group_id_uses_bad_json_shape() {
+        let err = parse_wire_uuid_v4("not-a-uuid").unwrap_err();
+
+        assert!(matches!(
+            err,
+            IngestError::BadJson {
+                position: None,
+                message: None
+            }
+        ));
+    }
+
+    #[test]
+    fn insert_sql_persists_submission_group_id_as_typed_uuid() {
+        assert!(INSERT_EVENT_SQL.contains("submission_group_id"));
+        assert!(INSERT_EVENT_SQL.contains("$2::uuid"));
+    }
 }
