@@ -89,7 +89,12 @@ jobs:
       - uses: actions/checkout@v4
       - name: Forbidden console_log content
         run: |
-          if git grep -nE 'console_log!.*(event_id|nonce|cf-connecting-ip|elapsed|password|conn_string|hyperdrive\.connection_string)' apps/worker/ crates/; then
+          if git grep -nE 'console_log!.*(event_id|nonce|submission_group_id|cf-connecting-ip|elapsed|password|conn_string|hyperdrive\.connection_string)' apps/worker/ crates/; then
+            echo "::error::Forbidden log content detected. INGE-11 + Pitfall 6 violation."
+            exit 1
+          fi
+          # CLI-side emitters (Phase 3 introduces crates/cli/) - same forbidden tokens.
+          if git grep -nE '(eprintln!|println!|tracing::(info|warn|error|debug|trace)!).*(event_id|nonce|submission_group_id|cf-connecting-ip|password|conn_string)' apps/worker/ crates/; then
             echo "::error::Forbidden log content detected. INGE-11 + Pitfall 6 violation."
             exit 1
           fi

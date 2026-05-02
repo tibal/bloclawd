@@ -101,6 +101,6 @@ The test:
 
 ## Logging boundary (INGE-11)
 
-No `worker::console_log!` (or any log emitter) may include `event_id`, `nonce`, `cf-connecting-ip`, `payload_hash`, `sig`, `WORKER_SECRET`, the Hyperdrive `connection_string`, or per-event timing.
+No log emitter may include `event_id`, `nonce`, `submission_group_id`, `cf-connecting-ip`, `payload_hash`, `sig`, `WORKER_SECRET`, the Hyperdrive `connection_string`, or per-event timing.
 The CI grep gate at `.github/workflows/pow.yml` enforces this.
-See `apps/worker/src/db.rs:43-44` for the only allowed log shape (`console_log!("pg connection task ended");` - no request context).
+The only allowed Worker log shape is the connection-task lifecycle message without request context.
