@@ -45,10 +45,7 @@ pub fn from_wire(error_code: &str, body: &serde_json::Value) -> IngestCliError {
         | "clock_skew"
         | "payload_hash_mismatch"
         | "pow_invalid" => IngestCliError::PowRejected,
-        "bad_json"
-        | "enum_invalid"
-        | "unknown_field"
-        | "version_invalid"
+        "bad_json" | "enum_invalid" | "unknown_field" | "version_invalid"
         | "token_out_of_range" => IngestCliError::SchemaMismatch,
         "body_too_large" => IngestCliError::BodyTooLarge,
         "rate_limited" => IngestCliError::RateLimited(
@@ -69,7 +66,10 @@ mod tests {
 
     #[test]
     fn pow_rejected_maps_signature_invalid() {
-        assert_eq!(from_wire("signature_invalid", &json!({})), IngestCliError::PowRejected);
+        assert_eq!(
+            from_wire("signature_invalid", &json!({})),
+            IngestCliError::PowRejected
+        );
     }
 
     #[test]
@@ -99,7 +99,10 @@ mod tests {
 
     #[test]
     fn body_too_large_maps() {
-        assert_eq!(from_wire("body_too_large", &json!({})), IngestCliError::BodyTooLarge);
+        assert_eq!(
+            from_wire("body_too_large", &json!({})),
+            IngestCliError::BodyTooLarge
+        );
     }
 
     #[test]
@@ -121,7 +124,10 @@ mod tests {
     #[test]
     fn server_unavailable_covers_server_codes_and_unknown() {
         for code in ["server_unavailable", "internal", "future_thing"] {
-            assert_eq!(from_wire(code, &json!({})), IngestCliError::ServerUnavailable);
+            assert_eq!(
+                from_wire(code, &json!({})),
+                IngestCliError::ServerUnavailable
+            );
         }
     }
 

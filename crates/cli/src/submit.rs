@@ -10,8 +10,8 @@ use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use event_schema::{EventPayload, SubmittedEvent};
 use pow::{ChallengeId, Nonce, Sig};
-use reqwest::header::CONTENT_TYPE;
 use reqwest::StatusCode;
+use reqwest::header::CONTENT_TYPE;
 
 use crate::api::{challenge_endpoint, event_endpoint};
 use crate::wire_error::{IngestCliError, from_wire};
@@ -55,9 +55,7 @@ pub fn fetch_challenge(
     }
 }
 
-pub fn parse_challenge_body(
-    body: &serde_json::Value,
-) -> Result<ChallengeResponse, IngestCliError> {
+pub fn parse_challenge_body(body: &serde_json::Value) -> Result<ChallengeResponse, IngestCliError> {
     let challenge_id_b64 = string_field(body, "challenge_id")?.to_string();
     let sig_b64 = string_field(body, "sig")?.to_string();
     let difficulty = u32_field(body, "difficulty")?;
@@ -217,7 +215,10 @@ mod tests {
 
     #[test]
     fn user_agent_contains_cli_version() {
-        assert_eq!(user_agent(), concat!("bloclawd-cli/", env!("CARGO_PKG_VERSION")));
+        assert_eq!(
+            user_agent(),
+            concat!("bloclawd-cli/", env!("CARGO_PKG_VERSION"))
+        );
     }
 
     #[test]

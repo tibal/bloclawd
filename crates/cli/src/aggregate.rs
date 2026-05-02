@@ -94,8 +94,7 @@ fn compute_counts(events: &[EventTokens]) -> TokenCounts {
         cached_write_5h = cached_write_5h.saturating_add(event.cached_write as u64);
     }
 
-    let (input_5min, output_5min, cached_read_5min, cached_write_5min) =
-        max_5min_burst(events);
+    let (input_5min, output_5min, cached_read_5min, cached_write_5min) = max_5min_burst(events);
 
     TokenCounts {
         input_5min: clamp_u32(input_5min),
