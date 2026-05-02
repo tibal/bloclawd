@@ -1,5 +1,6 @@
 //! bloclawd CLI library, consumed by the bin entry and in-process tests.
 
+pub mod aggregate;
 pub mod api;
 pub mod cli;
 pub mod config;
