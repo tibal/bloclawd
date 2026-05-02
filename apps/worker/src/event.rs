@@ -161,13 +161,15 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
 
     let bucket_ts = match insert_event(
         &ctx.env,
-        event_id,
-        submission_group_id,
-        &payload_value,
-        &model_str,
-        &tier_str,
-        &harness_str,
-        &region_str,
+        InsertEvent {
+            event_id,
+            submission_group_id,
+            payload: &payload_value,
+            model: &model_str,
+            tier: &tier_str,
+            harness: &harness_str,
+            region: &region_str,
+        },
     )
     .await
     {
@@ -191,15 +193,19 @@ const INSERT_EVENT_SQL: &str = r#"
             RETURNING bucket_ts
             "#;
 
-async fn insert_event(
-    env: &worker::Env,
+struct InsertEvent<'a> {
     event_id: Uuid,
     submission_group_id: Uuid,
-    payload: &serde_json::Value,
-    model: &str,
-    tier: &str,
-    harness: &str,
-    region: &str,
+    payload: &'a serde_json::Value,
+    model: &'a str,
+    tier: &'a str,
+    harness: &'a str,
+    region: &'a str,
+}
+
+async fn insert_event(
+    env: &worker::Env,
+    event: InsertEvent<'_>,
 ) -> std::result::Result<String, Box<dyn std::error::Error>> {
     let hyperdrive = env.get_binding::<Hyperdrive>("DB")?;
     let conn_string = hyperdrive.connection_string();
@@ -216,13 +222,13 @@ async fn insert_event(
         .query_typed_one(
             INSERT_EVENT_SQL,
             &[
-                (&event_id, Type::UUID),
-                (&submission_group_id, Type::UUID),
-                (&payload, Type::JSONB),
-                (&model, Type::TEXT),
-                (&tier, Type::TEXT),
-                (&harness, Type::TEXT),
-                (&region, Type::TEXT),
+                (&event.event_id, Type::UUID),
+                (&event.submission_group_id, Type::UUID),
+                (&event.payload, Type::JSONB),
+                (&event.model, Type::TEXT),
+                (&event.tier, Type::TEXT),
+                (&event.harness, Type::TEXT),
+                (&event.region, Type::TEXT),
             ],
         )
         .await?;
