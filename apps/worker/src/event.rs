@@ -20,9 +20,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use event_schema::{EventPayload, canonical_bytes};
+use event_schema::{SubmittedEvent, canonical_bytes};
 use pow::{ChallengeId, K_V1, Nonce, Sig, VerifyRequest};
-use serde::{Deserialize, de::IntoDeserializer};
+use serde::de::IntoDeserializer;
 use serde_json::json;
 use tokio_postgres::config::Config as PgConfig;
 use tokio_postgres::tls::NoTls;
@@ -35,15 +35,7 @@ use crate::errors::IngestError;
 use crate::ratelimit;
 use crate::secret;
 
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields)]
-struct WireRequest {
-    event_id: String,
-    challenge_id: String,
-    sig: String,
-    nonce: String,
-    payload: serde_json::Value,
-}
+type WireRequest = SubmittedEvent;
 
 pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
     // Step 1: RL_EVENT rate-limit (INGE-10).
@@ -57,8 +49,8 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
         Err(e) => return e.into_response(),
     };
 
-    // Step 3: parse WireRequest (D-43.3).
-    let wire: WireRequest = match serde_json::from_slice(&body_bytes) {
+    // Step 3: parse JSON body (D-43.3).
+    let wire_value: serde_json::Value = match serde_json::from_slice(&body_bytes) {
         Ok(v) => v,
         Err(e) => {
             return IngestError::BadJson {
@@ -69,9 +61,9 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
         }
     };
 
-    // Step 4: typed payload deserialize (closed enum plus deny_unknown_fields).
-    let deser = wire.payload.clone().into_deserializer();
-    let payload: EventPayload = match serde_path_to_error::deserialize(deser) {
+    // Step 4: typed wire + payload deserialize (closed enum plus deny_unknown_fields).
+    let deser = wire_value.into_deserializer();
+    let wire: WireRequest = match serde_path_to_error::deserialize(deser) {
         Ok(v) => v,
         Err(e) => {
             let msg = e.inner().to_string();
@@ -80,6 +72,17 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
                 return IngestError::EnumInvalid { field }.into_response();
             }
             return IngestError::classify_serde_error(e.into_inner()).into_response();
+        }
+    };
+    let payload = wire.payload.clone();
+    let payload_value = match serde_json::to_value(&payload) {
+        Ok(v) => v,
+        Err(e) => {
+            return IngestError::BadJson {
+                position: None,
+                message: Some(truncate(&e.to_string(), 200)),
+            }
+            .into_response();
         }
     };
 
@@ -94,7 +97,7 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
         return err.into_response();
     }
 
-    // Steps 6-9: decode crypto fields, recompute canonical payload hash, verify PoW.
+    // Steps 6-9: decode crypto fields, validate wire UUIDs, verify PoW.
     let cid_bytes: [u8; 32] = match decode_fixed(&wire.challenge_id) {
         Some(b) => b,
         None => return IngestError::SignatureInvalid.into_response(),
@@ -107,18 +110,16 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
         Some(b) => b,
         None => return IngestError::PowInvalid.into_response(),
     };
-    let event_id_bytes: [u8; 16] = match decode_fixed(&wire.event_id) {
-        Some(b) => b,
-        None => {
-            return IngestError::BadJson {
-                position: None,
-                message: None,
-            }
-            .into_response();
-        }
+    let event_id = match parse_wire_uuid_v4(&wire.event_id) {
+        Ok(u) => u,
+        Err(e) => return e.into_response(),
+    };
+    let submission_group_id = match parse_wire_uuid_v4(&wire.submission_group_id) {
+        Ok(u) => u,
+        Err(e) => return e.into_response(),
     };
 
-    let _canonical_payload_bytes = match canonical_bytes(&wire.payload) {
+    let _canonical_payload_bytes = match canonical_bytes(&payload) {
         Ok(bytes) => bytes,
         Err(e) => {
             return IngestError::BadJson {
@@ -128,7 +129,7 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
             .into_response();
         }
     };
-    let payload_hash_recomputed = pow::payload_hash(&wire.payload);
+    let payload_hash_recomputed = pow::payload_hash(&payload_value);
 
     let secret = match secret::worker_secret(&ctx.env) {
         Ok(secret) => secret,
@@ -143,7 +144,7 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
         secret: secret.as_bytes(),
         challenge_id: &cid,
         sig: &sig,
-        payload: &wire.payload,
+        payload: &payload_value,
         claimed_payload_hash: &payload_hash_recomputed,
         nonce: &nonce,
         difficulty: K_V1,
@@ -151,26 +152,6 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
     };
     if let Err(e) = pow::verify(verify_req) {
         return IngestError::from_verify(e).into_response();
-    }
-
-    // Step 10: UUIDv4 defense-in-depth, then INSERT (D-47).
-    let event_id = match Uuid::from_slice(&event_id_bytes) {
-        Ok(u) => u,
-        Err(_) => {
-            return IngestError::BadJson {
-                position: None,
-                message: None,
-            }
-            .into_response();
-        }
-    };
-    if event_id.get_variant() != Variant::RFC4122 || event_id.get_version() != Some(Version::Random)
-    {
-        return IngestError::BadJson {
-            position: None,
-            message: None,
-        }
-        .into_response();
     }
 
     let model_str = enum_to_wire(&payload.model);
@@ -181,7 +162,8 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
     let bucket_ts = match insert_event(
         &ctx.env,
         event_id,
-        &wire.payload,
+        submission_group_id,
+        &payload_value,
         &model_str,
         &tier_str,
         &harness_str,
@@ -199,9 +181,20 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
     }))
 }
 
+const INSERT_EVENT_SQL: &str = r#"
+            INSERT INTO events
+                (event_id, submission_group_id, bucket_ts, payload, model, tier, harness, region)
+            VALUES
+                ($1::uuid, $2::uuid, date_bin('15 minutes', now(), '1970-01-01 00:00:00+00'::timestamptz),
+                 $3::jsonb, $4::text, $5::text, $6::text, $7::text)
+            ON CONFLICT (event_id) DO UPDATE SET event_id = events.event_id
+            RETURNING bucket_ts
+            "#;
+
 async fn insert_event(
     env: &worker::Env,
     event_id: Uuid,
+    submission_group_id: Uuid,
     payload: &serde_json::Value,
     model: &str,
     tier: &str,
@@ -221,17 +214,10 @@ async fn insert_event(
 
     let row = client
         .query_typed_one(
-            r#"
-            INSERT INTO events
-                (event_id, bucket_ts, payload, model, tier, harness, region)
-            VALUES
-                ($1, date_bin('15 minutes', now(), '1970-01-01 00:00:00+00'::timestamptz),
-                 $2, $3, $4, $5, $6)
-            ON CONFLICT (event_id) DO UPDATE SET event_id = events.event_id
-            RETURNING bucket_ts
-            "#,
+            INSERT_EVENT_SQL,
             &[
                 (&event_id, Type::UUID),
+                (&submission_group_id, Type::UUID),
                 (&payload, Type::JSONB),
                 (&model, Type::TEXT),
                 (&tier, Type::TEXT),
@@ -245,6 +231,22 @@ async fn insert_event(
     let formatted = format_rfc3339(&bucket_ts);
     drop(client);
     Ok(formatted)
+}
+
+fn parse_wire_uuid_v4(s: &str) -> std::result::Result<Uuid, IngestError> {
+    let bytes: [u8; 16] = decode_fixed(s).ok_or_else(malformed_uuid_error)?;
+    let uuid = Uuid::from_slice(&bytes).map_err(|_| malformed_uuid_error())?;
+    if uuid.get_variant() != Variant::RFC4122 || uuid.get_version() != Some(Version::Random) {
+        return Err(malformed_uuid_error());
+    }
+    Ok(uuid)
+}
+
+fn malformed_uuid_error() -> IngestError {
+    IngestError::BadJson {
+        position: None,
+        message: None,
+    }
 }
 
 fn decode_fixed<const N: usize>(s: &str) -> Option<[u8; N]> {
@@ -312,6 +314,7 @@ fn extract_validate_field(msg: &str) -> String {
 }
 
 fn enum_invalid_field(path: &str) -> String {
+    let path = path.strip_prefix("payload.").unwrap_or(path);
     match path {
         "model" | "tier" | "harness" | "region" => path.to_string(),
         _ => "unknown".to_string(),
@@ -456,9 +459,7 @@ mod tests {
     #[test]
     fn wire_request_rejects_missing_submission_group_id() {
         let mut raw = valid_wire_json();
-        raw.as_object_mut()
-            .unwrap()
-            .remove("submission_group_id");
+        raw.as_object_mut().unwrap().remove("submission_group_id");
 
         let err = match serde_json::from_value::<WireRequest>(raw) {
             Ok(_) => panic!("expected missing submission_group_id to fail"),

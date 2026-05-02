@@ -32,6 +32,17 @@ psql "$PLANETSCALE_MAIN_URL"    < apps/worker/sql/0001_events.sql
 
 PlanetScale branching does NOT auto-replicate DDL. Each branch must be applied to manually.
 
+### 0002 - Add submission_group_id (Phase 3)
+
+The Phase 3 CLI submits events with a per-invocation `submission_group_id` (D-51). Apply this migration BEFORE the first Phase 3 CLI submission lands on either branch.
+
+```bash
+psql "$PLANETSCALE_STAGING_URL" < apps/worker/sql/0002_add_submission_group_id.sql
+psql "$PLANETSCALE_MAIN_URL"    < apps/worker/sql/0002_add_submission_group_id.sql
+```
+
+The migration is `NOT NULL` safe at v1 because Phase 2 only proved staging via the D-46 e2e test and no production rows exist on the main branch. If rows exist on staging at apply time, follow the safe ADD ... NULL -> backfill -> SET NOT NULL pattern instead.
+
 ### 2. Set the per-env WORKER_SECRET (D-38)
 
 `WORKER_SECRET` is the HMAC key used to sign and verify `GET /challenge` outputs. Per D-38, the staging and production secrets MUST be distinct >=256-bit values; a leaked staging secret cannot forge production challenges.
