@@ -1,14 +1,30 @@
 //! Resolve the user's region (D-65 + D-66 + CLI-07).
 
-use anyhow::Result;
-use event_schema::Region;
+use anyhow::{Result, anyhow};
+use event_schema::{Region, country_to_region};
 
 pub fn resolve_region() -> Result<Region> {
-    todo!("RED: implement resolve_region")
+    if let Ok(iso) = std::env::var("BLOCLAWD_COUNTRY") {
+        return country_to_region(&iso).ok_or_else(|| {
+            anyhow!(
+                "BLOCLAWD_COUNTRY={iso} unrecognized; example: BLOCLAWD_COUNTRY=US (use ISO 3166-1 alpha-2)"
+            )
+        });
+    }
+    let locale = sys_locale::get_locale()
+        .ok_or_else(|| anyhow!("sys-locale returned None; set BLOCLAWD_COUNTRY=US (or similar)"))?;
+    resolve_region_from_locale(&locale)
 }
 
-pub fn resolve_region_from_locale(_locale: &str) -> Result<Region> {
-    todo!("RED: implement resolve_region_from_locale")
+pub(crate) fn resolve_region_from_locale(locale: &str) -> Result<Region> {
+    let iso = locale.split_once('-').map(|(_, region)| region).ok_or_else(|| {
+        anyhow!(
+            "locale {locale:?} has no region subtag (BCP47); set BLOCLAWD_COUNTRY=US (or similar)"
+        )
+    })?;
+    country_to_region(iso).ok_or_else(|| {
+        anyhow!("region {iso:?} unrecognized; set BLOCLAWD_COUNTRY=<ISO2> (example: US)")
+    })
 }
 
 #[cfg(test)]

@@ -1,17 +1,54 @@
 //! `--end` parser. Accepts three local-TZ formats and converts to UTC.
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 
-pub fn parse_end(_s: &str) -> Result<DateTime<Utc>, String> {
-    todo!("RED: implement parse_end")
+const FMT_HH_MM: &str = "%H:%M";
+const FMT_DATE_HM: &str = "%Y-%m-%d %H:%M";
+const FMT_RFC3339_NO_TZ: &str = "%Y-%m-%dT%H:%M:%S";
+
+pub fn parse_end(s: &str) -> Result<DateTime<Utc>, String> {
+    if let Ok(t) = NaiveTime::parse_from_str(s, FMT_HH_MM) {
+        let today: NaiveDate = Local::now().date_naive();
+        let naive = NaiveDateTime::new(today, t);
+        return local_to_utc(naive);
+    }
+    if let Ok(naive) = NaiveDateTime::parse_from_str(s, FMT_DATE_HM) {
+        return local_to_utc(naive);
+    }
+    if let Ok(naive) = NaiveDateTime::parse_from_str(s, FMT_RFC3339_NO_TZ) {
+        return local_to_utc(naive);
+    }
+    Err(format!(
+        "error: --end must be HH:MM (today, local TZ), YYYY-MM-DD HH:MM (local TZ), \
+         or YYYY-MM-DDTHH:MM:SS (local TZ); got {:?}",
+        s
+    ))
+}
+
+fn local_to_utc(naive: NaiveDateTime) -> Result<DateTime<Utc>, String> {
+    match Local.from_local_datetime(&naive) {
+        chrono::offset::LocalResult::Single(dt) => Ok(dt.with_timezone(&Utc)),
+        chrono::offset::LocalResult::Ambiguous(early, _late) => Ok(early.with_timezone(&Utc)),
+        chrono::offset::LocalResult::None => Err(format!(
+            "error: --end {:?} is in a DST gap (no such local time)",
+            naive
+        )),
+    }
 }
 
 pub fn window(
-    _end_utc: DateTime<Utc>,
-    _five_hour: bool,
-    _week: bool,
+    end_utc: DateTime<Utc>,
+    five_hour: bool,
+    week: bool,
 ) -> (DateTime<Utc>, DateTime<Utc>) {
-    todo!("RED: implement window")
+    let duration = if week {
+        chrono::Duration::days(7)
+    } else if five_hour {
+        chrono::Duration::hours(5)
+    } else {
+        chrono::Duration::hours(5)
+    };
+    (end_utc - duration, end_utc)
 }
 
 #[cfg(test)]

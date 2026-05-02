@@ -1,18 +1,44 @@
 //! TOML config at ~/.config/bloclawd/config.toml (D-48 + D-49).
 
-use anyhow::Result;
+use anyhow::{Context, Result, anyhow};
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 pub fn config_path() -> Option<PathBuf> {
-    todo!("RED: implement config_path")
+    let home = std::env::var_os("HOME")?;
+    let mut p: PathBuf = home.into();
+    p.push(".config/bloclawd/config.toml");
+    Some(p)
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+struct ConfigFile {
+    tier: Option<String>,
+    #[serde(flatten)]
+    _other: BTreeMap<String, toml::Value>,
 }
 
 pub fn load_tier() -> Result<Option<String>> {
-    todo!("RED: implement load_tier")
+    let path = config_path().ok_or_else(|| anyhow!("HOME env var not set"))?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    let text =
+        std::fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
+    let cfg: ConfigFile =
+        toml::from_str(&text).with_context(|| format!("parse {} as TOML", path.display()))?;
+    Ok(cfg.tier)
 }
 
-pub fn save_tier(_tier: &str) -> Result<()> {
-    todo!("RED: implement save_tier")
+pub fn save_tier(tier: &str) -> Result<()> {
+    let path = config_path().ok_or_else(|| anyhow!("HOME env var not set"))?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("mkdir -p {}", parent.display()))?;
+    }
+    let body = format!("tier = \"{}\"\n", tier);
+    std::fs::write(&path, body).with_context(|| format!("write {}", path.display()))
 }
 
 #[cfg(test)]
