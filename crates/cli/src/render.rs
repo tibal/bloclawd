@@ -1,21 +1,139 @@
-//! Dry-run and JSON render layer.
+//! Single render layer for dry-run human output and machine JSON.
 
 use anyhow::Result;
 use event_schema::SubmittedEvent;
+use serde::Serialize;
+use serde_json::Value;
 
-pub fn render_dry_run(_group_id: &str, _events: &[SubmittedEvent]) -> Result<String> {
-    Ok("bloclawd dry-run\n".to_string())
+use crate::canonical::canonicalize;
+
+pub fn render_dry_run(group_id: &str, events: &[SubmittedEvent]) -> Result<String> {
+    let group_short = &group_id[..group_id.len().min(8)];
+    let mut out = String::new();
+    out.push_str(&format!(
+        "bloclawd dry-run - group {group_short}... - {} events\n\n",
+        events.len()
+    ));
+
+    if events.is_empty() {
+        out.push_str("(no events)\n");
+        return Ok(out);
+    }
+
+    let header = format!(
+        "| {:<22} | {:>10} | {:>11} | {:>16} | {:>17} | {:>10} | {:>10} | {:>15} | {:>15} |",
+        "model",
+        "input_5min",
+        "output_5min",
+        "cached_read_5min",
+        "cached_write_5min",
+        "input_5h",
+        "output_5h",
+        "cached_read_5h",
+        "cached_write_5h"
+    );
+    let sep: String = header
+        .chars()
+        .map(|ch| if ch == '|' { '+' } else { '-' })
+        .collect();
+
+    out.push_str(&sep);
+    out.push('\n');
+    out.push_str(&header);
+    out.push('\n');
+    out.push_str(&sep);
+    out.push('\n');
+
+    for event in events {
+        let tokens = &event.payload.tokens;
+        let row = format!(
+            "| {:<22} | {:>10} | {:>11} | {:>16} | {:>17} | {:>10} | {:>10} | {:>15} | {:>15} |",
+            model_name(event)?,
+            tokens.input_5min,
+            tokens.output_5min,
+            tokens.cached_read_5min,
+            tokens.cached_write_5min,
+            tokens.input_5h,
+            tokens.output_5h,
+            tokens.cached_read_5h,
+            tokens.cached_write_5h
+        );
+        out.push_str(&row);
+        out.push('\n');
+    }
+
+    out.push_str(&sep);
+    out.push('\n');
+    out.push('\n');
+
+    for (index, event) in events.iter().enumerate() {
+        out.push_str(&format!("--- event {}/{} ---\n", index + 1, events.len()));
+        out.push_str(&canonical_pretty_event(event)?);
+        out.push('\n');
+    }
+
+    Ok(out)
 }
 
 pub fn render_json(
-    _group_id: &str,
-    _ended_at: &str,
-    _parse_failures: (u32, u32),
-    _requests: &[SubmittedEvent],
-    _responses: &[(String, u16, serde_json::Value)],
-    _exit_code: i32,
+    group_id: &str,
+    ended_at: &str,
+    parse_failures: (u32, u32),
+    requests: &[SubmittedEvent],
+    responses: &[(String, u16, serde_json::Value)],
+    exit_code: i32,
 ) -> Result<String> {
-    Ok("{}".to_string())
+    let requests_json: Vec<Value> = requests
+        .iter()
+        .map(serde_json::to_value)
+        .collect::<serde_json::Result<_>>()?;
+    let responses_json: Vec<Value> = responses
+        .iter()
+        .map(|(model, status, body)| {
+            serde_json::json!({
+                "model": model,
+                "status": status,
+                "body": body,
+            })
+        })
+        .collect();
+    let value = serde_json::json!({
+        "group_id": group_id,
+        "ended_at": ended_at,
+        "parse_failures": {
+            "cc": parse_failures.0,
+            "codex": parse_failures.1,
+        },
+        "requests": requests_json,
+        "responses": responses_json,
+        "exit_code": exit_code,
+    });
+
+    Ok(serde_json::to_string(&value)?)
+}
+
+fn model_name(event: &SubmittedEvent) -> Result<String> {
+    let value = serde_json::to_value(event.payload.model)?;
+    Ok(value.as_str().unwrap_or("?").to_string())
+}
+
+fn canonical_pretty_event(event: &SubmittedEvent) -> Result<String> {
+    let canonical_payload = canonicalize(&event.payload)?;
+    let payload_value: Value = serde_json::from_slice(&canonical_payload)?;
+    let canonical_event = event_schema::canonical_bytes(event)?;
+    let mut event_value: Value = serde_json::from_slice(&canonical_event)?;
+    if let Some(object) = event_value.as_object_mut() {
+        object.insert("payload".to_string(), payload_value);
+    }
+    pretty_json_four_spaces(&event_value)
+}
+
+fn pretty_json_four_spaces(value: &impl Serialize) -> Result<String> {
+    let mut bytes = Vec::new();
+    let formatter = serde_json::ser::PrettyFormatter::with_indent(b"    ");
+    let mut serializer = serde_json::Serializer::with_formatter(&mut bytes, formatter);
+    value.serialize(&mut serializer)?;
+    Ok(String::from_utf8(bytes)?)
 }
 
 #[cfg(test)]
@@ -85,11 +203,8 @@ mod tests {
 
     #[test]
     fn dry_run_header_contains_group_short_and_event_count() {
-        let output = render_dry_run(
-            "12345678-1234-1234-1234-123456789012",
-            &sample_events(),
-        )
-        .expect("render succeeds");
+        let output = render_dry_run("12345678-1234-1234-1234-123456789012", &sample_events())
+            .expect("render succeeds");
 
         assert!(output.contains("bloclawd dry-run"));
         assert!(output.contains("12345678"));
@@ -102,12 +217,14 @@ mod tests {
             .expect("render succeeds");
 
         assert!(output.is_ascii());
-        assert!(!output.as_bytes().windows(2).any(|window| window == [27, b'[']));
+        assert!(
+            !output
+                .as_bytes()
+                .windows(2)
+                .any(|window| window == [27, b'['])
+        );
         for line in output.lines().filter(|line| line.starts_with('+')) {
-            assert!(
-                line.chars()
-                    .all(|ch| matches!(ch, '+' | '-' | '|' | ' '))
-            );
+            assert!(line.chars().all(|ch| matches!(ch, '+' | '-' | '|' | ' ')));
         }
     }
 
@@ -190,8 +307,15 @@ mod tests {
 
     #[test]
     fn render_json_dry_run_has_empty_responses() {
-        let rendered = render_json("group", "2026-05-02T00:00:00Z", (0, 0), &sample_events(), &[], 0)
-            .expect("render succeeds");
+        let rendered = render_json(
+            "group",
+            "2026-05-02T00:00:00Z",
+            (0, 0),
+            &sample_events(),
+            &[],
+            0,
+        )
+        .expect("render succeeds");
         let parsed: Value = serde_json::from_str(&rendered).expect("json parses");
 
         assert_eq!(parsed["responses"].as_array().unwrap().len(), 0);
@@ -209,8 +333,15 @@ mod tests {
 
     #[test]
     fn render_json_has_no_escape_byte() {
-        let rendered = render_json("group", "2026-05-02T00:00:00Z", (0, 0), &sample_events(), &[], 0)
-            .expect("render succeeds");
+        let rendered = render_json(
+            "group",
+            "2026-05-02T00:00:00Z",
+            (0, 0),
+            &sample_events(),
+            &[],
+            0,
+        )
+        .expect("render succeeds");
 
         assert!(!rendered.as_bytes().contains(&27));
     }
