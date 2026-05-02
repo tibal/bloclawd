@@ -3,6 +3,8 @@
 pub mod api;
 pub mod cli;
 pub mod config;
+pub mod min_version;
+pub mod parsers;
 pub mod region;
 pub mod window;
 
