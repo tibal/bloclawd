@@ -7,6 +7,7 @@ use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
@@ -70,7 +71,16 @@ pub fn parse_cc_line(line: &str) -> Option<CcEvent> {
 pub fn dedup_by_request_id(events: Vec<CcEvent>) -> Vec<CcEvent> {
     let mut out: HashMap<String, CcEvent> = HashMap::new();
     for event in events {
-        out.insert(event.request_id.clone(), event);
+        match out.entry(event.request_id.clone()) {
+            Entry::Vacant(slot) => {
+                slot.insert(event);
+            }
+            Entry::Occupied(mut slot) => {
+                if event.timestamp_utc >= slot.get().timestamp_utc {
+                    slot.insert(event);
+                }
+            }
+        }
     }
     out.into_values().collect()
 }
@@ -97,30 +107,33 @@ pub fn discover_session_files(
     let cutoff = window_start - chrono::Duration::minutes(30);
 
     let mut out = Vec::new();
-    for project_entry in
-        std::fs::read_dir(&projects).with_context(|| format!("read_dir {}", projects.display()))?
-    {
-        let project_entry = project_entry?;
-        if !project_entry.file_type()?.is_dir() {
+    collect_jsonl_files(&projects, cutoff, &mut out)?;
+    out.sort();
+    Ok(out)
+}
+
+fn collect_jsonl_files(dir: &Path, cutoff: DateTime<Utc>, out: &mut Vec<PathBuf>) -> Result<()> {
+    for entry in std::fs::read_dir(dir).with_context(|| format!("read_dir {}", dir.display()))? {
+        let entry = entry?;
+        let file_type = entry.file_type()?;
+        let path = entry.path();
+        if file_type.is_dir() {
+            collect_jsonl_files(&path, cutoff, out)?;
             continue;
         }
-        for session_entry in std::fs::read_dir(project_entry.path())
-            .with_context(|| format!("read_dir {}", project_entry.path().display()))?
-        {
-            let session_entry = session_entry?;
-            let path = session_entry.path();
-            if path.extension().and_then(|s| s.to_str()) != Some("jsonl") {
-                continue;
-            }
-            let mtime = session_entry.metadata()?.modified()?;
-            let mtime_utc: DateTime<Utc> = mtime.into();
-            if mtime_utc < cutoff {
-                continue;
-            }
+        if !file_type.is_file() {
+            continue;
+        }
+        if path.extension().and_then(|s| s.to_str()) != Some("jsonl") {
+            continue;
+        }
+        let mtime = entry.metadata()?.modified()?;
+        let mtime_utc: DateTime<Utc> = mtime.into();
+        if mtime_utc >= cutoff {
             out.push(path);
         }
     }
-    Ok(out)
+    Ok(())
 }
 
 pub fn parse_session_file(
@@ -212,6 +225,7 @@ mod tests {
     use super::*;
     use chrono::TimeZone;
     use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     fn ts(offset_minutes: i64) -> DateTime<Utc> {
         Utc.with_ymd_and_hms(2026, 1, 1, 12, 0, 0).single().unwrap()
@@ -239,6 +253,17 @@ mod tests {
                 }}
             }}"#
         )
+    }
+
+    fn temp_root(name: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock")
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "bloclawd-cc-{name}-{}-{unique}",
+            std::process::id()
+        ))
     }
 
     #[test]
@@ -298,6 +323,34 @@ mod tests {
         let deduped = dedup_by_request_id(events);
         assert_eq!(deduped.len(), 1);
         assert_eq!(deduped[0].output, 9);
+    }
+
+    #[test]
+    fn dedup_by_request_id_keeps_latest_streaming_snapshot() {
+        let older = CcEvent {
+            timestamp_utc: ts(2),
+            request_id: "req_same".to_string(),
+            model: Model::ClaudeSonnet45,
+            input: 1,
+            output: 9,
+            cached_read: 3,
+            cached_write: 4,
+        };
+        let newer = CcEvent {
+            timestamp_utc: ts(3),
+            request_id: "req_same".to_string(),
+            model: Model::ClaudeSonnet45,
+            input: 1,
+            output: 99,
+            cached_read: 3,
+            cached_write: 4,
+        };
+
+        let deduped = dedup_by_request_id(vec![newer.clone(), older]);
+
+        assert_eq!(deduped.len(), 1);
+        assert_eq!(deduped[0].timestamp_utc, newer.timestamp_utc);
+        assert_eq!(deduped[0].output, 99);
     }
 
     #[test]
@@ -378,11 +431,31 @@ mod tests {
     }
 
     #[test]
+    fn discover_session_files_includes_nested_subagent_jsonl() {
+        let root = temp_root("nested-discovery");
+        let claude_home = root.join(".claude");
+        let top = claude_home.join("projects/project-a/session.jsonl");
+        let nested = claude_home.join("projects/project-a/session/subagents/agent.jsonl");
+        let ignored = claude_home.join("projects/project-a/session/subagents/agent.txt");
+        fs::create_dir_all(top.parent().expect("top parent")).expect("mkdir top");
+        fs::create_dir_all(nested.parent().expect("nested parent")).expect("mkdir nested");
+        fs::write(&top, "").expect("write top");
+        fs::write(&nested, "").expect("write nested");
+        fs::write(&ignored, "").expect("write ignored");
+
+        let files = discover_session_files(&claude_home, ts(-1)).expect("discover files");
+        let _ = fs::remove_dir_all(&root);
+
+        let mut expected = vec![top, nested];
+        expected.sort();
+        assert_eq!(files, expected);
+    }
+
+    #[test]
     fn unsupported_first_assistant_shape_errors_with_min_version() {
-        let path = std::env::temp_dir().join(format!(
-            "bloclawd-cc-min-version-{}.jsonl",
-            std::process::id()
-        ));
+        let root = temp_root("min-version");
+        fs::create_dir_all(&root).expect("mkdir root");
+        let path = root.join("session.jsonl");
         fs::write(
             &path,
             r#"{"type":"assistant","timestamp":"2026-01-01T12:00:00Z","version":"2.1.126","requestId":"req_123","message":{"model":"claude-sonnet-4-5","usage":{"input_tokens":10,"output_tokens":20}}}"#,
@@ -390,7 +463,7 @@ mod tests {
         .expect("write fixture");
 
         let err = parse_session_file(&path, ts(-1), ts(1)).expect_err("shape error");
-        let _ = fs::remove_file(&path);
+        let _ = fs::remove_dir_all(&root);
         let message = err.to_string();
         assert!(message.contains(MIN_CC_VERSION));
         assert!(message.contains("cache_read_input_tokens"));
