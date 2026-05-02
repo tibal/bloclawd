@@ -2,7 +2,7 @@
 phase: 03-rust-cli
 verified: 2026-05-02T00:00:00Z
 status: human_needed
-score: "19/19 implementation requirements verified; 1 live submit UAT pending"
+score: "19/19 implementation requirements verified; live submit UAT deferred until provider usage limit is reached"
 overrides_applied: 0
 deferred:
   - truth: "Release-build matrix for darwin-arm64, darwin-x64, and linux-x64-musl"
@@ -11,20 +11,23 @@ deferred:
   - truth: "Rate-limit signature cassette from a genuinely rate-limited harness"
     addressed_in: "Pre-release operator verification"
     evidence: "Probe signatures are implemented from Phase 3 research and covered by classifier tests; live provider wording must be re-pinned before public release."
+  - truth: "Real rate-limited CLI submit"
+    addressed_in: "Peak-hours operator verification"
+    evidence: "Operator attempted the live path on 2026-05-02 before hitting provider usage limits; the provider probe failed closed as designed and no event was submitted. Positive-path proof requires a genuinely rate-limited account and is deferred until peak hours."
 human_verification:
   - test: "Real rate-limited CLI submit"
     expected: "On a machine with a real CC or Codex provider limit already reached, `bloclawd --cc --tier max20 --end <local-time> --5h --yes` or `bloclawd --codex --tier max20 --end <local-time> --5h --yes` prints the dry-run view, solves PoW, recognizes the provider rate-limit probe, submits to the deployed ingest Worker, exits 0, and a row appears in PlanetScale."
     why_human: "Requires a genuinely rate-limited provider account plus deployed Worker/PlanetScale credentials not available to the agent runtime."
-    result: "pending"
+    result: "deferred: expected probe failure observed while account was not rate-limited; retry during peak hours after provider usage limit is reached"
 ---
 
 # Phase 3: Rust CLI Verification Report
 
 **Phase Goal:** A user who just hit a rate limit on Claude Code or Codex can run `bloclawd --5h --cc` or `--codex`, see exactly what would be submitted, confirm with `[y/N]`, and have an anonymous, PoW-gated event accepted by the ingest Worker, with defensive parsers that survive CC/Codex format drift.
 
-**Status:** human_needed
+**Status:** human_needed (external-condition UAT deferred)
 
-Automated implementation verification passes. The remaining item is the live external submit proof, which cannot be performed from this workspace because it requires real provider rate-limit state and deployed ingest/PlanetScale access.
+Automated implementation verification passes. The remaining item is the positive live external submit proof, which is deferred until a real provider account is rate-limited.
 
 ## Goal Achievement
 
@@ -115,9 +118,11 @@ Expected:
 
 If the provider account is not genuinely rate-limited, the probe should converge to exit 4 and no event should be submitted.
 
+**Latest attempt (2026-05-02):** Operator ran the live path before hitting provider usage limits. The provider probe failed closed as designed and no event was submitted. Positive-path verification is deferred until peak hours, when the account can be retried in a genuinely rate-limited state.
+
 ## Gaps Summary
 
-No automated implementation gaps remain. Phase completion is waiting on the live external submit UAT above.
+No automated implementation gaps remain. Phase completion is waiting on the deferred positive live-submit UAT after the operator reaches a provider usage limit.
 
 ---
 _Verified: 2026-05-02_
