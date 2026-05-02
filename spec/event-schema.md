@@ -50,7 +50,7 @@ The `payload` object is canonicalized via RFC 8785 JCS (see `spec/payload-canoni
 | `payload.tier` | Must match `Tier` | `crates/event-schema/src/enums.rs` and `apps/web/src/generated/Tier.ts` |
 | `payload.harness` | Must match `Harness` | `crates/event-schema/src/enums.rs` and `apps/web/src/generated/Harness.ts` |
 | `payload.region` | Must match `Region` (ISO continent code) | `crates/event-schema/src/enums.rs` and `apps/web/src/generated/Region.ts` |
-| `payload.tokens.*` | Unsigned integer, 0 <= x <= 1_000_000_000 | `crates/event-schema/src/payload.rs` |
+| `payload.tokens.*` | Unsigned integer, 0 <= x <= 1_000_000_000_000 | `crates/event-schema/src/payload.rs` |
 | `event_id` | UUIDv4 (never v7), base64url-encoded as 16 raw bytes on the wire and decoded by the Worker into a Postgres `uuid` | CLI-09 carries forward from requirements |
 | `submission_group_id` | UUIDv4 (never v7), base64url-encoded as 16 raw bytes on the wire and decoded by the Worker into a Postgres `uuid`; one value is shared by all events from one CLI invocation | `crates/event-schema/src/wire.rs` |
 

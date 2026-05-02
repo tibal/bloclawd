@@ -75,10 +75,10 @@ pub fn aggregate(
 #[derive(Debug, Clone, Copy)]
 struct EventTokens {
     timestamp_utc: DateTime<Utc>,
-    input: u32,
-    output: u32,
-    cached_read: u32,
-    cached_write: u32,
+    input: u64,
+    output: u64,
+    cached_read: u64,
+    cached_write: u64,
 }
 
 fn compute_counts(events: &[EventTokens]) -> TokenCounts {
@@ -88,23 +88,23 @@ fn compute_counts(events: &[EventTokens]) -> TokenCounts {
     let mut cached_write_5h = 0u64;
 
     for event in events {
-        input_5h = input_5h.saturating_add(event.input as u64);
-        output_5h = output_5h.saturating_add(event.output as u64);
-        cached_read_5h = cached_read_5h.saturating_add(event.cached_read as u64);
-        cached_write_5h = cached_write_5h.saturating_add(event.cached_write as u64);
+        input_5h = input_5h.saturating_add(event.input);
+        output_5h = output_5h.saturating_add(event.output);
+        cached_read_5h = cached_read_5h.saturating_add(event.cached_read);
+        cached_write_5h = cached_write_5h.saturating_add(event.cached_write);
     }
 
     let (input_5min, output_5min, cached_read_5min, cached_write_5min) = max_5min_burst(events);
 
     TokenCounts {
-        input_5min: clamp_u32(input_5min),
-        output_5min: clamp_u32(output_5min),
-        cached_read_5min: clamp_u32(cached_read_5min),
-        cached_write_5min: clamp_u32(cached_write_5min),
-        input_5h: clamp_u32(input_5h),
-        output_5h: clamp_u32(output_5h),
-        cached_read_5h: clamp_u32(cached_read_5h),
-        cached_write_5h: clamp_u32(cached_write_5h),
+        input_5min,
+        output_5min,
+        cached_read_5min,
+        cached_write_5min,
+        input_5h,
+        output_5h,
+        cached_read_5h,
+        cached_write_5h,
     }
 }
 
@@ -123,10 +123,10 @@ fn max_5min_burst(events: &[EventTokens]) -> (u64, u64, u64, u64) {
             if event.timestamp_utc > cutoff {
                 break;
             }
-            input = input.saturating_add(event.input as u64);
-            output = output.saturating_add(event.output as u64);
-            cached_read = cached_read.saturating_add(event.cached_read as u64);
-            cached_write = cached_write.saturating_add(event.cached_write as u64);
+            input = input.saturating_add(event.input);
+            output = output.saturating_add(event.output);
+            cached_read = cached_read.saturating_add(event.cached_read);
+            cached_write = cached_write.saturating_add(event.cached_write);
         }
 
         if input + output + cached_read + cached_write > best.0 + best.1 + best.2 + best.3 {
@@ -135,10 +135,6 @@ fn max_5min_burst(events: &[EventTokens]) -> (u64, u64, u64, u64) {
     }
 
     best
-}
-
-fn clamp_u32(value: u64) -> u32 {
-    value.min(u32::MAX as u64) as u32
 }
 
 #[cfg(test)]
@@ -151,7 +147,7 @@ mod tests {
             + chrono::Duration::minutes(minute)
     }
 
-    fn cc_event(model: Model, minute: i64, input: u32, output: u32) -> CcEvent {
+    fn cc_event(model: Model, minute: i64, input: u64, output: u64) -> CcEvent {
         CcEvent {
             timestamp_utc: ts(minute),
             request_id: format!("req_{minute}"),
@@ -163,7 +159,7 @@ mod tests {
         }
     }
 
-    fn codex_event(model: Model, minute: i64, input: u32, output: u32) -> CodexEvent {
+    fn codex_event(model: Model, minute: i64, input: u64, output: u64) -> CodexEvent {
         CodexEvent {
             timestamp_utc: ts(minute),
             model,

@@ -21,10 +21,10 @@ pub struct CcEvent {
     pub timestamp_utc: DateTime<Utc>,
     pub request_id: String,
     pub model: Model,
-    pub input: u32,
-    pub output: u32,
-    pub cached_read: u32,
-    pub cached_write: u32,
+    pub input: u64,
+    pub output: u64,
+    pub cached_read: u64,
+    pub cached_write: u64,
 }
 
 pub fn parse_cc_line(line: &str) -> Option<CcEvent> {
@@ -46,16 +46,16 @@ pub fn parse_cc_line(line: &str) -> Option<CcEvent> {
     let model: Model = serde_json::from_value(Value::String(model_str.to_string())).ok()?;
 
     let usage = msg.get("usage")?;
-    let input = usage.get("input_tokens")?.as_u64()? as u32;
-    let output = usage.get("output_tokens")?.as_u64()? as u32;
+    let input = usage.get("input_tokens")?.as_u64()?;
+    let output = usage.get("output_tokens")?.as_u64()?;
     let cached_read = usage
         .get("cache_read_input_tokens")
         .and_then(Value::as_u64)
-        .unwrap_or(0) as u32;
+        .unwrap_or(0);
     let cached_write = usage
         .get("cache_creation_input_tokens")
         .and_then(Value::as_u64)
-        .unwrap_or(0) as u32;
+        .unwrap_or(0);
 
     Some(CcEvent {
         timestamp_utc,

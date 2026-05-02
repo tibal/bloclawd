@@ -15,9 +15,9 @@ use crate::min_version::{MIN_CODEX_VERSION, codex_first_token_count_passes_field
 pub struct CodexEvent {
     pub timestamp_utc: DateTime<Utc>,
     pub model: Model,
-    pub input: u32,
-    pub output: u32,
-    pub cached_read: u32,
+    pub input: u64,
+    pub output: u64,
+    pub cached_read: u64,
 }
 
 pub fn parse_codex_session(
@@ -105,23 +105,19 @@ pub fn parse_codex_session_checked(
                 let input = last
                     .get("input_tokens")
                     .and_then(Value::as_u64)
-                    .unwrap_or(0)
-                    .min(u32::MAX as u64) as u32;
+                    .unwrap_or(0);
                 let output = last
                     .get("output_tokens")
                     .and_then(Value::as_u64)
-                    .unwrap_or(0)
-                    .min(u32::MAX as u64) as u32;
+                    .unwrap_or(0);
                 let reasoning = last
                     .get("reasoning_output_tokens")
                     .and_then(Value::as_u64)
-                    .unwrap_or(0)
-                    .min(u32::MAX as u64) as u32;
+                    .unwrap_or(0);
                 let cached_read = last
                     .get("cached_input_tokens")
                     .and_then(Value::as_u64)
-                    .unwrap_or(0)
-                    .min(u32::MAX as u64) as u32;
+                    .unwrap_or(0);
 
                 events.push(CodexEvent {
                     timestamp_utc,

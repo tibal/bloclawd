@@ -2,7 +2,7 @@ use crate::enums::{Harness, Model, Region, Tier};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-pub const TOKEN_COUNT_MAX: u32 = 1_000_000_000;
+pub const TOKEN_COUNT_MAX: u64 = 1_000_000_000_000;
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
 #[ts(export)]
@@ -20,14 +20,22 @@ pub struct EventPayload {
 #[ts(export)]
 #[serde(deny_unknown_fields)]
 pub struct TokenCounts {
-    pub input_5min: u32,
-    pub output_5min: u32,
-    pub cached_read_5min: u32,
-    pub cached_write_5min: u32,
-    pub input_5h: u32,
-    pub output_5h: u32,
-    pub cached_read_5h: u32,
-    pub cached_write_5h: u32,
+    #[ts(type = "number")]
+    pub input_5min: u64,
+    #[ts(type = "number")]
+    pub output_5min: u64,
+    #[ts(type = "number")]
+    pub cached_read_5min: u64,
+    #[ts(type = "number")]
+    pub cached_write_5min: u64,
+    #[ts(type = "number")]
+    pub input_5h: u64,
+    #[ts(type = "number")]
+    pub output_5h: u64,
+    #[ts(type = "number")]
+    pub cached_read_5h: u64,
+    #[ts(type = "number")]
+    pub cached_write_5h: u64,
 }
 
 impl EventPayload {
@@ -109,8 +117,8 @@ mod tests {
         let mut payload = sample_payload();
         payload.model = Model::Gpt55;
         payload.harness = Harness::Codex;
-        payload.tokens.input_5h = 251_753_546;
-        payload.tokens.cached_read_5h = 248_517_248;
+        payload.tokens.input_5h = 2_064_887_608;
+        payload.tokens.cached_read_5h = 1_630_864_859;
         assert!(payload.validate().is_ok());
     }
 
