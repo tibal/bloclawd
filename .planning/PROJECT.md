@@ -116,6 +116,8 @@ These are deliberately deferred — capture during planning, resolve during exec
 - Country derivation in Rust without IP lookup (locale-based heuristic; how robust across OSes?)
 - Reverse-engineering safeguards in the CLI: how do we make it hard for someone to fork the CLI and pump bogus events while staying open source? (Likely: payload validation + outlier trim are the real defenses; CLI can't be the gate.)
 
+**Amended (Phase 3 Wave 0, D-57 + D-74..D-79):** The CLI gains a new requirement CLI-19 — a post-PoW, post-consent, pre-submit shell-out probe (`claude --print "<uuid>"` or `codex exec "<uuid>"`) that gates submission on a rate-limit signature in the harness's stdout+stderr. The probe is NOT a true cryptographic gate (an open-source binary can be modified to skip it) but it is a non-trivial cost-loader: a fraudster spends N×1s of CPU on PoW solves AND ~30s wall-clock on the probe AND real provider-API tokens BEFORE learning their fakes won't ship. Combined with payload validation + outlier trim, this raises the cost-of-data-pollution attack from "trivial" to "meaningfully expensive". The probe surface is opaque (D-78: all non-rate-limit-detected paths converge to a single `server_unavailable` exit 4 — no telegraphing) and provider-fingerprinting-safe (D-77: bare UUIDv4 prompt only, no bloclawd-identifiable strings).
+
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
