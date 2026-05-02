@@ -7,6 +7,8 @@ pub mod config;
 pub mod canonical;
 pub mod min_version;
 pub mod parsers;
+pub mod probe;
+pub mod probe_sig;
 pub mod region;
 pub mod solve;
 pub mod submit;
