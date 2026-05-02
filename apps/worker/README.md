@@ -87,7 +87,7 @@ A native Rust integration test exercises the full PoW flow against a deployed st
 ```bash
 BLOCLAWD_STAGING_URL='https://bloclawd-worker-staging.<account>.workers.dev' \
 PLANETSCALE_STAGING_URL='postgres://...staging-branch-direct-url...' \
-  cargo test -p bloclawd-worker --features staging-smoke -- --ignored happy_path
+  cargo test --release -p bloclawd-worker --features staging-smoke -- --ignored happy_path
 ```
 
 The test:

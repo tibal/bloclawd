@@ -9,7 +9,7 @@
 // RUN:
 //   BLOCLAWD_STAGING_URL='https://bloclawd-worker-staging.<account>.workers.dev' \
 //   PLANETSCALE_STAGING_URL='postgres://...staging-branch...' \
-//     cargo test -p bloclawd-worker --features staging-smoke -- --ignored happy_path
+//     cargo test --release -p bloclawd-worker --features staging-smoke -- --ignored happy_path
 //
 // NEVER in CI. Manual invocation by an operator after a staging deploy.
 // Documented in apps/worker/README.md section "End-to-end smoke test".
@@ -30,7 +30,7 @@ use event_schema_fixtures::sample_event_payload;
 fn require_env(key: &str) -> String {
     std::env::var(key).unwrap_or_else(|_| {
         panic!(
-            "{key} not set. Run via:\n  BLOCLAWD_STAGING_URL='...' PLANETSCALE_STAGING_URL='...' \\\n    cargo test -p bloclawd-worker --features staging-smoke -- --ignored happy_path"
+            "{key} not set. Run via:\n  BLOCLAWD_STAGING_URL='...' PLANETSCALE_STAGING_URL='...' \\\n    cargo test --release -p bloclawd-worker --features staging-smoke -- --ignored happy_path"
         )
     })
 }
@@ -96,8 +96,8 @@ async fn happy_path() {
     assert_eq!(URL_SAFE_NO_PAD.encode(cid_bytes), cid_b64);
     let cid = ChallengeId(cid_bytes);
     let deadline = Instant::now() + Duration::from_secs(30);
-    let (nonce, _solved_hash) =
-        pow::solve(&cid, &ph, K_V1, 0, deadline).expect("PoW solves within 30s");
+    let (nonce, _solved_hash) = pow::solve(&cid, &ph, K_V1, 0, deadline)
+        .expect("PoW solves within 30s; run staging smoke with cargo test --release");
 
     let event_id = Uuid::new_v4();
     let event_id_b64 = URL_SAFE_NO_PAD.encode(event_id.as_bytes());
