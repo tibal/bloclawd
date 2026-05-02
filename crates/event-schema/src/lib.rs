@@ -1,6 +1,7 @@
 pub mod enums;
 pub mod jcs;
 pub mod payload;
+pub mod region_map;
 
 pub use enums::{Harness, Model, Region, Tier};
 pub use jcs::canonical_bytes;

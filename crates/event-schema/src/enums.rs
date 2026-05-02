@@ -74,6 +74,19 @@ mod tests {
     }
 
     #[test]
+    fn model_roundtrip_gpt_5_5() {
+        let parsed: Model = serde_json::from_str(r#""gpt-5.5""#).unwrap();
+        assert_eq!(serde_json::to_string(&parsed).unwrap(), r#""gpt-5.5""#);
+    }
+
+    #[test]
+    fn model_rejects_neighboring_gpt_versions() {
+        let parsed: Model = serde_json::from_str(r#""gpt-5""#).unwrap();
+        assert_eq!(parsed, Model::Gpt5);
+        assert!(serde_json::from_str::<Model>(r#""gpt-5.6""#).is_err());
+    }
+
+    #[test]
     fn tier_pro_codex_is_snake_case() {
         assert_eq!(serde_json::to_string(&Tier::ProCodex).unwrap(), r#""pro_codex""#);
     }
