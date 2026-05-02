@@ -38,13 +38,11 @@ fn local_to_utc(naive: NaiveDateTime) -> Result<DateTime<Utc>, String> {
 
 pub fn window(
     end_utc: DateTime<Utc>,
-    five_hour: bool,
+    _five_hour: bool,
     week: bool,
 ) -> (DateTime<Utc>, DateTime<Utc>) {
     let duration = if week {
         chrono::Duration::days(7)
-    } else if five_hour {
-        chrono::Duration::hours(5)
     } else {
         chrono::Duration::hours(5)
     };
