@@ -63,6 +63,7 @@ Requirements for initial release. Each maps to roadmap phases. Auto-included fro
 - [ ] **CLI-16**: Submits via `reqwest` blocking + `rustls-tls` to `https://api.bloclawd.com/event`
 - [ ] **CLI-17**: Anonymized fixture session files (CC + Codex) committed; CI asserts known token totals against them
 - [ ] **CLI-18**: Minimum supported CC and Codex versions documented in README and asserted at startup with helpful error if older
+- [ ] **CLI-19**: Before submitting events to the ingest Worker, the CLI shells out to the appropriate harness binary (`claude --print "<bare-uuidv4>"` for CC, `codex exec "<bare-uuidv4>"` for Codex) with an opaque UUIDv4 prompt and only proceeds with submission if the harness responds with an unambiguous rate-limit signature on stdout+stderr (substring match, lowercased). The probe runs AFTER PoW solve and AFTER user consent, BEFORE the first POST. Any deviation (binary missing, child exits 0, child times out, child returns a non-rate-limit error, child returns a rate-limit error of unrecognized shape) converges to a single `server_unavailable`-shape error response with exit code 4. The probe prompt body MUST be opaque (no `bloclawd`/`probe`/version-tagged identifier) to prevent provider fingerprinting that could ban or selectively rate-limit users running bloclawd. Child env strips all `BLOCLAWD_*` variables. `--dry-run` does NOT run the probe.
 
 ### Aggregation (Cron + R2 Materialization)
 
@@ -218,6 +219,7 @@ Explicitly excluded. Documented to prevent scope creep. Anti-features tied to bl
 | CLI-16 | Phase 3 | Pending |
 | CLI-17 | Phase 3 | Pending |
 | CLI-18 | Phase 3 | Pending |
+| CLI-19 | Phase 3 | Pending |
 | AGGR-01 | Phase 4 | Pending |
 | AGGR-02 | Phase 4 | Pending |
 | AGGR-03 | Phase 4 | Pending |
@@ -261,15 +263,15 @@ Explicitly excluded. Documented to prevent scope creep. Anti-features tied to bl
 | DIST-10 | Phase 5 | Pending |
 
 **Coverage:**
-- v1 requirements: 81 total
-- Mapped to phases: 81
+- v1 requirements: 82 total
+- Mapped to phases: 82
 - Unmapped: 0
 
 **By phase:**
 - Phase 1 (Foundations): 6 requirements (SPEC-01..05, BACK-01)
 - Phase 1.5 (Worker Rust Migration): 4 requirements (BACK-05..08)
 - Phase 2 (Ingest Backbone): 14 requirements (BACK-02..04, INGE-01..11)
-- Phase 3 (Rust CLI): 18 requirements (CLI-01..18)
+- Phase 3 (Rust CLI): 19 requirements (CLI-01..19)
 - Phase 4 (Aggregation + Dashboard): 31 requirements (AGGR-01..14, WEB-01..17)
 - Phase 5 (Launch): 10 requirements (DIST-01..10)
 
@@ -278,3 +280,4 @@ Explicitly excluded. Documented to prevent scope creep. Anti-features tied to bl
 *Last updated: 2026-04-30 — Phase 1 doc-conflict resolution: SPEC-01/02/03 rewritten for 72-byte input + JCS; SPEC-05 added; INGE-01/02/04/09 rewritten for HMAC model; BACK-03 KV removed (5 phases, 77/77 mapped)*
 *2026-04-30 — Phase 1.5 inserted: SPEC-04, SPEC-05, BACK-04, INGE-03, INGE-07, INGE-08, INGE-10, INGE-11 rewritten for Rust Worker; BACK-05..08 added (6 phases, 81/81 mapped).*
 *2026-04-30 — Phase 1.5 complete: BACK-04, INGE-03, INGE-07, INGE-08, INGE-10, INGE-11, SPEC-04, SPEC-05, AGGR-12 rewritten for Rust Worker + crates/event-schema source of truth + ts-rs bindings + R2 enums.json drop.*
+*2026-05-02 — Phase 3 Wave 0: CLI-19 added (post-PoW liveness probe per D-74); Phase 3 count 18 → 19; total 81 → 82.*
