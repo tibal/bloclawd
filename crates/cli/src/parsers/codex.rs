@@ -1,6 +1,6 @@
 //! Codex session parser (D-59 + RESEARCH section 2).
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Datelike, Utc};
 use serde_json::Value;
 use std::fs::File;
@@ -8,6 +8,8 @@ use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 use event_schema::Model;
+
+use crate::min_version::{MIN_CODEX_VERSION, codex_first_token_count_passes_field_shape};
 
 #[derive(Debug, Clone)]
 pub struct CodexEvent {
@@ -21,9 +23,16 @@ pub struct CodexEvent {
 pub fn parse_codex_session(
     lines: impl Iterator<Item = Result<String, std::io::Error>>,
 ) -> (Vec<CodexEvent>, u32) {
+    parse_codex_session_checked(lines).unwrap_or_else(|_| (Vec::new(), 1))
+}
+
+pub fn parse_codex_session_checked(
+    lines: impl Iterator<Item = Result<String, std::io::Error>>,
+) -> Result<(Vec<CodexEvent>, u32)> {
     let mut current_model: Option<Model> = None;
     let mut events = Vec::new();
     let mut failures = 0u32;
+    let mut checked_shape = false;
 
     for line in lines {
         let line = match line {
@@ -73,6 +82,14 @@ pub fn parse_codex_session(
                 let Some(last) = info.get("last_token_usage") else {
                     continue;
                 };
+                if !checked_shape {
+                    checked_shape = true;
+                    if !codex_first_token_count_passes_field_shape(&value) {
+                        return Err(anyhow!(
+                            "Codex session format is unsupported; bloclawd requires Codex >= {MIN_CODEX_VERSION} with payload.info.last_token_usage input_tokens, output_tokens, and cached_input_tokens"
+                        ));
+                    }
+                }
                 let Some(model) = current_model else {
                     continue;
                 };
@@ -118,7 +135,7 @@ pub fn parse_codex_session(
         }
     }
 
-    (events, failures)
+    Ok((events, failures))
 }
 
 pub fn discover_session_files(
@@ -193,7 +210,8 @@ pub fn walk(
                 continue;
             }
         };
-        let (mut events, failures) = parse_codex_session(reader.lines());
+        let (mut events, failures) = parse_codex_session_checked(reader.lines())
+            .with_context(|| format!("parse {}", path.display()))?;
         events.retain(|event| {
             event.timestamp_utc >= window_start && event.timestamp_utc <= window_end
         });
@@ -344,6 +362,19 @@ mod tests {
         let (events, _) = parse_codex_session(lines(&raw));
 
         assert_eq!(events[0].cached_read, 9);
+    }
+
+    #[test]
+    fn unsupported_first_token_count_shape_errors_with_min_version() {
+        let raw = vec![
+            turn_context("gpt-5"),
+            r#"{"type":"event_msg","timestamp":"2026-01-01T12:00:00Z","payload":{"type":"token_count","info":{"last_token_usage":{"input_tokens":10,"output_tokens":20}}}}"#.to_string(),
+        ];
+
+        let err = parse_codex_session_checked(lines(&raw)).expect_err("shape error");
+        let message = err.to_string();
+        assert!(message.contains(MIN_CODEX_VERSION));
+        assert!(message.contains("cached_input_tokens"));
     }
 
     #[test]

@@ -3,7 +3,7 @@
 //! Defensive: upstream JSONL is parsed with `serde_json::Value` and `.get()`
 //! chains only. Strict wire structs are for the Worker side, not this surface.
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -13,7 +13,7 @@ use std::path::{Path, PathBuf};
 
 use event_schema::Model;
 
-use crate::min_version::cc_first_line_passes_field_shape;
+use crate::min_version::{MIN_CC_VERSION, cc_first_line_passes_field_shape};
 
 #[derive(Debug, Clone)]
 pub struct CcEvent {
@@ -127,10 +127,10 @@ pub fn parse_session_file(
     path: &Path,
     window_start: DateTime<Utc>,
     window_end: DateTime<Utc>,
-) -> (Vec<CcEvent>, u32) {
+) -> Result<(Vec<CcEvent>, u32)> {
     let file = match File::open(path) {
         Ok(file) => file,
-        Err(_) => return (Vec::new(), 1),
+        Err(_) => return Ok((Vec::new(), 1)),
     };
     let reader = BufReader::new(file);
     let mut events = Vec::new();
@@ -170,8 +170,9 @@ pub fn parse_session_file(
         if !checked_shape {
             checked_shape = true;
             if !cc_first_line_passes_field_shape(&value) {
-                failures = failures.saturating_add(1);
-                return (Vec::new(), failures);
+                return Err(anyhow!(
+                    "Claude Code session format is unsupported; bloclawd requires Claude Code >= {MIN_CC_VERSION} with assistant message.usage input_tokens, output_tokens, cache_read_input_tokens, and cache_creation_input_tokens"
+                ));
             }
         }
 
@@ -186,7 +187,7 @@ pub fn parse_session_file(
         }
     }
 
-    (events, failures)
+    Ok((events, failures))
 }
 
 pub fn walk(
@@ -198,7 +199,8 @@ pub fn walk(
     let mut all = Vec::new();
     let mut total_failures: u32 = 0;
     for path in &files {
-        let (events, failures) = parse_session_file(path, window_start, window_end);
+        let (events, failures) = parse_session_file(path, window_start, window_end)
+            .with_context(|| format!("parse {}", path.display()))?;
         all.extend(events);
         total_failures = total_failures.saturating_add(failures);
     }
@@ -209,6 +211,7 @@ pub fn walk(
 mod tests {
     use super::*;
     use chrono::TimeZone;
+    use std::fs;
 
     fn ts(offset_minutes: i64) -> DateTime<Utc> {
         Utc.with_ymd_and_hms(2026, 1, 1, 12, 0, 0).single().unwrap()
@@ -372,5 +375,24 @@ mod tests {
             .expect("assistant usage parses");
         assert_eq!(event.cached_read, 0);
         assert_eq!(event.cached_write, 0);
+    }
+
+    #[test]
+    fn unsupported_first_assistant_shape_errors_with_min_version() {
+        let path = std::env::temp_dir().join(format!(
+            "bloclawd-cc-min-version-{}.jsonl",
+            std::process::id()
+        ));
+        fs::write(
+            &path,
+            r#"{"type":"assistant","timestamp":"2026-01-01T12:00:00Z","version":"2.1.126","requestId":"req_123","message":{"model":"claude-sonnet-4-5","usage":{"input_tokens":10,"output_tokens":20}}}"#,
+        )
+        .expect("write fixture");
+
+        let err = parse_session_file(&path, ts(-1), ts(1)).expect_err("shape error");
+        let _ = fs::remove_file(&path);
+        let message = err.to_string();
+        assert!(message.contains(MIN_CC_VERSION));
+        assert!(message.contains("cache_read_input_tokens"));
     }
 }

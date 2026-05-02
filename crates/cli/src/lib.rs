@@ -173,7 +173,10 @@ pub fn run_inner_with_output<W: Write, E: Write>(
     }
 
     let client = submit::http_client().map_err(|_| IngestCliError::ServerUnavailable)?;
-    for event in &mut events {
+    let event_count = events.len();
+    for (idx, event) in events.iter_mut().enumerate() {
+        writeln!(stderr, "solving {}/{}", idx + 1, event_count)
+            .map_err(|_| IngestCliError::ServerUnavailable)?;
         let challenge = submit::fetch_challenge(&client)?;
         event.challenge_id = challenge.challenge_id_b64;
         event.sig = challenge.sig_b64;
@@ -182,6 +185,8 @@ pub fn run_inner_with_output<W: Write, E: Write>(
         event.nonce = URL_SAFE_NO_PAD.encode(nonce.0);
     }
 
+    writeln!(stderr, "probing provider rate-limit state")
+        .map_err(|_| IngestCliError::ServerUnavailable)?;
     match probe::probe_blocking(harness_probe) {
         ProbeOutcome::RateLimited => {}
         ProbeOutcome::Converge => return Err(IngestCliError::ServerUnavailable),
@@ -189,7 +194,9 @@ pub fn run_inner_with_output<W: Write, E: Write>(
 
     let mut responses: Vec<(String, u16, serde_json::Value)> = Vec::new();
     let mut overall_exit = 0;
-    for event in &events {
+    for (idx, event) in events.iter().enumerate() {
+        writeln!(stderr, "submitting {}/{}", idx + 1, event_count)
+            .map_err(|_| IngestCliError::ServerUnavailable)?;
         let model = model_name(event.payload.model);
         match submit::post_event(&client, event) {
             Ok(ok) => responses.push((
