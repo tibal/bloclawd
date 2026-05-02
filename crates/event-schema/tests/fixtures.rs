@@ -26,7 +26,7 @@ pub fn sample_event_payload() -> EventPayload {
     }
 }
 
-/// Sample TokenCounts within INGE-07 bounds (each field <= 10_000_000).
+/// Sample TokenCounts within INGE-07 bounds (each field <= TOKEN_COUNT_MAX).
 pub fn sample_token_counts() -> TokenCounts {
     TokenCounts {
         input_5min: 12_345,

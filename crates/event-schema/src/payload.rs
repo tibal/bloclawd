@@ -2,7 +2,7 @@ use crate::enums::{Harness, Model, Region, Tier};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-pub const TOKEN_COUNT_MAX: u32 = 100_000_000;
+pub const TOKEN_COUNT_MAX: u32 = 1_000_000_000;
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
 #[ts(export)]
@@ -101,6 +101,16 @@ mod tests {
     fn validate_accepts_high_real_world_cache_reads() {
         let mut payload = sample_payload();
         payload.tokens.cached_read_5h = 10_378_233;
+        assert!(payload.validate().is_ok());
+    }
+
+    #[test]
+    fn validate_accepts_high_real_world_codex_inputs() {
+        let mut payload = sample_payload();
+        payload.model = Model::Gpt55;
+        payload.harness = Harness::Codex;
+        payload.tokens.input_5h = 251_753_546;
+        payload.tokens.cached_read_5h = 248_517_248;
         assert!(payload.validate().is_ok());
     }
 
