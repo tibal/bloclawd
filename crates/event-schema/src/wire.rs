@@ -1,8 +1,32 @@
+//! Wire body for POST /event (D-54).
+//!
+//! `SubmittedEvent` wraps `EventPayload` plus per-event identifiers and the
+//! per-INVOCATION `submission_group_id` (D-51). The id is a TRANSPORT field:
+//! it is NOT inside `payload` (D-52), NOT JCS-canonicalized, NOT bound into
+//! the 72-byte PoW input. The Worker reads it from the wire body, validates
+//! UUIDv4 format, persists it on the row, and the Phase 4 cron strips it
+//! before any R2 emission (D-56).
+
+use crate::EventPayload;
+use serde::{Deserialize, Serialize};
+use ts_rs::TS;
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
+#[ts(export)]
+#[serde(deny_unknown_fields)]
+pub struct SubmittedEvent {
+    pub event_id: String,            // base64url no-padding UUIDv4
+    pub challenge_id: String,        // base64url no-padding 32 bytes
+    pub sig: String,                 // base64url no-padding HMAC-SHA256 32 bytes
+    pub nonce: String,               // base64url no-padding 8 bytes
+    pub submission_group_id: String, // base64url no-padding UUIDv4 (D-51)
+    pub payload: EventPayload,
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::{
-        EventPayload, Harness, Model, Region, Tier, TokenCounts, canonical_bytes,
-    };
+    use super::*;
+    use crate::{canonical_bytes, Harness, Model, Region, Tier, TokenCounts};
 
     fn sample_payload() -> EventPayload {
         EventPayload {

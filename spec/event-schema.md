@@ -1,7 +1,7 @@
 # Event Payload Schema v1
 
 **Status:** Frozen for v1.
-**Last updated:** 2026-04-30
+**Last updated:** 2026-05-02
 **Source of truth (post-Phase-1.5):** canonical types are defined in Rust under `crates/event-schema/`. Enum definitions live in `crates/event-schema/src/enums.rs`; payload structs live in `crates/event-schema/src/payload.rs`; TypeScript bindings for the SPA are generated via `ts-rs` into `apps/web/src/generated/`.
 
 The former Phase 1 enum JSON artifact was deleted in 01.5-04. It is not a v1 schema source and is not published to R2. Frontend filters import enum values from the generated TypeScript bindings.
@@ -14,6 +14,7 @@ The former Phase 1 enum JSON artifact was deleted in 01.5-04. It is not a v1 sch
   "challenge_id": "<base64url(challenge_id_32B), 43 chars no padding>",
   "sig":          "<base64url(hmac_sig_32B),      43 chars no padding>",
   "nonce":        "<base64url(nonce_8B_be),       11 chars no padding>",
+  "submission_group_id": "<base64url(uuidv4_bytes), 22 chars no padding>",
   "payload": {
     "v":               1,
     "model":           "<one of Model>",
@@ -38,6 +39,8 @@ The `payload` object is canonicalized via RFC 8785 JCS (see `spec/payload-canoni
 
 `event_id`, `challenge_id`, `sig`, and `nonce` are transport fields for the request. They are not part of the canonical `payload` object.
 
+**`submission_group_id`** (string, base64url no-padding UUIDv4, REQUIRED). Per-invocation linkage id; all events emitted by ONE `bloclawd` invocation share the same value (D-51). It is a TRANSPORT field — it is NOT included in the JCS-canonical bytes that produce `payload_hash` (D-52), is NOT bound into the 72-byte PoW input, and is NOT signed by HMAC. The Worker validates UUIDv4 format and persists it on the row; Phase 4 cron strips it before any R2 emission (D-56). Logging boundary applies (CLAUDE.md INGE-11 + D-55): `submission_group_id` MUST NOT appear in any log line.
+
 ## 2. Field Constraints
 
 | Field | Constraint | Source of truth |
@@ -49,6 +52,7 @@ The `payload` object is canonicalized via RFC 8785 JCS (see `spec/payload-canoni
 | `payload.region` | Must match `Region` (ISO continent code) | `crates/event-schema/src/enums.rs` and `apps/web/src/generated/Region.ts` |
 | `payload.tokens.*` | Unsigned integer, 0 <= x <= 10_000_000 | `crates/event-schema/src/payload.rs` |
 | `event_id` | UUIDv4 (never v7), base64url-encoded as 16 raw bytes on the wire and decoded by the Worker into a Postgres `uuid` | CLI-09 carries forward from requirements |
+| `submission_group_id` | UUIDv4 (never v7), base64url-encoded as 16 raw bytes on the wire and decoded by the Worker into a Postgres `uuid`; one value is shared by all events from one CLI invocation | `crates/event-schema/src/wire.rs` |
 
 The generated SPA bindings also include `apps/web/src/generated/EventPayload.ts`, `TokenCounts.ts`, and the hand-maintained `apps/web/src/generated/index.ts` barrel.
 
@@ -60,6 +64,7 @@ These are permanently excluded. The Worker's typed deserializer (`crates/event-s
 - `country` - intermediate-only on the CLI; coarsened to `region` client-side.
 - `event_id` - top-level idempotency field only; never part of the canonical payload.
 - `nonce` - top-level PoW field only; never part of the canonical payload.
+- `submission_group_id` - top-level per-invocation linkage field only; never part of the canonical payload.
 - `ip` - never collected, never logged.
 - `user_id`, `session_id`, `account_id` - bloclawd has no concept of identity.
 

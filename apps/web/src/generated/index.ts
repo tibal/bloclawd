@@ -3,6 +3,7 @@
 // Adding a new #[ts(export)] type? Add an `export type` line here too.
 export type { EventPayload } from "./EventPayload";
 export type { TokenCounts } from "./TokenCounts";
+export type { SubmittedEvent } from "./SubmittedEvent";
 export type { Model } from "./Model";
 export type { Tier } from "./Tier";
 export type { Harness } from "./Harness";
