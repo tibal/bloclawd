@@ -9,6 +9,7 @@ pub mod min_version;
 pub mod parsers;
 pub mod region;
 pub mod solve;
+pub mod submit;
 pub mod window;
 pub mod wire_error;
 
