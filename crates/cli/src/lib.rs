@@ -10,6 +10,7 @@ pub mod parsers;
 pub mod probe;
 pub mod probe_sig;
 pub mod region;
+pub mod render;
 pub mod solve;
 pub mod submit;
 pub mod window;
