@@ -1,8 +1,10 @@
 //! Codex session parser (D-59 + RESEARCH section 2).
 
-use anyhow::Result;
-use chrono::{DateTime, Utc};
-use std::io::{BufRead, BufReader, Cursor};
+use anyhow::{Context, Result};
+use chrono::{DateTime, Datelike, Utc};
+use serde_json::Value;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 use event_schema::Model;
@@ -17,29 +19,189 @@ pub struct CodexEvent {
 }
 
 pub fn parse_codex_session(
-    _lines: impl Iterator<Item = Result<String, std::io::Error>>,
+    lines: impl Iterator<Item = Result<String, std::io::Error>>,
 ) -> (Vec<CodexEvent>, u32) {
-    (Vec::new(), 0)
+    let mut current_model: Option<Model> = None;
+    let mut events = Vec::new();
+    let mut failures = 0u32;
+
+    for line in lines {
+        let line = match line {
+            Ok(line) => line,
+            Err(_) => {
+                failures = failures.saturating_add(1);
+                continue;
+            }
+        };
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let value: Value = match serde_json::from_str(&line) {
+            Ok(value) => value,
+            Err(_) => {
+                failures = failures.saturating_add(1);
+                continue;
+            }
+        };
+
+        match value.get("type").and_then(Value::as_str) {
+            Some("turn_context") => {
+                let Some(model_str) = value
+                    .get("payload")
+                    .and_then(|payload| payload.get("model"))
+                    .and_then(Value::as_str)
+                else {
+                    continue;
+                };
+                if let Ok(model) =
+                    serde_json::from_value::<Model>(Value::String(model_str.to_string()))
+                {
+                    current_model = Some(model);
+                }
+            }
+            Some("event_msg") => {
+                let Some(payload) = value.get("payload") else {
+                    continue;
+                };
+                if payload.get("type").and_then(Value::as_str) != Some("token_count") {
+                    continue;
+                }
+                let Some(info) = payload.get("info").filter(|info| !info.is_null()) else {
+                    continue;
+                };
+                let Some(last) = info.get("last_token_usage") else {
+                    continue;
+                };
+                let Some(model) = current_model else {
+                    continue;
+                };
+                let Some(ts) = value.get("timestamp").and_then(Value::as_str) else {
+                    continue;
+                };
+                let Ok(timestamp_utc) =
+                    DateTime::parse_from_rfc3339(ts).map(|ts| ts.with_timezone(&Utc))
+                else {
+                    continue;
+                };
+
+                let input = last
+                    .get("input_tokens")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0)
+                    .min(u32::MAX as u64) as u32;
+                let output = last
+                    .get("output_tokens")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0)
+                    .min(u32::MAX as u64) as u32;
+                let reasoning = last
+                    .get("reasoning_output_tokens")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0)
+                    .min(u32::MAX as u64) as u32;
+                let cached_read = last
+                    .get("cached_input_tokens")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0)
+                    .min(u32::MAX as u64) as u32;
+
+                events.push(CodexEvent {
+                    timestamp_utc,
+                    model,
+                    input,
+                    output: output.saturating_add(reasoning),
+                    cached_read,
+                });
+            }
+            _ => continue,
+        }
+    }
+
+    (events, failures)
 }
 
 pub fn discover_session_files(
-    _codex_home: &Path,
-    _window_start: DateTime<Utc>,
-    _window_end: DateTime<Utc>,
+    codex_home: &Path,
+    window_start: DateTime<Utc>,
+    window_end: DateTime<Utc>,
 ) -> Result<Vec<PathBuf>> {
-    Ok(Vec::new())
+    let sessions = codex_home.join("sessions");
+    if !sessions.exists() {
+        return Ok(Vec::new());
+    }
+
+    let mut out = Vec::new();
+    let mut day = (window_start - chrono::Duration::days(1)).date_naive();
+    let last_day = (window_end + chrono::Duration::days(1)).date_naive();
+
+    while day <= last_day {
+        let dir = sessions
+            .join(format!("{:04}", day.year()))
+            .join(format!("{:02}", day.month()))
+            .join(format!("{:02}", day.day()));
+        if dir.exists() {
+            for entry in
+                std::fs::read_dir(&dir).with_context(|| format!("read_dir {}", dir.display()))?
+            {
+                let entry = entry?;
+                let path = entry.path();
+                let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+                    continue;
+                };
+                if name.starts_with("rollout-")
+                    && (name.ends_with(".jsonl") || name.ends_with(".jsonl.zst"))
+                {
+                    out.push(path);
+                }
+            }
+        }
+
+        let Some(next) = day.succ_opt() else {
+            break;
+        };
+        day = next;
+    }
+
+    Ok(out)
 }
 
-pub fn open_rollout(_path: &Path) -> Result<Box<dyn BufRead>> {
-    Ok(Box::new(BufReader::new(Cursor::new(Vec::<u8>::new()))))
+pub fn open_rollout(path: &Path) -> Result<Box<dyn BufRead>> {
+    let file = File::open(path).with_context(|| format!("open {}", path.display()))?;
+    if path.extension().and_then(|ext| ext.to_str()) == Some("zst") {
+        let decoder = zstd::stream::Decoder::new(file)
+            .with_context(|| format!("zstd decode {}", path.display()))?;
+        return Ok(Box::new(BufReader::new(decoder)));
+    }
+    Ok(Box::new(BufReader::new(file)))
 }
 
 pub fn walk(
-    _codex_home: &Path,
-    _window_start: DateTime<Utc>,
-    _window_end: DateTime<Utc>,
+    codex_home: &Path,
+    window_start: DateTime<Utc>,
+    window_end: DateTime<Utc>,
 ) -> Result<(Vec<CodexEvent>, u32)> {
-    Ok((Vec::new(), 0))
+    let files = discover_session_files(codex_home, window_start, window_end)?;
+    let mut all = Vec::new();
+    let mut total_failures = 0u32;
+
+    for path in files {
+        let reader = match open_rollout(&path) {
+            Ok(reader) => reader,
+            Err(_) => {
+                total_failures = total_failures.saturating_add(1);
+                continue;
+            }
+        };
+        let (mut events, failures) = parse_codex_session(reader.lines());
+        events.retain(|event| {
+            event.timestamp_utc >= window_start && event.timestamp_utc <= window_end
+        });
+        all.extend(events);
+        total_failures = total_failures.saturating_add(failures);
+    }
+
+    Ok((all, total_failures))
 }
 
 #[cfg(test)]
