@@ -23,7 +23,7 @@ bloclawd is an anonymous, community analytics service that tracks **when AI codi
 - [ ] Rust CLI `bloclawd` reads local Claude Code session artifacts (`~/.claude/projects/.../*.jsonl`) and Codex session artifacts on demand
 - [ ] CLI supports `--5h`, `--week`, `--end <local-time>`, `--cc`, `--codex` flags to compute a per-window token-usage breakdown
 - [ ] CLI computes per-model token counts: input, output, cached read, cached write, 5min and 1h windows
-- [ ] CLI captures harness (`claude-code` | `codex`), subscription tier (Anthropic: `pro`/`max5`/`max20`; OpenAI provider naming), TZ offset, country (coarse)
+- [ ] CLI captures harness (`claude-code` | `codex`), provider-neutral individual subscription tier (`pro`/`max5`/`max20`), TZ offset, country (coarse)
 - [ ] CLI fetches PoW challenge from ingest worker and solves it (~1s on dev laptop hardware)
 - [ ] CLI submits the event payload via `POST /event` with `{ challenge_id, nonce, event_id (UUIDv4), payload }`
 - [ ] CLI runs only when user has hit a limit (no tokens left); explicitly not background telemetry
@@ -42,7 +42,7 @@ bloclawd is an anonymous, community analytics service that tracks **when AI codi
 - [ ] Dashboard at `bloclawd.com/dashboard` renders timeseries of median tokens-per-window with vertical spread (e.g., p25–p75 / p10–p90) and filters for model, subscription tier, harness, region
 - [ ] Dashboard lazy-loads only the JSON buckets needed for the selected time window
 - [ ] `bloclawd.org` redirects to `bloclawd.com`
-- [ ] PoW invariant enforced by spec/pow-v1.md (72-byte byte-exact input: challenge_id || payload_hash || nonce) + spec/payload-canonical.md (RFC 8785 JCS) + spec/pow-fixtures.json (>=10 cross-language test vectors); CI runs cargo test -p pow + vitest run pow + xtask gen-fixtures --check (any failure blocks merge)
+- [ ] PoW invariant enforced by spec/pow-v1.md (72-byte byte-exact input: challenge_id || payload_hash || nonce) + spec/payload-canonical.md (RFC 8785 JCS) + spec/pow-fixtures.json (>=10 test vectors); CI runs the Rust PoW suite, fixture drift check, ts-rs binding drift check, log-boundary grep, and Worker WASM size gate (any failure blocks merge)
 - [ ] Anonymity defenses applied combinatorially at materialization (cron, not ingest): k-anonymity suppression of public-R2 cells with n<5; token counts binned to log-spaced buckets before public emission; `tz_offset` dropped from public R2; `event_id` and `nonce` never written to public R2; per-event timing never persisted
 
 ### Out of Scope
@@ -65,18 +65,20 @@ bloclawd is an anonymous, community analytics service that tracks **when AI codi
 
 ## Context
 
-- **Why this exists:** AI subscription users (Pro / Max5 / Max20 on Anthropic, equivalent OpenAI tiers) repeatedly hit rate limits in their dev workflows but have no aggregate visibility into when others hit them, on what models, in what regions. bloclawd makes that aggregate visible without requiring accounts.
+- **Why this exists:** AI subscription users on individual $20 / $100 / $200 plan buckets repeatedly hit rate limits in their dev workflows but have no aggregate visibility into when others hit them, on what models, in what regions. bloclawd makes that aggregate visible without requiring accounts.
 - **Trust model:** Anonymity is the product. The PoW gate, payload validation, outlier trimming, and the absence of accounts/IDs are all in service of "we can't deanonymize you and the data is still useful."
 - **Architecture lineage:** Lightweight CQRS — write path is rare, gated, validated, durable; read path is static, cached at edge, serves arbitrary traffic without touching the DB.
 - **Data sources:** CC and Codex both write structured session artifacts to disk locally (CC: `~/.claude/projects/<project>/sessions/*.jsonl`, Codex: equivalent). The CLI parses these to compute usage windows; no network access is required to derive the payload.
-- **Critical invariant:** PoW input format must match exactly between the Rust CLI and the TypeScript ingest Worker. They are written in different languages — they cannot share a library — so the format must be specified independently and tested with cross-language fixtures.
+- **Critical invariant:** PoW input format is locked by `spec/pow-v1.md` + `spec/pow-fixtures.json`. After Phase 1.5 the Rust CLI (solver) and the Rust Worker (verifier) share a single implementation in `crates/pow`, so there is no cross-language gap — the spec + fixtures still anchor the wire contract for any future re-implementation, but the in-process verifier is one library.
 - **Cloudflare-native stack:** Workers (ingest, cron, frontend), R2 (materialized JSON), Hyperdrive (PlanetScale Postgres connection pool). Single vendor for the whole edge story; PlanetScale Postgres for source of truth.
 - **Domain assets:** User owns `bloclawd.com` and `bloclawd.org`. `.org` redirects to `.com`. Subdomains: `api.bloclawd.com` (ingest worker), `data.bloclawd.com` (R2 reports).
 
 ## Constraints
 
 - **Tech stack — CLI**: Rust. Reason: small static binaries, easy distribution via cargo + brew + curl-script; no Node runtime requirement for end users.
-- **Tech stack — Workers/Frontend**: TypeScript on Cloudflare Workers; Vite + React SPA. Reason: official Cloudflare DX path, smart placement near PlanetScale for ingest worker.
+- **Tech stack — Workers**: Rust on Cloudflare Workers via `workers-rs 0.8.1` (the `worker` crate), compiled to WASM with `worker-build 0.8.1`. Reason: the entire backend (CLI + Worker) is Rust so canonical event/enum/PoW types live in shared workspace crates consumed by both sides — no cross-language drift, no parallel TS schema, single source of truth for the wire contract.
+- **Shared type source**: `crates/event-schema` is the canonical Rust source for `EventPayload`, `TokenCounts`, model/tier/harness/region enums, and `canonical_bytes`; TypeScript bindings are generated via `ts-rs` into `apps/web/src/generated/`. Reason: frontend gets compile-time-checked types without maintaining a runtime enum JSON file.
+- **Tech stack — Frontend**: TypeScript + Vite 6 + React 19 SPA on Cloudflare Workers. Reason: browser bundle ergonomics, ecosystem (TanStack Query, uPlot), and `@cloudflare/vite-plugin` 1.x dev-server parity.
 - **Tech stack — Database**: PlanetScale Postgres via Hyperdrive. Reason: durability, standard PostgreSQL driver compatibility, branch-based dev, integrates cleanly with Cloudflare.
 - **Privacy**: No long-lived identifiers, no IP-based geo, no accounts. Reason: anonymity is the trust contract with users.
 - **Volume budget**: ≤ 1 event per user per 5 hours. Reason: correlates with the lowest Anthropic limit window; defines write-path sizing.
@@ -92,6 +94,8 @@ bloclawd is an anonymous, community analytics service that tracks **when AI codi
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | CLI in Rust (not Node) | Small static binaries, easier distribution to non-Node users, faster PoW solver | — Pending |
+| Backend Worker in Rust via `workers-rs` (not TypeScript) | Single language across CLI + Worker; `crates/event-schema` supplies canonical event/enum/JCS types; PoW verifier collapses to one `crates/pow`. Phase 01.5-03 deployed staging `/db-ping` and proved workers-rs 0.8.1 first-class `Hyperdrive` binding + upstream `tokio-postgres` rev `35a85bdbfeeac465e092950f65a10d9192418175` works through Hyperdrive when queries use `query_typed_one`; the earlier devsnek-fork assumption is no longer current for this smoke path. | — Pending |
+| Deleted enum JSON manifest as source of truth (D-27/D-28) | `crates/event-schema/src/enums.rs` is the canonical enum list. `ts-rs` emits SPA bindings into `apps/web/src/generated/`; no `enums.json` is published to R2 in v1 unless a third-party non-SPA consumer appears later. | — Pending |
 | Cloudflare-native stack (Workers + R2 + Hyperdrive + PlanetScale Postgres) | Single-vendor edge story, smart placement available, free egress on R2 custom domain, standard Postgres semantics | — Pending |
 | PoW gate via stateless HMAC-signed challenges (no KV); 72-byte input binds challenge_id, payload_hash, and nonce; 60s expiry | Removes KV consistency-race + state surface; payload_hash binding is the primary replay defense; event_id PK and 60s expiry are layered defenses | — Pending |
 | 15-min bucket JSON files in R2 (lazy loading) | CDN-friendly: old buckets are immutable so cache hits forever; dashboard fetches only what it needs | — Pending |
@@ -112,6 +116,8 @@ These are deliberately deferred — capture during planning, resolve during exec
 - Country derivation in Rust without IP lookup (locale-based heuristic; how robust across OSes?)
 - Reverse-engineering safeguards in the CLI: how do we make it hard for someone to fork the CLI and pump bogus events while staying open source? (Likely: payload validation + outlier trim are the real defenses; CLI can't be the gate.)
 
+**Amended (Phase 3 Wave 0, D-57 + D-74..D-79):** The CLI gains a new requirement CLI-19 — a post-PoW, post-consent, pre-submit shell-out probe (`claude --print "<uuid>"` or `codex exec "<uuid>"`) that gates submission on a rate-limit signature in the harness's stdout+stderr. The probe is NOT a true cryptographic gate (an open-source binary can be modified to skip it) but it is a non-trivial cost-loader: a fraudster spends N×1s of CPU on PoW solves AND ~30s wall-clock on the probe AND real provider-API tokens BEFORE learning their fakes won't ship. Combined with payload validation + outlier trim, this raises the cost-of-data-pollution attack from "trivial" to "meaningfully expensive". The probe surface is opaque (D-78: all non-rate-limit-detected paths converge to a single `server_unavailable` exit 4 — no telegraphing) and provider-fingerprinting-safe (D-77: bare UUIDv4 prompt only, no bloclawd-identifiable strings).
+
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
@@ -131,3 +137,5 @@ This document evolves at phase transitions and milestone boundaries.
 
 ---
 *Last updated: 2026-04-30 — Phase 1 doc-conflict resolution: HMAC PoW (no KV), 72-byte input, double-MAD trim*
+*2026-04-30 — Phase 1.5 inserted: backend Worker stack pivots from TypeScript to Rust (workers-rs); shared workspace crate for canonical event/enum/JCS types; bilingual PoW CI gate collapses to single-language Rust gate.*
+*2026-04-30 — Phase 1.5 Plan 05 doc sweep: Rust Worker is workers-rs 0.8.1 + worker-build; `crates/event-schema` is canonical shared type source; `apps/web/src/generated/` is the frontend enum/type source; R2 enum JSON dropped per D-27/D-28.*

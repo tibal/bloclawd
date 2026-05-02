@@ -89,4 +89,4 @@ K=22 is fixed for v1. Tunable via Worker env var `POW_DIFFICULTY_K` (defaults to
 
 ## 7. Worked example
 
-A single canonical example is provided in `spec/pow-fixtures.json`. Both Rust and TypeScript implementations must round-trip every fixture in that file (see `spec/pow-fixtures.json` and the bilingual CI gate in `.github/workflows/pow.yml`).
+A single canonical example is provided in `spec/pow-fixtures.json`. The shared `crates/pow` is the verifier/solver implementation used by the Rust CLI and the Rust Worker. It must round-trip every fixture in that file. CI verifies this in `.github/workflows/pow.yml` via `cargo test -p pow` plus the deterministic-fixture drift gate `cargo xtask gen-fixtures --check`. Pre-Phase-1.5 used a transitional bilingual gate; Phase 1.5 retired that bridge and made `crates/pow` the only verifier implementation.

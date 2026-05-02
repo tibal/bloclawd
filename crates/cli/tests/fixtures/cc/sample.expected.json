@@ -1,0 +1,12 @@
+{
+  "claude-sonnet-4-5": {
+    "input_5min": 150,
+    "output_5min": 275,
+    "cached_read_5min": 14,
+    "cached_write_5min": 8,
+    "input_5h": 150,
+    "output_5h": 275,
+    "cached_read_5h": 14,
+    "cached_write_5h": 8
+  }
+}

@@ -6,6 +6,9 @@
 resolver = "3"
 members = [
   "crates/pow",
+  "crates/event-schema",
+  "crates/cli",
+  "apps/worker",
   "xtask",
 ]
 
@@ -23,12 +26,26 @@ hmac = "0.12"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_jcs = "0.2"
+ts-rs = "12"
 base64 = "0.22"
 hex = "0.4"
 anyhow = "1"
 thiserror = "1"
+clap = { version = "4", features = ["derive"] }
+reqwest = { version = "0.13", default-features = false, features = ["blocking", "rustls"] }
+sys-locale = "0.3"
+chrono = "0.4"
+zstd = "0.13"
+uuid = { version = "1", features = ["v4"] }
+toml = "0.8"
+tokio = { version = "1", default-features = false, features = ["macros", "process", "time", "rt"] }
+indicatif = "0.18"
 
 [profile.release]
+opt-level = "s"
 lto = "thin"
 codegen-units = 1
 strip = "symbols"
+
+[profile.release.package.bloclawd-worker]
+opt-level = "s"

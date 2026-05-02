@@ -1,10 +1,12 @@
 # Event Payload Schema v1
 
 **Status:** Frozen for v1.
-**Last updated:** 2026-04-30
-**Enums (machine-readable):** [`spec/enums.json`](./enums.json) - single source of truth, imported by the Worker (`z.enum(...)`) and copied byte-for-byte to R2 by the cron (per AGGR-12).
+**Last updated:** 2026-05-02
+**Source of truth (post-Phase-1.5):** canonical types are defined in Rust under `crates/event-schema/`. Enum definitions live in `crates/event-schema/src/enums.rs`; payload structs live in `crates/event-schema/src/payload.rs`; TypeScript bindings for the SPA are generated via `ts-rs` into `apps/web/src/generated/`.
 
-## 1. Logical request body - `POST /event`
+The former Phase 1 enum JSON artifact was deleted in 01.5-04. It is not a v1 schema source and is not published to R2. Frontend filters import enum values from the generated TypeScript bindings.
+
+## 1. Logical Request Body - `POST /event`
 
 ```json
 {
@@ -12,12 +14,13 @@
   "challenge_id": "<base64url(challenge_id_32B), 43 chars no padding>",
   "sig":          "<base64url(hmac_sig_32B),      43 chars no padding>",
   "nonce":        "<base64url(nonce_8B_be),       11 chars no padding>",
+  "submission_group_id": "<base64url(uuidv4_bytes), 22 chars no padding>",
   "payload": {
     "v":               1,
-    "model":           "<one of enums.model>",
-    "tier":            "<one of enums.tier>",
-    "harness":         "<one of enums.harness>",
-    "region":          "<one of enums.region>",
+    "model":           "<one of Model>",
+    "tier":            "<one of Tier>",
+    "harness":         "<one of Harness>",
+    "region":          "<one of Region>",
     "tokens": {
       "input_5min":         <unsigned int>,
       "output_5min":        <unsigned int>,
@@ -36,48 +39,58 @@ The `payload` object is canonicalized via RFC 8785 JCS (see `spec/payload-canoni
 
 `event_id`, `challenge_id`, `sig`, and `nonce` are transport fields for the request. They are not part of the canonical `payload` object.
 
-## 2. Field constraints
+**`submission_group_id`** (string, base64url no-padding UUIDv4, REQUIRED). Per-invocation linkage id; all events emitted by ONE `bloclawd` invocation share the same value (D-51). It is a TRANSPORT field — it is NOT included in the JCS-canonical bytes that produce `payload_hash` (D-52), is NOT bound into the 72-byte PoW input, and is NOT signed by HMAC. The Worker validates UUIDv4 format and persists it on the row; Phase 4 cron strips it before any R2 emission (D-56). Logging boundary applies (CLAUDE.md INGE-11 + D-55): `submission_group_id` MUST NOT appear in any log line.
+
+## 2. Field Constraints
 
 | Field | Constraint | Source of truth |
 |-------|------------|-----------------|
-| `payload.v` | Must be `1` for v1 | This document |
-| `payload.model` | Must match an entry in `enums.json#model` | `spec/enums.json` |
-| `payload.tier` | Must match an entry in `enums.json#tier` | `spec/enums.json` |
-| `payload.harness` | Must match an entry in `enums.json#harness` | `spec/enums.json` |
-| `payload.region` | Must match an entry in `enums.json#region` (ISO continent code) | `spec/enums.json` |
-| `payload.tokens.*` | Unsigned integer, 0 <= x <= 10_000_000 | This document |
-| `event_id` | UUIDv4 (never v7), base64url-encoded as 16 raw bytes on the wire and decoded by the Worker into a Postgres `uuid` | `01-CONTEXT.md` carries forward CLI-09 |
+| `payload.v` | Must be `1` for v1 | `crates/event-schema/src/payload.rs` |
+| `payload.model` | Must match `Model` | `crates/event-schema/src/enums.rs` and `apps/web/src/generated/Model.ts` |
+| `payload.tier` | Must match `Tier` | `crates/event-schema/src/enums.rs` and `apps/web/src/generated/Tier.ts` |
+| `payload.harness` | Must match `Harness` | `crates/event-schema/src/enums.rs` and `apps/web/src/generated/Harness.ts` |
+| `payload.region` | Must match `Region` (ISO continent code) | `crates/event-schema/src/enums.rs` and `apps/web/src/generated/Region.ts` |
+| `payload.tokens.*` | Unsigned integer, 0 <= x <= 1_000_000_000_000 | `crates/event-schema/src/payload.rs` |
+| `event_id` | UUIDv4 (never v7), base64url-encoded as 16 raw bytes on the wire and decoded by the Worker into a Postgres `uuid` | CLI-09 carries forward from requirements |
+| `submission_group_id` | UUIDv4 (never v7), base64url-encoded as 16 raw bytes on the wire and decoded by the Worker into a Postgres `uuid`; one value is shared by all events from one CLI invocation | `crates/event-schema/src/wire.rs` |
 
-## 3. Fields that MUST NOT appear in the payload
+The generated SPA bindings also include `apps/web/src/generated/EventPayload.ts`, `TokenCounts.ts`, and the hand-maintained `apps/web/src/generated/index.ts` barrel.
 
-These are permanently excluded. Worker `zod` schema rejects (with status 400) if seen:
+## 3. Fields That MUST NOT Appear in the Payload
 
-- `tz_offset` - coarsened to `region` client-side; never reaches the Worker, never reaches the DB, never reaches R2.
+These are permanently excluded. The Worker's typed deserializer (`crates/event-schema::EventPayload`, with `#[serde(deny_unknown_fields)]`) rejects unknown fields with status 400 if seen:
+
+- `tz_offset` - coarsened to `region` client-side; never reaches the Worker, DB, or R2.
 - `country` - intermediate-only on the CLI; coarsened to `region` client-side.
 - `event_id` - top-level idempotency field only; never part of the canonical payload.
 - `nonce` - top-level PoW field only; never part of the canonical payload.
+- `submission_group_id` - top-level per-invocation linkage field only; never part of the canonical payload.
 - `ip` - never collected, never logged.
 - `user_id`, `session_id`, `account_id` - bloclawd has no concept of identity.
 
-## 4. Server-assigned fields (DB only, never on the wire)
+## 4. Server-Assigned Fields
 
 The DB row also contains, populated by the Worker:
 
 - `bucket_ts TIMESTAMPTZ` - server-assigned and floored to the 15-minute bucket, for example with `date_bin('15 minutes', now(), '1970-01-01 00:00:00+00'::timestamptz)`. Client-supplied timestamps are never trusted. (Per BACK-02 + INGE-06.)
 - `received_at TIMESTAMPTZ` - `now()` at insert.
 
-## 5. Unknown enum value handling (D-20)
+These fields are never on the wire payload.
 
-- Worker: `zod` `.enum(...)` produces a 400 with the offending field name and the allowed value list. Never silently coerced.
-- CLI: starts up by loading `spec/enums.json` (vendored at build time via `include_bytes!`) and asserting the values it derived (`model`, `tier`, `harness`, `region`) against the enum sets before spending a 30s PoW solve. (Per CLI-12 in REQUIREMENTS.md.)
+## 5. Unknown Enum Value Handling
 
-## 6. Anonymity guarantees (cron / R2)
+- Worker: serde deserialization into `crates/event-schema::EventPayload` rejects unknown enum values before insert. Phase 2 should surface a 400 with the offending field name and allowed values derived from the Rust enum source.
+- CLI: validates derived `model`, `tier`, `harness`, and `region` against `crates/event-schema` before spending the PoW solve budget.
+- Frontend: imports enum sets from `apps/web/src/generated/` and does not maintain its own list.
+
+## 6. Anonymity Guarantees
 
 The aggregation cron writes a derived form of the payload to R2 (see Phase 4):
 
-- `tz_offset` is not in the wire payload at all (this document), so the cron has nothing to drop.
-- `event_id` and `nonce` are dropped by the cron before R2 write (per AGGR-08).
+- `tz_offset` is not in the wire payload at all, so the cron has nothing to drop.
+- `event_id` and `nonce` are dropped before R2 write (per AGGR-08).
 - Token counts are log-binned before R2 emission (per AGGR-06).
 - Cells with `n < 5` are suppressed (per AGGR-05, k-anonymity).
+- Enum sets for filters come from `apps/web/src/generated/`, not an R2 enum manifest.
 
-These properties are enforced at the materialization step, not at ingest. The DB rows retain the precise form for re-aggregation; only R2 is public.
+These properties are enforced at materialization, not at ingest. The DB rows retain the precise private form for re-aggregation; only R2 is public.

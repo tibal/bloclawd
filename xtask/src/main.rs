@@ -8,6 +8,8 @@ use std::fs;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
+mod anonymize_session;
+
 const FIXTURE_PATH: &str = "spec/pow-fixtures.json";
 
 #[derive(Clone, Copy)]
@@ -53,6 +55,23 @@ fn main() -> Result<()> {
             let check = args.any(|arg| arg == "--check");
             gen_fixtures(check)
         }
+        "anonymize-session" => {
+            let mut harness = None;
+            let mut input = None;
+            let mut output = None;
+            while let Some(arg) = args.next() {
+                match arg.as_str() {
+                    "--harness" => harness = args.next(),
+                    "--input" => input = args.next().map(std::path::PathBuf::from),
+                    "--output" => output = args.next().map(std::path::PathBuf::from),
+                    other => bail!("unknown anonymize-session flag `{other}`"),
+                }
+            }
+            let harness = harness.ok_or_else(|| anyhow::anyhow!("--harness required"))?;
+            let input = input.ok_or_else(|| anyhow::anyhow!("--input required"))?;
+            let output = output.ok_or_else(|| anyhow::anyhow!("--output required"))?;
+            anonymize_session::run(&harness, &input, &output)
+        }
         "--help" | "-h" | "help" => {
             usage();
             Ok(())
@@ -65,6 +84,9 @@ fn usage() {
     eprintln!("usage:");
     eprintln!("  cargo run -p xtask -- gen-fixtures");
     eprintln!("  cargo run -p xtask -- gen-fixtures --check");
+    eprintln!(
+        "  cargo run -p xtask -- anonymize-session --harness <cc|codex> --input <path> --output <path>"
+    );
 }
 
 fn gen_fixtures(check: bool) -> Result<()> {

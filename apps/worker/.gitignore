@@ -1,0 +1,3 @@
+# worker-build output and Rust target dir; both are reproducible from source.
+build/
+target/
