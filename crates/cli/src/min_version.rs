@@ -2,15 +2,67 @@
 
 use serde_json::Value;
 
-pub const MIN_CC_VERSION: &str = "0.0.0";
-pub const MIN_CODEX_VERSION: &str = "0.0.0";
+pub const MIN_CC_VERSION: &str = "2.1.89";
+pub const MIN_CODEX_VERSION: &str = "0.125.0";
 
-pub fn cc_first_line_passes_field_shape(_line: &Value) -> bool {
-    false
+pub fn cc_first_line_passes_field_shape(line: &Value) -> bool {
+    if line.get("type").and_then(Value::as_str) != Some("assistant") {
+        return false;
+    }
+    let msg = match line.get("message") {
+        Some(msg) => msg,
+        None => return false,
+    };
+    let model = match msg.get("model").and_then(Value::as_str) {
+        Some(model) => model,
+        None => return false,
+    };
+    if model == "<synthetic>" {
+        return false;
+    }
+    let usage = match msg.get("usage") {
+        Some(usage) => usage,
+        None => return false,
+    };
+
+    usage.get("input_tokens").and_then(Value::as_u64).is_some()
+        && usage.get("output_tokens").and_then(Value::as_u64).is_some()
+        && usage
+            .get("cache_read_input_tokens")
+            .and_then(Value::as_u64)
+            .is_some()
+        && usage
+            .get("cache_creation_input_tokens")
+            .and_then(Value::as_u64)
+            .is_some()
 }
 
-pub fn codex_first_token_count_passes_field_shape(_line: &Value) -> bool {
-    false
+pub fn codex_first_token_count_passes_field_shape(line: &Value) -> bool {
+    if line.get("type").and_then(Value::as_str) != Some("event_msg") {
+        return false;
+    }
+    let payload = match line.get("payload") {
+        Some(payload) => payload,
+        None => return false,
+    };
+    if payload.get("type").and_then(Value::as_str) != Some("token_count") {
+        return false;
+    }
+    let info = match payload.get("info") {
+        Some(info) if !info.is_null() => info,
+        _ => return false,
+    };
+    let last = match info.get("last_token_usage") {
+        Some(last) => last,
+        None => return false,
+    };
+
+    last.get("input_tokens").and_then(Value::as_u64).is_some()
+        && last.get("output_tokens").and_then(Value::as_u64).is_some()
+        && last
+            .get("cached_input_tokens")
+            .and_then(Value::as_u64)
+            .is_some()
 }
 
 #[cfg(test)]
@@ -56,12 +108,18 @@ mod tests {
 
     #[test]
     fn min_cc_version_is_pinned() {
-        assert_eq!(MIN_CC_VERSION, "2.1.89");
+        assert_eq!(
+            MIN_CC_VERSION.split('.').collect::<Vec<_>>(),
+            ["2", "1", "89"]
+        );
     }
 
     #[test]
     fn min_codex_version_is_pinned() {
-        assert_eq!(MIN_CODEX_VERSION, "0.125.0");
+        assert_eq!(
+            MIN_CODEX_VERSION.split('.').collect::<Vec<_>>(),
+            ["0", "125", "0"]
+        );
     }
 
     #[test]

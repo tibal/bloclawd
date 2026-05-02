@@ -1,10 +1,19 @@
 //! CC session parser (D-58 + RESEARCH section 1).
+//!
+//! Defensive: upstream JSONL is parsed with `serde_json::Value` and `.get()`
+//! chains only. Strict wire structs are for the Worker side, not this surface.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
+use serde_json::Value;
+use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
 use event_schema::Model;
+
+use crate::min_version::cc_first_line_passes_field_shape;
 
 #[derive(Debug, Clone)]
 pub struct CcEvent {
@@ -17,35 +26,183 @@ pub struct CcEvent {
     pub cached_write: u32,
 }
 
-pub fn parse_cc_line(_line: &str) -> Option<CcEvent> {
-    None
+pub fn parse_cc_line(line: &str) -> Option<CcEvent> {
+    let v: Value = serde_json::from_str(line).ok()?;
+    if v.get("type")?.as_str()? != "assistant" {
+        return None;
+    }
+
+    let ts = v.get("timestamp")?.as_str()?;
+    let timestamp_utc = DateTime::parse_from_rfc3339(ts).ok()?.with_timezone(&Utc);
+
+    let request_id = v.get("requestId")?.as_str()?.to_string();
+    let msg = v.get("message")?;
+    let model_str = msg.get("model")?.as_str()?;
+    if model_str == "<synthetic>" {
+        return None;
+    }
+
+    let model: Model = serde_json::from_value(Value::String(model_str.to_string())).ok()?;
+
+    let usage = msg.get("usage")?;
+    let input = usage.get("input_tokens")?.as_u64()? as u32;
+    let output = usage.get("output_tokens")?.as_u64()? as u32;
+    let cached_read = usage
+        .get("cache_read_input_tokens")
+        .and_then(Value::as_u64)
+        .unwrap_or(0) as u32;
+    let cached_write = usage
+        .get("cache_creation_input_tokens")
+        .and_then(Value::as_u64)
+        .unwrap_or(0) as u32;
+
+    Some(CcEvent {
+        timestamp_utc,
+        request_id,
+        model,
+        input,
+        output,
+        cached_read,
+        cached_write,
+    })
 }
 
-pub fn dedup_by_request_id(_events: Vec<CcEvent>) -> Vec<CcEvent> {
-    Vec::new()
+pub fn dedup_by_request_id(events: Vec<CcEvent>) -> Vec<CcEvent> {
+    let mut out: HashMap<String, CcEvent> = HashMap::new();
+    for event in events {
+        out.insert(event.request_id.clone(), event);
+    }
+    out.into_values().collect()
+}
+
+pub fn filter_window(
+    events: Vec<CcEvent>,
+    window_start: DateTime<Utc>,
+    window_end: DateTime<Utc>,
+) -> Vec<CcEvent> {
+    events
+        .into_iter()
+        .filter(|event| event.timestamp_utc >= window_start && event.timestamp_utc <= window_end)
+        .collect()
 }
 
 pub fn discover_session_files(
-    _claude_home: &Path,
-    _window_start: DateTime<Utc>,
+    claude_home: &Path,
+    window_start: DateTime<Utc>,
 ) -> Result<Vec<PathBuf>> {
-    Ok(Vec::new())
+    let projects = claude_home.join("projects");
+    if !projects.exists() {
+        return Ok(Vec::new());
+    }
+    let cutoff = window_start - chrono::Duration::minutes(30);
+
+    let mut out = Vec::new();
+    for project_entry in
+        std::fs::read_dir(&projects).with_context(|| format!("read_dir {}", projects.display()))?
+    {
+        let project_entry = project_entry?;
+        if !project_entry.file_type()?.is_dir() {
+            continue;
+        }
+        for session_entry in std::fs::read_dir(project_entry.path())
+            .with_context(|| format!("read_dir {}", project_entry.path().display()))?
+        {
+            let session_entry = session_entry?;
+            let path = session_entry.path();
+            if path.extension().and_then(|s| s.to_str()) != Some("jsonl") {
+                continue;
+            }
+            let mtime = session_entry.metadata()?.modified()?;
+            let mtime_utc: DateTime<Utc> = mtime.into();
+            if mtime_utc < cutoff {
+                continue;
+            }
+            out.push(path);
+        }
+    }
+    Ok(out)
 }
 
 pub fn parse_session_file(
-    _path: &Path,
-    _window_start: DateTime<Utc>,
-    _window_end: DateTime<Utc>,
+    path: &Path,
+    window_start: DateTime<Utc>,
+    window_end: DateTime<Utc>,
 ) -> (Vec<CcEvent>, u32) {
-    (Vec::new(), 0)
+    let file = match File::open(path) {
+        Ok(file) => file,
+        Err(_) => return (Vec::new(), 1),
+    };
+    let reader = BufReader::new(file);
+    let mut events = Vec::new();
+    let mut failures: u32 = 0;
+    let mut checked_shape = false;
+
+    for line in reader.lines() {
+        let line = match line {
+            Ok(line) => line,
+            Err(_) => {
+                failures = failures.saturating_add(1);
+                continue;
+            }
+        };
+        if line.trim().is_empty() {
+            continue;
+        }
+
+        let value: Value = match serde_json::from_str(&line) {
+            Ok(value) => value,
+            Err(_) => {
+                failures = failures.saturating_add(1);
+                continue;
+            }
+        };
+        if value.get("type").and_then(Value::as_str) != Some("assistant") {
+            continue;
+        }
+        if value
+            .get("message")
+            .and_then(|message| message.get("model"))
+            .and_then(Value::as_str)
+            == Some("<synthetic>")
+        {
+            continue;
+        }
+        if !checked_shape {
+            checked_shape = true;
+            if !cc_first_line_passes_field_shape(&value) {
+                failures = failures.saturating_add(1);
+                return (Vec::new(), failures);
+            }
+        }
+
+        match parse_cc_line(&line) {
+            Some(event)
+                if event.timestamp_utc >= window_start && event.timestamp_utc <= window_end =>
+            {
+                events.push(event);
+            }
+            Some(_) => {}
+            None => failures = failures.saturating_add(1),
+        }
+    }
+
+    (events, failures)
 }
 
 pub fn walk(
-    _claude_home: &Path,
-    _window_start: DateTime<Utc>,
-    _window_end: DateTime<Utc>,
+    claude_home: &Path,
+    window_start: DateTime<Utc>,
+    window_end: DateTime<Utc>,
 ) -> Result<(Vec<CcEvent>, u32)> {
-    Ok((Vec::new(), 0))
+    let files = discover_session_files(claude_home, window_start)?;
+    let mut all = Vec::new();
+    let mut total_failures: u32 = 0;
+    for path in &files {
+        let (events, failures) = parse_session_file(path, window_start, window_end);
+        all.extend(events);
+        total_failures = total_failures.saturating_add(failures);
+    }
+    Ok((dedup_by_request_id(all), total_failures))
 }
 
 #[cfg(test)]
@@ -54,9 +211,7 @@ mod tests {
     use chrono::TimeZone;
 
     fn ts(offset_minutes: i64) -> DateTime<Utc> {
-        Utc.with_ymd_and_hms(2026, 1, 1, 12, 0, 0)
-            .single()
-            .unwrap()
+        Utc.with_ymd_and_hms(2026, 1, 1, 12, 0, 0).single().unwrap()
             + chrono::Duration::minutes(offset_minutes)
     }
 
@@ -145,17 +300,54 @@ mod tests {
     #[test]
     fn window_filter_keeps_only_inclusive_range() {
         let events = vec![
-            CcEvent { timestamp_utc: ts(-2), request_id: "a".into(), model: Model::ClaudeSonnet45, input: 1, output: 1, cached_read: 0, cached_write: 0 },
-            CcEvent { timestamp_utc: ts(-1), request_id: "b".into(), model: Model::ClaudeSonnet45, input: 1, output: 1, cached_read: 0, cached_write: 0 },
-            CcEvent { timestamp_utc: ts(0), request_id: "c".into(), model: Model::ClaudeSonnet45, input: 1, output: 1, cached_read: 0, cached_write: 0 },
-            CcEvent { timestamp_utc: ts(1), request_id: "d".into(), model: Model::ClaudeSonnet45, input: 1, output: 1, cached_read: 0, cached_write: 0 },
-            CcEvent { timestamp_utc: ts(2), request_id: "e".into(), model: Model::ClaudeSonnet45, input: 1, output: 1, cached_read: 0, cached_write: 0 },
+            CcEvent {
+                timestamp_utc: ts(-2),
+                request_id: "a".into(),
+                model: Model::ClaudeSonnet45,
+                input: 1,
+                output: 1,
+                cached_read: 0,
+                cached_write: 0,
+            },
+            CcEvent {
+                timestamp_utc: ts(-1),
+                request_id: "b".into(),
+                model: Model::ClaudeSonnet45,
+                input: 1,
+                output: 1,
+                cached_read: 0,
+                cached_write: 0,
+            },
+            CcEvent {
+                timestamp_utc: ts(0),
+                request_id: "c".into(),
+                model: Model::ClaudeSonnet45,
+                input: 1,
+                output: 1,
+                cached_read: 0,
+                cached_write: 0,
+            },
+            CcEvent {
+                timestamp_utc: ts(1),
+                request_id: "d".into(),
+                model: Model::ClaudeSonnet45,
+                input: 1,
+                output: 1,
+                cached_read: 0,
+                cached_write: 0,
+            },
+            CcEvent {
+                timestamp_utc: ts(2),
+                request_id: "e".into(),
+                model: Model::ClaudeSonnet45,
+                input: 1,
+                output: 1,
+                cached_read: 0,
+                cached_write: 0,
+            },
         ];
 
-        let filtered: Vec<_> = events
-            .into_iter()
-            .filter(|e| e.timestamp_utc >= ts(-1) && e.timestamp_utc <= ts(1))
-            .collect();
+        let filtered = filter_window(events, ts(-1), ts(1));
 
         assert_eq!(filtered.len(), 3);
     }
