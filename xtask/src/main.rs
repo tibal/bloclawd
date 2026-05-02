@@ -8,6 +8,8 @@ use std::fs;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
+mod anonymize_session;
+
 const FIXTURE_PATH: &str = "spec/pow-fixtures.json";
 
 #[derive(Clone, Copy)]
