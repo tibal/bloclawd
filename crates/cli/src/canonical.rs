@@ -1,4 +1,21 @@
-use event_schema::{EventPayload, SubmittedEvent};
+//! CLI-10 single canonical formatter.
+//!
+//! All CLI paths that need EventPayload bytes call this module. Dry-run output
+//! and PoW input binding must use the same byte source.
+//!
+//! Never implement JCS here. Delegate to the shared event-schema helper.
+
+use anyhow::{Context, Result};
+use event_schema::EventPayload;
+use sha2::{Digest, Sha256};
+
+pub fn canonicalize(payload: &EventPayload) -> Result<Vec<u8>> {
+    event_schema::canonical_bytes(payload).context("canonicalize EventPayload with shared JCS")
+}
+
+pub fn payload_hash(canonical: &[u8]) -> [u8; 32] {
+    Sha256::digest(canonical).into()
+}
 
 #[cfg(test)]
 mod tests {
@@ -47,18 +64,17 @@ mod tests {
     fn transport_group_id_stays_out_of_payload_bytes() {
         let payload = sample_payload();
         let group_value = "group-value-that-must-not-appear";
-        let envelope = SubmittedEvent {
-            event_id: "event".into(),
-            challenge_id: "challenge".into(),
-            sig: "sig".into(),
-            nonce: "nonce".into(),
-            submission_group_id: group_value.into(),
-            payload,
-        };
-
-        let canonical = canonicalize(&envelope.payload).expect("canonicalize payload");
-        let canonical = String::from_utf8(canonical).expect("canonical JSON is UTF-8");
         let key = ["submission", "group", "id"].join("_");
+        let mut envelope = serde_json::Map::new();
+        envelope.insert(key.clone(), serde_json::json!(group_value));
+        envelope.insert(
+            "payload".into(),
+            serde_json::to_value(&payload).expect("payload serializes"),
+        );
+        assert!(envelope.contains_key(&key));
+
+        let canonical = canonicalize(&payload).expect("canonicalize payload");
+        let canonical = String::from_utf8(canonical).expect("canonical JSON is UTF-8");
         assert!(!canonical.contains(&key));
         assert!(!canonical.contains(group_value));
     }
