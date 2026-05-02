@@ -101,12 +101,15 @@ async fn happy_path() {
 
     let event_id = Uuid::new_v4();
     let event_id_b64 = URL_SAFE_NO_PAD.encode(event_id.as_bytes());
+    let submission_group_id = Uuid::new_v4();
+    let submission_group_id_b64 = URL_SAFE_NO_PAD.encode(submission_group_id.as_bytes());
 
     let body = serde_json::json!({
         "event_id": event_id_b64,
         "challenge_id": cid_b64,
         "sig": sig_b64,
         "nonce": URL_SAFE_NO_PAD.encode(nonce.0),
+        "submission_group_id": submission_group_id_b64,
         "payload": payload_value,
     });
     let response = client
@@ -116,8 +119,15 @@ async fn happy_path() {
         .await
         .expect("POST /event succeeds");
 
-    assert_eq!(response.status().as_u16(), 200, "expect 200 on happy path");
-    let response_body: serde_json::Value = response.json().await.expect("/event body is JSON");
+    let status = response.status();
+    let response_text = response.text().await.expect("/event body reads");
+    assert_eq!(
+        status.as_u16(),
+        200,
+        "expect 200 on happy path, got {status}: {response_text}"
+    );
+    let response_body: serde_json::Value =
+        serde_json::from_str(&response_text).expect("/event body is JSON");
     assert_eq!(response_body["ok"], serde_json::Value::Bool(true));
     let bucket_ts_str = response_body["bucket_ts"]
         .as_str()
@@ -135,16 +145,21 @@ async fn happy_path() {
     });
     let row = pg_client
         .query_one(
-            "SELECT bucket_ts FROM events WHERE event_id = $1",
+            "SELECT bucket_ts, submission_group_id FROM events WHERE event_id = $1",
             &[&event_id],
         )
         .await
         .expect("row visible in PlanetScale staging");
     let actual_bucket_ts: SystemTime = row.get(0);
+    let actual_submission_group_id: Uuid = row.get(1);
     let actual_str = format_system_time_rfc3339(actual_bucket_ts);
     assert_eq!(
         actual_str, bucket_ts_str,
         "DB bucket_ts ({actual_str}) matches /event response bucket_ts ({bucket_ts_str})"
+    );
+    assert_eq!(
+        actual_submission_group_id, submission_group_id,
+        "DB submission_group_id matches wire envelope"
     );
 
     let response2 = client
@@ -153,8 +168,14 @@ async fn happy_path() {
         .send()
         .await
         .expect("second POST /event succeeds");
-    assert_eq!(response2.status().as_u16(), 200, "duplicate is 200 (D-47)");
-    let body2: serde_json::Value = response2.json().await.expect("body");
+    let status2 = response2.status();
+    let text2 = response2.text().await.expect("duplicate body reads");
+    assert_eq!(
+        status2.as_u16(),
+        200,
+        "duplicate is 200 (D-47), got {status2}: {text2}"
+    );
+    let body2: serde_json::Value = serde_json::from_str(&text2).expect("body");
     assert_eq!(body2["ok"], serde_json::Value::Bool(true));
     assert_eq!(
         body2["bucket_ts"].as_str(),
