@@ -2,6 +2,9 @@
 
 pub mod api;
 pub mod cli;
+pub mod config;
+pub mod region;
+pub mod window;
 
 pub use cli::Args;
 
