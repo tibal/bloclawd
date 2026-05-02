@@ -28,7 +28,8 @@ fn rfc8785_official_vectors() {
         let stem = name_str.trim_end_matches(".input.json");
 
         let input_bytes = std::fs::read(entry.path()).expect("read input");
-        let output_bytes = std::fs::read(dir.join(format!("{stem}.output.json"))).expect("read output");
+        let output_bytes =
+            std::fs::read(dir.join(format!("{stem}.output.json"))).expect("read output");
 
         let value: serde_json::Value =
             serde_json::from_slice(&input_bytes).expect("input is valid JSON");

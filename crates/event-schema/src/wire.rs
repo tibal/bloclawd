@@ -26,7 +26,7 @@ pub struct SubmittedEvent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{canonical_bytes, Harness, Model, Region, Tier, TokenCounts};
+    use crate::{Harness, Model, Region, Tier, TokenCounts, canonical_bytes};
 
     fn sample_payload() -> EventPayload {
         EventPayload {
