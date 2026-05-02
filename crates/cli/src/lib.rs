@@ -4,12 +4,16 @@ pub mod aggregate;
 pub mod api;
 pub mod cli;
 pub mod config;
+pub mod canonical;
 pub mod min_version;
 pub mod parsers;
 pub mod region;
+pub mod solve;
 pub mod window;
+pub mod wire_error;
 
 pub use cli::Args;
+pub use wire_error::IngestCliError;
 
 /// Stub entry. Plan 07 wires parsers, canonicalization, PoW, submit, probe,
 /// and rendering into a real run-loop.
