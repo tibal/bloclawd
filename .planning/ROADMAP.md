@@ -92,7 +92,7 @@ Plans:
 ### Phase 3: Rust CLI
 **Goal**: A user who just hit a rate limit on Claude Code or Codex can run `bloclawd --5h --cc` (or `--codex`), see exactly what would be submitted, confirm with `[y/N]`, and have an anonymous, PoW-gated event accepted by the live ingest Worker — with defensive parsers that survive CC/Codex format drift.
 **Depends on**: Phase 2 (live ingest endpoint)
-**Requirements**: CLI-01, CLI-02, CLI-03, CLI-04, CLI-05, CLI-06, CLI-07, CLI-08, CLI-09, CLI-10, CLI-11, CLI-12, CLI-13, CLI-14, CLI-15, CLI-16, CLI-17, CLI-18
+**Requirements**: CLI-01, CLI-02, CLI-03, CLI-04, CLI-05, CLI-06, CLI-07, CLI-08, CLI-09, CLI-10, CLI-11, CLI-12, CLI-13, CLI-14, CLI-15, CLI-16, CLI-17, CLI-18, CLI-19
 **Success Criteria** (what must be TRUE):
   1. `bloclawd --5h --cc` (and `--codex`, `--week`, `--end <local-time>`) walks the local session artifacts, parses JSONL line-by-line via `serde_json::Value` + tolerant `.get()` walks, surfaces a per-line parse-failure counter, and never aborts on a single bad line.
   2. The CLI computes per-model, per-window (5-min and 1-hour) token counts (input, output, cached read, cached write), captures harness/tier/`tz_offset`/country (via `sys-locale`, `BLOCLAWD_COUNTRY=` override accepted), and produces a UUIDv4 `event_id` (never v7).
