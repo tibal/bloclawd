@@ -2,6 +2,8 @@ use crate::enums::{Harness, Model, Region, Tier};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
+pub const TOKEN_COUNT_MAX: u32 = 100_000_000;
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
 #[ts(export)]
 #[serde(deny_unknown_fields)]
@@ -33,7 +35,6 @@ impl EventPayload {
     /// WASM weight for what is 8 lines of validation. INGE-07 is satisfied here plus
     /// serde's native rejection of unknown enum values (closed enum sets).
     pub fn validate(&self) -> Result<(), String> {
-        const MAX: u32 = 10_000_000;
         if self.v != 1 {
             return Err(format!("unsupported v: {} (expected 1)", self.v));
         }
@@ -48,8 +49,8 @@ impl EventPayload {
             ("cached_read_5h", t.cached_read_5h),
             ("cached_write_5h", t.cached_write_5h),
         ] {
-            if val > MAX {
-                return Err(format!("tokens.{name} = {val} exceeds {MAX}"));
+            if val > TOKEN_COUNT_MAX {
+                return Err(format!("tokens.{name} = {val} exceeds {TOKEN_COUNT_MAX}"));
             }
         }
         Ok(())
@@ -91,9 +92,16 @@ mod tests {
     #[test]
     fn validate_rejects_token_field_above_limit_with_field_name() {
         let mut payload = sample_payload();
-        payload.tokens.input_5h = 10_000_001;
+        payload.tokens.input_5h = TOKEN_COUNT_MAX + 1;
         let err = payload.validate().unwrap_err();
         assert!(err.contains("input_5h"));
+    }
+
+    #[test]
+    fn validate_accepts_high_real_world_cache_reads() {
+        let mut payload = sample_payload();
+        payload.tokens.cached_read_5h = 10_378_233;
+        assert!(payload.validate().is_ok());
     }
 
     #[test]
