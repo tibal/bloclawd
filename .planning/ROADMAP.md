@@ -99,7 +99,22 @@ Plans:
   3. `--dry-run` prints the payload byte-identically to what `--yes` would submit (single canonical formatter); a `[y/N]` confirmation is shown by default; `--yes` skips the prompt; `--json` emits machine-readable status; `NO_COLOR`/TTY auto-detect and `--no-color` are honored; documented exit codes (0/1/2/3/4) are followed.
   4. The PoW solver uses `sha2`, reports progress, hard-times-out at 30 seconds, then submits via `reqwest` blocking + `rustls-tls` to `https://api.bloclawd.com/event`; an end-to-end run from a real CC or Codex session lands a row in PlanetScale.
   5. Anonymized fixture session files for both CC and Codex are committed to the repo and a CI test asserts known token totals against them; minimum supported CC and Codex versions are documented in the README and asserted at startup with a helpful error if older.
-**Plans**: TBD
+**Plans**: 8 plans
+Plans:
+- [ ] **Wave 0** *(prerequisite for all subsequent waves — docs amendments)*
+  - [ ] 03-00-docs-amendments-PLAN.md — REQUIREMENTS.md adds CLI-19 (D-74); ROADMAP.md Phase 3 Requirements line includes CLI-19; PROJECT.md Open Q#5 amended (D-57)
+- [ ] **Wave 1** *(blocked on Wave 0)*
+  - [ ] 03-01-shared-types-amendments-PLAN.md — Extend crates/event-schema with SubmittedEvent wire wrapper (D-54), region_map.rs (D-65), Model::Gpt55 variant; regenerate ts-rs bindings
+- [ ] **Wave 2** *(blocked on Wave 1)*
+  - [ ] 03-02-worker-amendment-PLAN.md — Worker accepts submission_group_id (D-55); SQL migration 0002; pow.yml log-boundary grep extended
+  - [ ] 03-03-cli-scaffold-PLAN.md — crates/cli workspace member: clap Args (with required-window-kind ArgGroup), config TOML, --end parser, region resolver, API URL helpers
+- [ ] **Wave 3** *(blocked on Wave 2)*
+  - [ ] 03-04-parsers-aggregate-PLAN.md — Defensive CC + Codex JSONL parsers (.zst transparent), per-window-per-model aggregator (FiveHour-only on submit; --week is dry-run-only), min_version heuristic
+  - [ ] 03-05-wire-glue-PLAN.md — canonical formatter glue (CLI-10), PoW solver wrapper (30s timeout), reqwest blocking submit (https_only enforced), 14-code wire_error mapping
+- [ ] **Wave 4** *(blocked on Wave 3)*
+  - [ ] 03-06-probe-render-PLAN.md — CLI-19 probe (D-74..D-79: bare-UUID prompt, 30s timeout, opaque convergence), single render layer (dry-run + --json; always plain ASCII, no force_plain helper)
+- [ ] **Wave 5** *(blocked on Wave 4)*
+  - [ ] 03-07-orchestration-fixtures-PLAN.md — lib::run + run_inner orchestration (W7 fixture-determinism API), anonymized CC + Codex fixtures (CLI-17), xtask anonymize-session (D-69), README.md documents min versions + install paths
 
 ### Phase 4: Aggregation + Dashboard
 **Goal**: Every 15 minutes the cron worker turns raw events into a tiered, k-anonymous, log-binned public dataset on R2, and a Vite + React SPA at `bloclawd.com/dashboard` lets anyone explore that dataset with URL-synced filters, spread bands, and tier comparison overlays — without ever exposing raw counts, `event_id`, `nonce`, or `tz_offset`.
