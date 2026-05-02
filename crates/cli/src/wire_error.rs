@@ -1,11 +1,65 @@
+//! Closed-enum mirror of the Worker error envelope (D-73).
+//!
+//! Wire errors all converge to exit 4. Local-only CLI errors keep their
+//! documented exit codes.
+
 #[derive(Debug, thiserror::Error, PartialEq, Eq)]
 pub enum IngestCliError {
+    #[error("server rejected proof-of-work, please retry")]
+    PowRejected,
     #[error("payload rejected (CLI-Worker schema mismatch - please file an issue)")]
     SchemaMismatch,
+    #[error("payload too large (please file an issue)")]
+    BodyTooLarge,
+    #[error("rate-limited by ingest, retry in {0}s")]
+    RateLimited(u32),
     #[error("server unavailable, please retry")]
     ServerUnavailable,
     #[error("PoW solve timed out at K=22 (30s)")]
     PowTimeout,
+    #[error("no events found in window")]
+    NoEvents,
+    #[error("user error: {0}")]
+    UserError(String),
+}
+
+impl IngestCliError {
+    pub fn exit_code(&self) -> i32 {
+        match self {
+            IngestCliError::UserError(_) => 1,
+            IngestCliError::NoEvents => 2,
+            IngestCliError::PowTimeout => 3,
+            IngestCliError::PowRejected
+            | IngestCliError::SchemaMismatch
+            | IngestCliError::BodyTooLarge
+            | IngestCliError::RateLimited(_)
+            | IngestCliError::ServerUnavailable => 4,
+        }
+    }
+}
+
+pub fn from_wire(error_code: &str, body: &serde_json::Value) -> IngestCliError {
+    match error_code {
+        "signature_invalid"
+        | "challenge_expired"
+        | "clock_skew"
+        | "payload_hash_mismatch"
+        | "pow_invalid" => IngestCliError::PowRejected,
+        "bad_json"
+        | "enum_invalid"
+        | "unknown_field"
+        | "version_invalid"
+        | "token_out_of_range" => IngestCliError::SchemaMismatch,
+        "body_too_large" => IngestCliError::BodyTooLarge,
+        "rate_limited" => IngestCliError::RateLimited(
+            body.get("retry_after_s")
+                .and_then(|v| v.as_u64())
+                .and_then(|n| u32::try_from(n).ok())
+                .unwrap_or(60),
+        ),
+        "server_unavailable" | "internal" => IngestCliError::ServerUnavailable,
+        _ => IngestCliError::ServerUnavailable,
+    }
 }
 
 #[cfg(test)]
