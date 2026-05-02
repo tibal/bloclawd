@@ -32,7 +32,7 @@ mod tests {
         EventPayload {
             v: 1,
             model: Model::Gpt55,
-            tier: Tier::ProCodex,
+            tier: Tier::Max20,
             harness: Harness::Codex,
             region: Region::Na,
             tokens: TokenCounts {

@@ -134,9 +134,9 @@ mod tests {
     fn save_tier_creates_parent_directory_and_file() {
         let _env = env_lock();
         let _home = HomeGuard::set("save");
-        save_tier("pro_codex").expect("save tier");
+        save_tier("max20").expect("save tier");
         let body = fs::read_to_string(config_path().expect("path")).expect("read config");
-        assert!(body.contains("tier = \"pro_codex\""));
+        assert!(body.contains("tier = \"max20\""));
     }
 
     #[test]

@@ -15,7 +15,7 @@ bloclawd dry-run - group 10000000... - 1 events
         "harness": "codex",
         "model": "gpt-5.5",
         "region": "NA",
-        "tier": "pro_codex",
+        "tier": "max20",
         "tokens": {
             "cached_read_5h": 48,
             "cached_read_5min": 48,

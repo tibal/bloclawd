@@ -23,7 +23,7 @@ bloclawd is an anonymous, community analytics service that tracks **when AI codi
 - [ ] Rust CLI `bloclawd` reads local Claude Code session artifacts (`~/.claude/projects/.../*.jsonl`) and Codex session artifacts on demand
 - [ ] CLI supports `--5h`, `--week`, `--end <local-time>`, `--cc`, `--codex` flags to compute a per-window token-usage breakdown
 - [ ] CLI computes per-model token counts: input, output, cached read, cached write, 5min and 1h windows
-- [ ] CLI captures harness (`claude-code` | `codex`), subscription tier (Anthropic: `pro`/`max5`/`max20`; OpenAI provider naming), TZ offset, country (coarse)
+- [ ] CLI captures harness (`claude-code` | `codex`), provider-neutral individual subscription tier (`pro`/`max5`/`max20`), TZ offset, country (coarse)
 - [ ] CLI fetches PoW challenge from ingest worker and solves it (~1s on dev laptop hardware)
 - [ ] CLI submits the event payload via `POST /event` with `{ challenge_id, nonce, event_id (UUIDv4), payload }`
 - [ ] CLI runs only when user has hit a limit (no tokens left); explicitly not background telemetry
@@ -65,7 +65,7 @@ bloclawd is an anonymous, community analytics service that tracks **when AI codi
 
 ## Context
 
-- **Why this exists:** AI subscription users (Pro / Max5 / Max20 on Anthropic, equivalent OpenAI tiers) repeatedly hit rate limits in their dev workflows but have no aggregate visibility into when others hit them, on what models, in what regions. bloclawd makes that aggregate visible without requiring accounts.
+- **Why this exists:** AI subscription users on individual $20 / $100 / $200 plan buckets repeatedly hit rate limits in their dev workflows but have no aggregate visibility into when others hit them, on what models, in what regions. bloclawd makes that aggregate visible without requiring accounts.
 - **Trust model:** Anonymity is the product. The PoW gate, payload validation, outlier trimming, and the absence of accounts/IDs are all in service of "we can't deanonymize you and the data is still useful."
 - **Architecture lineage:** Lightweight CQRS — write path is rare, gated, validated, durable; read path is static, cached at edge, serves arbitrary traffic without touching the DB.
 - **Data sources:** CC and Codex both write structured session artifacts to disk locally (CC: `~/.claude/projects/<project>/sessions/*.jsonl`, Codex: equivalent). The CLI parses these to compute usage windows; no network access is required to derive the payload.

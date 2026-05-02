@@ -14,12 +14,6 @@ pub enum CliTier {
     Max5,
     #[value(name = "max20")]
     Max20,
-    #[value(name = "plus")]
-    Plus,
-    #[value(name = "pro_codex")]
-    ProCodex,
-    #[value(name = "business")]
-    Business,
 }
 
 impl From<CliTier> for Tier {
@@ -28,9 +22,6 @@ impl From<CliTier> for Tier {
             CliTier::Pro => Tier::Pro,
             CliTier::Max5 => Tier::Max5,
             CliTier::Max20 => Tier::Max20,
-            CliTier::Plus => Tier::Plus,
-            CliTier::ProCodex => Tier::ProCodex,
-            CliTier::Business => Tier::Business,
         }
     }
 }
@@ -131,15 +122,16 @@ mod tests {
     }
 
     #[test]
-    fn cli_tier_round_trips_pro_codex_snake_case() {
-        let parsed = CliTier::from_str("pro_codex", true).expect("parses");
-        assert_eq!(parsed, CliTier::ProCodex);
-        assert_eq!(Tier::from(parsed), Tier::ProCodex);
+    fn cli_tiers_are_provider_neutral_price_buckets() {
+        let parsed = CliTier::from_str("max20", true).expect("parses");
+        assert_eq!(parsed, CliTier::Max20);
+        assert_eq!(Tier::from(parsed), Tier::Max20);
     }
 
     #[test]
-    fn cli_tier_rejects_kebab_case() {
-        assert!(CliTier::from_str("pro-codex", true).is_err());
+    fn cli_tier_rejects_non_individual_business_tier() {
+        assert!(CliTier::from_str("business", true).is_err());
+        assert!(CliTier::from_str("pro_codex", true).is_err());
     }
 
     #[test]

@@ -29,12 +29,6 @@ pub enum Tier {
     Max5,
     #[serde(rename = "max20")]
     Max20,
-    #[serde(rename = "plus")]
-    Plus,
-    #[serde(rename = "pro_codex")]
-    ProCodex,
-    #[serde(rename = "business")]
-    Business,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS)]
@@ -92,10 +86,11 @@ mod tests {
     }
 
     #[test]
-    fn tier_pro_codex_is_snake_case() {
-        assert_eq!(
-            serde_json::to_string(&Tier::ProCodex).unwrap(),
-            r#""pro_codex""#
-        );
+    fn tiers_are_provider_neutral_price_buckets() {
+        assert_eq!(serde_json::to_string(&Tier::Pro).unwrap(), r#""pro""#);
+        assert_eq!(serde_json::to_string(&Tier::Max5).unwrap(), r#""max5""#);
+        assert_eq!(serde_json::to_string(&Tier::Max20).unwrap(), r#""max20""#);
+        assert!(serde_json::from_str::<Tier>(r#""business""#).is_err());
+        assert!(serde_json::from_str::<Tier>(r#""pro_codex""#).is_err());
     }
 }

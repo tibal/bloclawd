@@ -13,7 +13,7 @@ deferred:
     evidence: "Probe signatures are implemented from Phase 3 research and covered by classifier tests; live provider wording must be re-pinned before public release."
 human_verification:
   - test: "Real rate-limited CLI submit"
-    expected: "On a machine with a real CC or Codex provider limit already reached, `bloclawd --cc --tier max20 --end <local-time> --5h --yes` or `bloclawd --codex --tier pro_codex --end <local-time> --5h --yes` prints the dry-run view, solves PoW, recognizes the provider rate-limit probe, submits to the deployed ingest Worker, exits 0, and a row appears in PlanetScale."
+    expected: "On a machine with a real CC or Codex provider limit already reached, `bloclawd --cc --tier max20 --end <local-time> --5h --yes` or `bloclawd --codex --tier max20 --end <local-time> --5h --yes` prints the dry-run view, solves PoW, recognizes the provider rate-limit probe, submits to the deployed ingest Worker, exits 0, and a row appears in PlanetScale."
     why_human: "Requires a genuinely rate-limited provider account plus deployed Worker/PlanetScale credentials not available to the agent runtime."
     result: "pending"
 ---
@@ -101,7 +101,7 @@ Run on a machine/account that is currently rate-limited by Claude Code or Codex:
 ```sh
 bloclawd --cc --tier max20 --end <local-time> --5h --yes
 # or
-bloclawd --codex --tier pro_codex --end <local-time> --5h --yes
+bloclawd --codex --tier max20 --end <local-time> --5h --yes
 ```
 
 Expected:

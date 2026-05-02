@@ -44,14 +44,14 @@ Dry-run first. This does not contact the network and does not run the provider p
 
 ```sh
 bloclawd --cc --tier max20 --end 16:00 --5h --dry-run
-bloclawd --codex --tier pro_codex --end 16:00 --5h --dry-run
+bloclawd --codex --tier max20 --end 16:00 --5h --dry-run
 ```
 
 Submit mode prints the dry-run view, asks one `[y/N]` confirmation for the whole batch, fetches a PoW challenge per event, solves it locally, runs the provider rate-limit probe once, and submits each event.
 
 ```sh
 bloclawd --cc --tier max20 --end 16:00 --5h
-bloclawd --codex --tier pro_codex --end 16:00 --5h --yes
+bloclawd --codex --tier max20 --end 16:00 --5h --yes
 ```
 
 `--tier` is persisted to `~/.config/bloclawd/config.toml`. Later runs may omit `--tier` if the config exists.
@@ -64,19 +64,13 @@ bloclawd --cc --tier max20 --end 16:00 --week --dry-run
 
 ## Tiers
 
-Claude Code runs must use Anthropic tiers:
+`--tier` uses provider-neutral individual subscription price buckets for both Claude Code and Codex:
 
 ```text
-pro, max5, max20
+pro    # $20 individual plan
+max5   # $100 individual plan
+max20  # $200 individual plan
 ```
-
-Codex runs must use OpenAI tiers:
-
-```text
-plus, pro_codex, business
-```
-
-The CLI rejects mismatched combinations such as `--cc --tier pro_codex`.
 
 ## Fixture Anonymization
 

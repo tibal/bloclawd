@@ -75,8 +75,7 @@ pub fn run_inner_with_output<W: Write, E: Write>(
         ));
     }
 
-    let (tier, tier_str) = resolve_tier(&args, stderr)?;
-    validate_tier_matches_harness(&args, tier, &tier_str)?;
+    let (tier, _) = resolve_tier(&args, stderr)?;
 
     let harness_schema = if args.cc {
         SchemaHarness::ClaudeCode
@@ -263,8 +262,7 @@ fn resolve_tier<E: Write>(args: &Args, stderr: &mut E) -> Result<(Tier, String),
             }
             Ok(None) => {
                 return Err(IngestCliError::UserError(
-                    "--tier <pro|max5|max20|plus|pro_codex|business> is required (no config found)"
-                        .into(),
+                    "--tier <pro|max5|max20> is required (no config found)".into(),
                 ));
             }
             Err(err) => return Err(IngestCliError::UserError(err.to_string())),
@@ -274,26 +272,6 @@ fn resolve_tier<E: Write>(args: &Args, stderr: &mut E) -> Result<(Tier, String),
     let tier = serde_json::from_value::<Tier>(serde_json::Value::String(tier_str.clone()))
         .map_err(|_| IngestCliError::UserError(format!("invalid tier: {tier_str}")))?;
     Ok((tier, tier_str))
-}
-
-fn validate_tier_matches_harness(
-    args: &Args,
-    tier: Tier,
-    tier_str: &str,
-) -> Result<(), IngestCliError> {
-    let provider_is_anthropic = matches!(tier, Tier::Pro | Tier::Max5 | Tier::Max20);
-    let provider_is_openai = matches!(tier, Tier::Plus | Tier::ProCodex | Tier::Business);
-    if args.cc && !provider_is_anthropic {
-        return Err(IngestCliError::UserError(format!(
-            "--cc with tier {tier_str} (OpenAI tier) - choose an Anthropic tier (pro, max5, max20)"
-        )));
-    }
-    if args.codex && !provider_is_openai {
-        return Err(IngestCliError::UserError(format!(
-            "--codex with tier {tier_str} (Anthropic tier) - choose an OpenAI tier (plus, pro_codex, business)"
-        )));
-    }
-    Ok(())
 }
 
 fn build_submitted_events(
@@ -340,9 +318,6 @@ fn tier_wire_name(tier: Tier) -> &'static str {
         Tier::Pro => "pro",
         Tier::Max5 => "max5",
         Tier::Max20 => "max20",
-        Tier::Plus => "plus",
-        Tier::ProCodex => "pro_codex",
-        Tier::Business => "business",
     }
 }
 

@@ -289,7 +289,7 @@ fn codex_fixture_dryrun_snapshot_locks() {
             "bloclawd",
             "--codex",
             "--tier",
-            "pro_codex",
+            "max20",
             "--end",
             "2026-01-01T06:00:00",
             "--5h",
@@ -384,16 +384,16 @@ fn missing_tier_is_user_error() {
 }
 
 #[test]
-fn tier_provider_mismatch_is_user_error() {
+fn codex_accepts_individual_max20_tier() {
     let _env = env_lock();
-    let _guard = EnvGuard::new("tier-mismatch");
+    let _guard = EnvGuard::new("codex-max20-tier");
 
     let err = run_to_string(
         args(&[
             "bloclawd",
-            "--cc",
+            "--codex",
             "--tier",
-            "pro_codex",
+            "max20",
             "--end",
             "2026-01-01T06:00:00",
             "--5h",
@@ -402,10 +402,9 @@ fn tier_provider_mismatch_is_user_error() {
         Uuid::parse_str("10000000-0000-4000-8000-000000000006").unwrap(),
         vec![Uuid::parse_str("20000000-0000-4000-8000-000000000006").unwrap()],
     )
-    .expect_err("provider mismatch fails");
+    .expect_err("empty fixture returns no events");
 
-    assert_eq!(err.exit_code(), 1);
-    assert!(err.to_string().contains("--cc with tier pro_codex"));
+    assert_eq!(err, IngestCliError::NoEvents);
 }
 
 #[test]
