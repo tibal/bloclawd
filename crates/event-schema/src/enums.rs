@@ -14,6 +14,8 @@ pub enum Model {
     ClaudeHaiku45,
     #[serde(rename = "gpt-5")]
     Gpt5,
+    #[serde(rename = "gpt-5.5")]
+    Gpt55,
     #[serde(rename = "gpt-5-codex")]
     Gpt5Codex,
 }
@@ -65,7 +67,10 @@ mod tests {
     fn model_roundtrip_claude_sonnet_4_5() {
         let parsed: Model = serde_json::from_str(r#""claude-sonnet-4-5""#).unwrap();
         assert_eq!(parsed, Model::ClaudeSonnet45);
-        assert_eq!(serde_json::to_string(&parsed).unwrap(), r#""claude-sonnet-4-5""#);
+        assert_eq!(
+            serde_json::to_string(&parsed).unwrap(),
+            r#""claude-sonnet-4-5""#
+        );
     }
 
     #[test]
@@ -88,6 +93,9 @@ mod tests {
 
     #[test]
     fn tier_pro_codex_is_snake_case() {
-        assert_eq!(serde_json::to_string(&Tier::ProCodex).unwrap(), r#""pro_codex""#);
+        assert_eq!(
+            serde_json::to_string(&Tier::ProCodex).unwrap(),
+            r#""pro_codex""#
+        );
     }
 }
