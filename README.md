@@ -21,10 +21,10 @@ cargo install bloclawd
 ### Via Homebrew (macOS)
 
 ```sh
-brew install <gh-org>/bloclawd/bloclawd
+brew install tibal/bloclawd/bloclawd
 ```
 
-Replace `<gh-org>` with the bloclawd GitHub organization (see the [latest release](https://github.com/<gh-org>/bloclawd/releases) page for the canonical tap path).
+See the [latest release](https://github.com/tibal/bloclawd/releases) page for the canonical tap path.
 
 ### Via curl (universal)
 

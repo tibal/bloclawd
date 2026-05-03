@@ -22,7 +22,7 @@ install-updater = false
 # not what we want. The default (no tag-namespace) accepts plain `vX.Y.Z` tags and
 # produces `release.yml` — exactly the DIST-01 / D-113 contract.
 # A GitHub repo to push Homebrew formulas to
-tap = "<gh-org>/homebrew-bloclawd"
+tap = "tibal/homebrew-bloclawd"
 # Which actions to run on pull requests
 pr-run-mode = "plan"
 # Publish jobs to run in CI

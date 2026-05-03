@@ -86,12 +86,12 @@ jobs:
       - name: Install via brew (macOS only)
         if: matrix.channel == 'brew' && matrix.runner == 'macos-latest'
         run: |
-          # Tap path: <gh-org>/bloclawd (homebrew tap convention strips
-          # 'homebrew-' prefix). Operator substitutes <gh-org> in plan
-          # 05-13. We read the tap value from dist-workspace.toml at
-          # smoke time — the tap config is the source of truth.
+          # Tap path: tibal/bloclawd (homebrew tap convention strips the
+          # 'homebrew-' prefix). We read the tap value from
+          # dist-workspace.toml at smoke time — the tap config is the
+          # source of truth.
           TAP_PATH=$(grep -E '^tap\s*=' dist-workspace.toml | sed -E 's/.*"([^"]+)".*/\1/')
-          # tap = "<gh-org>/homebrew-bloclawd" → user/repo, brew expects user/tapname
+          # tap = "tibal/homebrew-bloclawd" → user/repo, brew expects user/tapname
           # so transform homebrew-X → X
           BREW_TAP=$(echo "$TAP_PATH" | sed -E 's|/homebrew-|/|')
           echo "Brew tap path: $BREW_TAP (from dist-workspace.toml: $TAP_PATH)"
