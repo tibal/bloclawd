@@ -193,8 +193,8 @@ jobs:
       - run: pnpm --filter ./apps/frontend test:run
       - run: pnpm --filter ./apps/frontend build
       - run: |
-          test -f apps/frontend/dist/index.html
-          test -d apps/frontend/dist/assets
+          test -f apps/frontend/dist/client/index.html
+          test -d apps/frontend/dist/client/assets
 
   r2-schema-drift:
     name: r2-schema-drift — frozen R2 v1 fixture

@@ -7,8 +7,8 @@ use std::time::{Duration, Instant};
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use bloclawd_schema::EventPayload;
 use bloclawd_pow::{ChallengeId, K_V1, Nonce, PayloadHash, PowError};
+use bloclawd_schema::EventPayload;
 
 use crate::canonical::{canonicalize, payload_hash};
 use crate::wire_error::IngestCliError;
@@ -50,8 +50,8 @@ mod tests {
     use super::*;
     use base64::Engine;
     use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    use bloclawd_schema::{Harness, Model, Region, Tier, TokenCounts};
     use bloclawd_pow::ChallengeId;
+    use bloclawd_schema::{Harness, Model, Region, Tier, TokenCounts};
     use std::time::Instant;
 
     fn sample_payload() -> EventPayload {

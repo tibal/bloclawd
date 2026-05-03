@@ -17,8 +17,8 @@
 
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use getrandom::fill as getrandom;
 use bloclawd_pow::{K_V1, issue_challenge};
+use getrandom::fill as getrandom;
 use serde_json::json;
 use worker::{Date, Request, Response, Result, RouteContext};
 

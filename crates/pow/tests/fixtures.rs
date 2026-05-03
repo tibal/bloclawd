@@ -1,5 +1,7 @@
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use bloclawd_pow::{ChallengeId, Hash, Nonce, PayloadHash, leading_zero_bits, payload_hash, pow_hash};
+use bloclawd_pow::{
+    ChallengeId, Hash, Nonce, PayloadHash, leading_zero_bits, payload_hash, pow_hash,
+};
 use serde::Deserialize;
 
 #[derive(Deserialize)]

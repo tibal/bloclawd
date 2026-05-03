@@ -67,10 +67,7 @@ mod tests {
                 .duration_since(UNIX_EPOCH)
                 .expect("clock")
                 .as_nanos();
-            path.push(format!(
-                "bloclawd-{name}-{}-{unique}",
-                std::process::id()
-            ));
+            path.push(format!("bloclawd-{name}-{}-{unique}", std::process::id()));
             fs::create_dir_all(&path).expect("create temp home");
             unsafe {
                 std::env::set_var("HOME", &path);

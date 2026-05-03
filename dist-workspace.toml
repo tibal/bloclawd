@@ -31,3 +31,9 @@ publish-jobs = ["homebrew"]
 macos-sign = true
 # Whether CI should trigger releases with dispatches instead of tag pushes
 dispatch-releases = false
+# release.yml contains hand-edits that cargo-dist doesn't template:
+# the `update-install-sh` job (post-publish PR that overwrites
+# apps/frontend/public/install.sh with the real cargo-dist installer
+# baked with sha256 hashes per release; see D-122). `allow-dirty = ["ci"]`
+# tells `dist plan` to skip the workflow-drift check so PR CI passes.
+allow-dirty = ["ci"]
