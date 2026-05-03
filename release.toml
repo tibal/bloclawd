@@ -1,0 +1,28 @@
+# cargo-release 1.1.2 configuration for the bloclawd workspace.
+# Operator runs `cargo release {patch|minor|major|<exact-version>} --execute`
+# which bumps every workspace member, commits, tags `vX.Y.Z`, and pushes.
+# The tag push is what triggers `.github/workflows/release.yml`.
+# See docs/RELEASE.md for the full operator runbook.
+
+# All publishable members share one version number.
+shared-version = true
+# One commit for all version bumps (consolidate-pushes is implicit when
+# consolidate-commits = true; cargo-release 1.1.2 does NOT expose a
+# `consolidate-pushes` key — it pushes once at the end of the workspace
+# release loop).
+consolidate-commits = true
+
+# Tag format: just `vX.Y.Z` (no per-crate prefix).
+tag-name = "v{{version}}"
+tag-prefix = ""
+
+# Branch protection: only release from main (D-115).
+allow-branch = ["main"]
+
+# Sign-tag: v1 ships unsigned. Flip to true once the operator has a GPG
+# key configured; documented in docs/RELEASE.md secret-rotation section.
+sign-tag = false
+
+# Commit + tag messages (D-115 format).
+pre-release-commit-message = "chore(release): bump to {{version}}"
+tag-message = "Release {{version}}"
