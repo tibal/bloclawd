@@ -20,7 +20,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use event_schema::{SubmittedEvent, canonical_bytes};
+use bloclawd_schema::{SubmittedEvent, canonical_bytes};
 use bloclawd_pow::{ChallengeId, K_V1, Nonce, Sig, VerifyRequest};
 use serde::de::IntoDeserializer;
 use serde_json::json;

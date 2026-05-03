@@ -82,7 +82,7 @@ async fn happy_path() {
     let payload = sample_event_payload();
     payload.validate().expect("sample payload is valid");
     let payload_value = serde_json::to_value(&payload).expect("payload serializes");
-    let canonical = event_schema::canonical_bytes(&payload).expect("payload canonicalizes");
+    let canonical = bloclawd_schema::canonical_bytes(&payload).expect("payload canonicalizes");
     let payload_hash_bytes: [u8; 32] = Sha256::digest(&canonical).into();
     let ph = PayloadHash(payload_hash_bytes);
 

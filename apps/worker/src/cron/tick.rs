@@ -3,7 +3,7 @@
 use std::str::FromStr;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use event_schema::{EventPayload, LOG_BIN_EDGES};
+use bloclawd_schema::{EventPayload, LOG_BIN_EDGES};
 use serde_json::Value;
 use tokio_postgres::config::Config as PgConfig;
 use tokio_postgres::tls::NoTls;

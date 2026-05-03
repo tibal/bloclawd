@@ -1,6 +1,6 @@
 //! Regression tests for serde_json display prefixes consumed by worker error classification.
 
-use event_schema::{EventPayload, SubmittedEvent};
+use bloclawd_schema::{EventPayload, SubmittedEvent};
 use serde::de::IntoDeserializer;
 
 fn valid_base_json() -> &'static str {

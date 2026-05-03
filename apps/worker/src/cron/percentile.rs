@@ -167,7 +167,7 @@ fn bin_index_for_edges(value: f64, bin_edges: &[u64]) -> u8 {
 mod tests {
     use super::*;
     use crate::cron::aggregate::{Cell, ModelCell};
-    use event_schema::LOG_BIN_EDGES;
+    use bloclawd_schema::LOG_BIN_EDGES;
     use serde::Deserialize;
 
     #[derive(Debug, Deserialize)]

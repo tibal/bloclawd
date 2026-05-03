@@ -9,7 +9,7 @@
 
 use std::time::Instant;
 
-use event_schema::{EventPayload, Harness, LOG_BIN_EDGES, Model, Region, Tier, TokenCounts};
+use bloclawd_schema::{EventPayload, Harness, LOG_BIN_EDGES, Model, Region, Tier, TokenCounts};
 use uuid::Uuid;
 
 #[allow(dead_code)]

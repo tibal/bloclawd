@@ -43,12 +43,12 @@ jobs:
         run: cargo test --workspace --locked
       - name: cargo clippy --workspace
         run: cargo clippy --workspace --locked -- -D warnings
-      - name: cargo test --features ts-export -p event-schema (writes apps/web/src/generated/*.ts)
-        run: cargo test --features ts-export -p event-schema --locked
+      - name: cargo test --features ts-export -p bloclawd-schema (writes apps/web/src/generated/*.ts)
+        run: cargo test --features ts-export -p bloclawd-schema --locked
       - name: ts-rs drift check
         run: |
           if ! git diff --exit-code -- apps/web/src/generated/; then
-            echo "::error file=apps/web/src/generated/::ts-rs output drift. Re-run cargo test --features ts-export -p event-schema and commit the result."
+            echo "::error file=apps/web/src/generated/::ts-rs output drift. Re-run cargo test --features ts-export -p bloclawd-schema and commit the result."
             exit 1
           fi
 

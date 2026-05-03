@@ -8,7 +8,7 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use event_schema::{EventPayload, LimitType, SubmittedEvent};
+use bloclawd_schema::{EventPayload, LimitType, SubmittedEvent};
 use bloclawd_pow::{ChallengeId, Nonce, Sig};
 use reqwest::StatusCode;
 use reqwest::header::CONTENT_TYPE;
@@ -177,7 +177,7 @@ mod tests {
     use super::*;
     use base64::Engine;
     use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-    use event_schema::{EventPayload, Harness, Model, Region, Tier, TokenCounts};
+    use bloclawd_schema::{EventPayload, Harness, Model, Region, Tier, TokenCounts};
     use bloclawd_pow::{ChallengeId, Nonce, Sig};
     use reqwest::StatusCode;
     use serde_json::json;

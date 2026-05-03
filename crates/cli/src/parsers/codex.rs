@@ -7,7 +7,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
-use event_schema::Model;
+use bloclawd_schema::Model;
 
 use crate::min_version::{MIN_CODEX_VERSION, codex_first_token_count_passes_field_shape};
 

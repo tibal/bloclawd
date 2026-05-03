@@ -1,7 +1,7 @@
 //! Single render layer for dry-run human output and machine JSON.
 
 use anyhow::Result;
-use event_schema::SubmittedEvent;
+use bloclawd_schema::SubmittedEvent;
 use serde::Serialize;
 use serde_json::Value;
 
@@ -120,7 +120,7 @@ fn model_name(event: &SubmittedEvent) -> Result<String> {
 fn canonical_pretty_event(event: &SubmittedEvent) -> Result<String> {
     let canonical_payload = canonicalize(&event.payload)?;
     let payload_value: Value = serde_json::from_slice(&canonical_payload)?;
-    let canonical_event = event_schema::canonical_bytes(event)?;
+    let canonical_event = bloclawd_schema::canonical_bytes(event)?;
     let mut event_value: Value = serde_json::from_slice(&canonical_event)?;
     if let Some(object) = event_value.as_object_mut() {
         object.insert("payload".to_string(), payload_value);
@@ -139,7 +139,7 @@ fn pretty_json_four_spaces(value: &impl Serialize) -> Result<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use event_schema::{EventPayload, Harness, LimitType, Model, Region, Tier, TokenCounts};
+    use bloclawd_schema::{EventPayload, Harness, LimitType, Model, Region, Tier, TokenCounts};
     use serde_json::Value;
 
     fn sample_event(index: usize, model: Model) -> SubmittedEvent {
@@ -262,8 +262,8 @@ mod tests {
 
         for (block, event) in blocks.iter().zip(events.iter()) {
             let parsed: Value = serde_json::from_str(block).expect("block is JSON");
-            let rendered = event_schema::canonical_bytes(&parsed).expect("block canonicalizes");
-            let expected = event_schema::canonical_bytes(event).expect("event canonicalizes");
+            let rendered = bloclawd_schema::canonical_bytes(&parsed).expect("block canonicalizes");
+            let expected = bloclawd_schema::canonical_bytes(event).expect("event canonicalizes");
             assert_eq!(rendered, expected);
         }
     }
@@ -300,8 +300,8 @@ mod tests {
         let requests = parsed["requests"].as_array().expect("requests array");
 
         for (request, event) in requests.iter().zip(events.iter()) {
-            let got = event_schema::canonical_bytes(request).expect("request canonicalizes");
-            let expected = event_schema::canonical_bytes(event).expect("event canonicalizes");
+            let got = bloclawd_schema::canonical_bytes(request).expect("request canonicalizes");
+            let expected = bloclawd_schema::canonical_bytes(event).expect("event canonicalizes");
             assert_eq!(got, expected);
         }
     }
