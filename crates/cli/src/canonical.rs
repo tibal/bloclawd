@@ -10,11 +10,11 @@
 //! this at the type level.
 
 use anyhow::{Context, Result};
-use event_schema::EventPayload;
+use bloclawd_schema::EventPayload;
 use sha2::{Digest, Sha256};
 
 pub fn canonicalize(payload: &EventPayload) -> Result<Vec<u8>> {
-    event_schema::canonical_bytes(payload).context("canonicalize EventPayload with shared JCS")
+    bloclawd_schema::canonical_bytes(payload).context("canonicalize EventPayload with shared JCS")
 }
 
 pub fn payload_hash(canonical: &[u8]) -> [u8; 32] {
@@ -24,7 +24,7 @@ pub fn payload_hash(canonical: &[u8]) -> [u8; 32] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use event_schema::{Harness, Model, Region, Tier, TokenCounts};
+    use bloclawd_schema::{Harness, Model, Region, Tier, TokenCounts};
 
     fn sample_payload() -> EventPayload {
         EventPayload {
@@ -50,7 +50,7 @@ mod tests {
     fn canonicalize_matches_event_schema_bytes() {
         let payload = sample_payload();
         let got = canonicalize(&payload).expect("canonicalize payload");
-        let expected = event_schema::canonical_bytes(&payload).expect("event-schema canonicalizes");
+        let expected = bloclawd_schema::canonical_bytes(&payload).expect("event-schema canonicalizes");
         assert_eq!(got, expected);
     }
 

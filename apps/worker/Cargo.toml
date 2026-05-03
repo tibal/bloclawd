@@ -23,7 +23,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 serde_path_to_error = "0.1"
 thiserror = { workspace = true }
-event-schema = { path = "../../crates/event-schema" }
+bloclawd-schema = { path = "../../crates/event-schema" }
 bloclawd-pow = { path = "../../crates/pow" }
 base64 = { workspace = true }
 getrandom = { version = "0.4", features = ["wasm_js"] }

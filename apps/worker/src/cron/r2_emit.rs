@@ -3,7 +3,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::cron::{aggregate::Cell, health::StatusJson};
-use event_schema::LOG_BIN_EDGES;
+use bloclawd_schema::LOG_BIN_EDGES;
 use serde::{Deserialize, Serialize};
 use worker::{Bucket, Env, HttpMetadata, Result};
 

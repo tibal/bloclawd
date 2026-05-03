@@ -12,7 +12,7 @@ use bloclawd::aggregate::WindowKind;
 use bloclawd::parsers::{cc, codex};
 use bloclawd::{Args, IngestCliError, run_inner_with_output};
 use clap::Parser;
-use event_schema::{LimitType, Model, TokenCounts};
+use bloclawd_schema::{LimitType, Model, TokenCounts};
 use serde_json::{Map, Value};
 use uuid::{Uuid, Version};
 

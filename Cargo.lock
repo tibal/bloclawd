@@ -155,9 +155,9 @@ dependencies = [
  "anyhow",
  "base64",
  "bloclawd-pow",
+ "bloclawd-schema",
  "chrono",
  "clap",
- "event-schema",
  "indicatif",
  "reqwest 0.13.3",
  "serde",
@@ -186,13 +186,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "bloclawd-schema"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_jcs",
+ "serde_json",
+ "serde_path_to_error",
+ "thiserror 1.0.69",
+ "ts-rs",
+]
+
+[[package]]
 name = "bloclawd-worker"
 version = "0.1.0"
 dependencies = [
  "base64",
  "bloclawd-pow",
+ "bloclawd-schema",
  "console_error_panic_hook",
- "event-schema",
  "getrandom 0.4.2",
  "reqwest 0.12.28",
  "rustls",
@@ -547,18 +559,6 @@ checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
  "windows-sys 0.61.2",
-]
-
-[[package]]
-name = "event-schema"
-version = "0.1.0"
-dependencies = [
- "serde",
- "serde_jcs",
- "serde_json",
- "serde_path_to_error",
- "thiserror 1.0.69",
- "ts-rs",
 ]
 
 [[package]]
@@ -3376,8 +3376,8 @@ dependencies = [
  "anyhow",
  "base64",
  "bloclawd-pow",
+ "bloclawd-schema",
  "chrono",
- "event-schema",
  "hex",
  "serde",
  "serde_jcs",

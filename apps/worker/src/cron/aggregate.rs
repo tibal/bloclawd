@@ -10,7 +10,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use event_schema::{
+use bloclawd_schema::{
     EventPayload, Model, TokenCounts, TokenType, Window, model_price_lookup as price_lookup,
 };
 use serde::Serialize;
@@ -553,7 +553,7 @@ fn log_trim_rate(trim_rate: f64) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use event_schema::{EventPayload, Harness, Model, Region, Tier, TokenCounts};
+    use bloclawd_schema::{EventPayload, Harness, Model, Region, Tier, TokenCounts};
     use serde::Deserialize;
     use uuid::Uuid;
 

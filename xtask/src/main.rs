@@ -112,9 +112,9 @@ fn gen_canonical_fixture(input: &Path, output: &Path) -> Result<()> {
     let payload = raw
         .get("payload")
         .ok_or_else(|| anyhow::anyhow!("input json must have top-level `payload` field"))?;
-    let typed: event_schema::EventPayload =
+    let typed: bloclawd_schema::EventPayload =
         serde_json::from_value(payload.clone()).context("deserialize payload as EventPayload")?;
-    let bytes = event_schema::canonical_bytes(&typed).context("canonicalize EventPayload")?;
+    let bytes = bloclawd_schema::canonical_bytes(&typed).context("canonicalize EventPayload")?;
     let hex_encoded = hex::encode(bytes);
 
     if let Some(parent) = output

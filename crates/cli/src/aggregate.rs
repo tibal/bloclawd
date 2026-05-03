@@ -8,7 +8,7 @@
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;
 
-use event_schema::{Model, TokenCounts};
+use bloclawd_schema::{Model, TokenCounts};
 use thiserror::Error;
 
 use crate::parsers::cc::CcEvent;

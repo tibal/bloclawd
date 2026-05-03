@@ -36,5 +36,5 @@ anyhow = { workspace = true }
 thiserror = { workspace = true }
 base64 = { workspace = true }
 sha2 = { workspace = true }
-event-schema = { path = "../event-schema", version = "0.1.0" }
+bloclawd-schema = { path = "../event-schema", version = "0.1.0" }
 bloclawd-pow = { path = "../pow", version = "0.1.0" }

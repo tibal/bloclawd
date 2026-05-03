@@ -10,7 +10,7 @@
 //! challenge_id, sig, nonce all base64url ~22 + 43 + 43 + 11 = ~119 bytes plus
 //! JSON overhead).
 
-use event_schema::{EventPayload, Harness, Model, Region, Tier, TokenCounts, canonical_bytes};
+use bloclawd_schema::{EventPayload, Harness, Model, Region, Tier, TokenCounts, canonical_bytes};
 
 /// Canonical sample EventPayload for integration tests.
 /// Wire-valid (v=1, closed-enum values, token bounds satisfied).

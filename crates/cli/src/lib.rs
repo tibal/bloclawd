@@ -3,7 +3,7 @@
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use chrono::Utc;
-use event_schema::{
+use bloclawd_schema::{
     EventPayload, Harness as SchemaHarness, LimitType, Region, SubmittedEvent, Tier, TokenCounts,
 };
 use std::io::{self, BufRead, Write};
@@ -277,7 +277,7 @@ fn resolve_tier<E: Write>(args: &Args, stderr: &mut E) -> Result<(Tier, String),
 }
 
 fn build_submitted_events(
-    by_model: std::collections::HashMap<event_schema::Model, TokenCounts>,
+    by_model: std::collections::HashMap<bloclawd_schema::Model, TokenCounts>,
     harness: SchemaHarness,
     tier: Tier,
     region: Region,
@@ -325,7 +325,7 @@ fn tier_wire_name(tier: Tier) -> &'static str {
     }
 }
 
-fn model_name(model: event_schema::Model) -> String {
+fn model_name(model: bloclawd_schema::Model) -> String {
     serde_json::to_value(model)
         .ok()
         .and_then(|value| value.as_str().map(str::to_string))

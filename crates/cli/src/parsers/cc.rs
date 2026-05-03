@@ -12,7 +12,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 
-use event_schema::Model;
+use bloclawd_schema::Model;
 
 use crate::min_version::{MIN_CC_VERSION, cc_first_line_passes_field_shape};
 

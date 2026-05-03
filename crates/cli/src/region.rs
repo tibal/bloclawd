@@ -1,7 +1,7 @@
 //! Resolve the user's region.
 
 use anyhow::{Result, anyhow};
-use event_schema::{Region, country_to_region};
+use bloclawd_schema::{Region, country_to_region};
 
 pub fn resolve_region() -> Result<Region> {
     if let Ok(iso) = std::env::var("BLOCLAWD_COUNTRY") {
