@@ -114,15 +114,15 @@ impl IngestError {
     }
 
     /// Map crates/pow verification variants to ingest error codes.
-    pub fn from_verify(e: pow::VerifyError) -> Self {
+    pub fn from_verify(e: bloclawd_pow::VerifyError) -> Self {
         match e {
-            pow::VerifyError::InvalidSig => Self::SignatureInvalid,
-            pow::VerifyError::Expired => Self::ChallengeExpired,
-            pow::VerifyError::ClockSkew => Self::ClockSkew,
-            pow::VerifyError::PayloadHashMismatch => Self::PayloadHashMismatch,
-            pow::VerifyError::PowInsufficient { .. } => Self::PowInvalid,
-            pow::VerifyError::MalformedChallenge => Self::Internal,
-            pow::VerifyError::InvalidSecret => Self::Internal,
+            bloclawd_pow::VerifyError::InvalidSig => Self::SignatureInvalid,
+            bloclawd_pow::VerifyError::Expired => Self::ChallengeExpired,
+            bloclawd_pow::VerifyError::ClockSkew => Self::ClockSkew,
+            bloclawd_pow::VerifyError::PayloadHashMismatch => Self::PayloadHashMismatch,
+            bloclawd_pow::VerifyError::PowInsufficient { .. } => Self::PowInvalid,
+            bloclawd_pow::VerifyError::MalformedChallenge => Self::Internal,
+            bloclawd_pow::VerifyError::InvalidSecret => Self::Internal,
         }
     }
 

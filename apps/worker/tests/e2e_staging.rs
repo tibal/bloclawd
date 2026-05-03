@@ -18,7 +18,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use pow::{ChallengeId, K_V1, PayloadHash};
+use bloclawd_pow::{ChallengeId, K_V1, PayloadHash};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
@@ -96,7 +96,7 @@ async fn happy_path() {
     assert_eq!(URL_SAFE_NO_PAD.encode(cid_bytes), cid_b64);
     let cid = ChallengeId(cid_bytes);
     let deadline = Instant::now() + Duration::from_secs(30);
-    let (nonce, _solved_hash) = pow::solve(&cid, &ph, K_V1, 0, deadline)
+    let (nonce, _solved_hash) = bloclawd_pow::solve(&cid, &ph, K_V1, 0, deadline)
         .expect("PoW solves within 30s; run staging smoke with cargo test --release");
 
     let event_id = Uuid::new_v4();

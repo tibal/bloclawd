@@ -12,7 +12,7 @@ path = "src/main.rs"
 
 [dependencies]
 event-schema = { path = "../crates/event-schema" }
-pow = { path = "../crates/pow" }
+bloclawd-pow = { path = "../crates/pow" }
 sha2 = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }

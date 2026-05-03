@@ -154,11 +154,11 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64",
+ "bloclawd-pow",
  "chrono",
  "clap",
  "event-schema",
  "indicatif",
- "pow",
  "reqwest 0.13.3",
  "serde",
  "serde_json",
@@ -172,14 +172,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "bloclawd-pow"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "hex",
+ "hmac 0.12.1",
+ "serde",
+ "serde_jcs",
+ "serde_json",
+ "sha2 0.10.9",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "bloclawd-worker"
 version = "0.1.0"
 dependencies = [
  "base64",
+ "bloclawd-pow",
  "console_error_panic_hook",
  "event-schema",
  "getrandom 0.4.2",
- "pow",
  "reqwest 0.12.28",
  "rustls",
  "rustls-native-certs",
@@ -1522,20 +1536,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0103b1cef7ec0cf76490e969665504990193874ea05c85ff9bab8b911d0a0564"
 dependencies = [
  "zerovec",
-]
-
-[[package]]
-name = "pow"
-version = "0.1.0"
-dependencies = [
- "base64",
- "hex",
- "hmac 0.12.1",
- "serde",
- "serde_jcs",
- "serde_json",
- "sha2 0.10.9",
- "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -3375,10 +3375,10 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "base64",
+ "bloclawd-pow",
  "chrono",
  "event-schema",
  "hex",
- "pow",
  "serde",
  "serde_jcs",
  "serde_json",
