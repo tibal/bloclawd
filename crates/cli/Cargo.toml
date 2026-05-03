@@ -1,10 +1,16 @@
 [package]
-name = "bloclawd-cli"
+name = "bloclawd"
 version = "0.0.1"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+description.workspace = true
+homepage.workspace = true
+documentation.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [lib]
 # Library + bin split: integration tests call the lib in-process; the bin is

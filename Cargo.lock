@@ -149,7 +149,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "bloclawd-cli"
+name = "bloclawd"
 version = "0.0.1"
 dependencies = [
  "anyhow",

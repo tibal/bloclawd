@@ -68,7 +68,7 @@ mod tests {
                 .expect("clock")
                 .as_nanos();
             path.push(format!(
-                "bloclawd-cli-{name}-{}-{unique}",
+                "bloclawd-{name}-{}-{unique}",
                 std::process::id()
             ));
             fs::create_dir_all(&path).expect("create temp home");
