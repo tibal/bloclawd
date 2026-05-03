@@ -10,10 +10,24 @@ ci = "github"
 # The installers to generate for each app
 installers = ["shell", "homebrew"]
 # Target platforms to build apps for (Rust target-triple syntax)
-targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl", "x86_64-pc-windows-msvc"]
+targets = ["aarch64-apple-darwin", "x86_64-apple-darwin", "x86_64-unknown-linux-musl"]
 # Path that installers should place binaries in
 install-path = "CARGO_HOME"
 # Where to host releases
 hosting = "github"
 # Whether to install an updater program
 install-updater = false
+# NOTE: `tag-namespace` is intentionally OMITTED. In cargo-dist 0.31.0 setting it to
+# `""` generates a workflow file named `-release.yml` (literal dash prefix), which is
+# not what we want. The default (no tag-namespace) accepts plain `vX.Y.Z` tags and
+# produces `release.yml` — exactly the DIST-01 / D-113 contract.
+# A GitHub repo to push Homebrew formulas to
+tap = "<gh-org>/homebrew-bloclawd"
+# Which actions to run on pull requests
+pr-run-mode = "plan"
+# Publish jobs to run in CI
+publish-jobs = ["homebrew"]
+# Whether to sign macOS executables
+macos-sign = true
+# Whether CI should trigger releases with dispatches instead of tag pushes
+dispatch-releases = false
