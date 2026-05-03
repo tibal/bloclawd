@@ -150,7 +150,7 @@ dependencies = [
 
 [[package]]
 name = "bloclawd"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "base64",
@@ -173,7 +173,7 @@ dependencies = [
 
 [[package]]
 name = "bloclawd-worker"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "base64",
  "console_error_panic_hook",
