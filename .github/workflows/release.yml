@@ -180,6 +180,56 @@ jobs:
           echo "EOF" >> "$GITHUB_OUTPUT"
 
           cp dist-manifest.json "$BUILD_MANIFEST_NAME"
+      # In-build notarize: runs INSIDE this job AFTER cargo-dist's signing /
+      # build step and BEFORE the artifact upload. cargo-dist itself does not
+      # call `xcrun notarytool` (RESEARCH Landmine #1), and a separate
+      # notarize-macos job would force re-uploads under a new artifact name
+      # that cargo-dist's `host` job would not find (ISSUE-02). Inserting
+      # here means the existing upload-artifact step below uploads the
+      # already-notarized + stapled archives under cargo-dist's chosen name,
+      # so downstream jobs need zero changes.
+      #
+      # D-119 fail-closed: any non-zero exit from `xcrun notarytool submit`
+      # fails this build job, which fails cargo-dist's `host`,
+      # `publish-homebrew-formula`, and `announce` jobs (they all `needs:`
+      # this one). No public surface is touched on Apple rejection.
+      - name: Notarize macOS binaries (in-build, before upload)
+        if: runner.os == 'macOS'
+        env:
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+        run: |
+          set -euo pipefail
+          KEYFILE=$(mktemp -t apple_key.XXXXXX.p8)
+          trap 'rm -f "$KEYFILE"' EXIT
+          printf '%s' "$APPLE_API_KEY_P8" | base64 -d > "$KEYFILE"
+          chmod 600 "$KEYFILE"
+          LOG_FILE="/tmp/notarytool-${GITHUB_RUN_ID}.log"
+          shopt -s nullglob
+          for ARCHIVE in target/distrib/*-apple-darwin*.zip target/distrib/*-apple-darwin*.tar.xz; do
+            echo "::group::Notarize $ARCHIVE"
+            xcrun notarytool submit "$ARCHIVE" \
+              --key "$KEYFILE" \
+              --key-id "$APPLE_API_KEY_ID" \
+              --issuer "$APPLE_API_ISSUER" \
+              --wait \
+              --timeout 30m 2>&1 | tee -a "$LOG_FILE"
+            # Stapler only succeeds on .dmg/.pkg/.app bundles. Raw CLI tarballs
+            # cannot be stapled; users get online-Gatekeeper checks on first run.
+            xcrun stapler staple "$ARCHIVE" || echo "Stapler skipped (CLI archive, expected)"
+            echo "::endgroup::"
+          done
+      - name: Cleanup notarize keyfile
+        if: always() && runner.os == 'macOS'
+        run: rm -f /tmp/apple_key*.p8
+      - name: Upload notarytool log on failure
+        if: failure() && runner.os == 'macOS'
+        uses: actions/upload-artifact@v6
+        with:
+          name: notarytool-log-${{ github.ref_name }}-${{ join(matrix.targets, '_') }}
+          path: /tmp/notarytool-*.log
+          retention-days: 14
       - name: "Upload artifacts"
         uses: actions/upload-artifact@v6
         with:
