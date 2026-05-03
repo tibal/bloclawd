@@ -11,7 +11,7 @@ import { Filters } from "@/components/Filters";
 import { TierToggle } from "@/components/TierToggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChartData, useDelayedLoading } from "@/lib/dashboard-data";
-import { useStatus, type StatusJson } from "@/lib/r2";
+import { isR2NotFound, useStatus, type StatusJson } from "@/lib/r2";
 
 const MODEL_VALUES = [
   "claude-opus-4-7",
@@ -100,10 +100,17 @@ function DashboardPage() {
       ) : null}
 
       {error ? (
-        <EmptyState
-          heading="We can't reach the public data right now"
-          subhead="data.bloclawd.com may be having a hiccup. Refresh in a minute, or check the methodology page for what to expect."
-        />
+        isR2NotFound(error) ? (
+          <EmptyState
+            heading="No public data published yet"
+            subhead="The first daily aggregation runs at 03:00 UTC. Check the methodology page to see what will be published."
+          />
+        ) : (
+          <EmptyState
+            heading="We can't reach the public data right now"
+            subhead="data.bloclawd.com may be having a hiccup. Refresh in a minute, or check the methodology page for what to expect."
+          />
+        )
       ) : delayedLoading ? (
         <Skeleton
           aria-label="Loading aggregates..."
