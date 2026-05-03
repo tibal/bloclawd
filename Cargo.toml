@@ -54,3 +54,8 @@ strip = "symbols"
 
 [profile.release.package.bloclawd-worker]
 opt-level = "s"
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
