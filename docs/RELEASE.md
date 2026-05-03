@@ -97,7 +97,7 @@ Version-management upgrade path (post-ISSUE-01 fix in plan 05-03): the workspace
    bloclawd --version
 
    # Brew (macOS only)
-   brew install <gh-org>/bloclawd/bloclawd
+   brew install tibal/bloclawd/bloclawd
    bloclawd --version
 
    # Curl
