@@ -16,7 +16,7 @@ not, once 0.2.0 is cut). v1.0.0+ may adopt a longer-tailed policy.
 To report a security vulnerability in bloclawd, please use GitHub Private
 Vulnerability Reporting:
 
-**[github.com/tibal/bloclawd/security/advisories/new](https://github.com/tibal/bloclawd/security/advisories/new)**
+**[github.com/bloclawd/bloclawd/security/advisories/new](https://github.com/bloclawd/bloclawd/security/advisories/new)**
 
 This channel is private; only the bloclawd maintainers see your report.
 

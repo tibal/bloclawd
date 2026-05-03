@@ -21,10 +21,10 @@ cargo install bloclawd
 ### Via Homebrew (macOS)
 
 ```sh
-brew install tibal/bloclawd/bloclawd
+brew install bloclawd/tap/bloclawd
 ```
 
-See the [latest release](https://github.com/tibal/bloclawd/releases) page for the canonical tap path.
+See the [latest release](https://github.com/bloclawd/bloclawd/releases) page for the canonical tap path.
 
 ### Via curl (universal)
 

@@ -15,7 +15,7 @@ set -eu
 
 printf 'bloclawd is not yet released.\n'
 printf 'The first version (0.1.x) is in preparation.\n'
-printf 'Track release status at: https://github.com/%s/bloclawd/releases\n' "${BLOCLAWD_GH_ORG:-tibal}"
+printf 'Track release status at: https://github.com/%s/bloclawd/releases\n' "${BLOCLAWD_GH_ORG:-bloclawd}"
 printf 'Source: https://bloclawd.com\n'
 
 exit 1
