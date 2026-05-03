@@ -19,6 +19,14 @@ tag-prefix = ""
 # Branch protection: only release from main (D-115).
 allow-branch = ["main"]
 
+# DO NOT publish from cargo-release. Publishing happens in CI on tag push:
+# .github/workflows/release.yml runs `cargo publish -p X --locked` in topo
+# order (bloclawd-schema → bloclawd-pow → bloclawd) so cargo's path-dep
+# resolution succeeds. Letting cargo-release publish locally would fail on
+# stable cargo (multi-package `-p` flag is nightly-only) and would also
+# duplicate the work CI is already doing.
+publish = false
+
 # Sign-tag: v1 ships unsigned. Flip to true once the operator has a GPG
 # key configured; documented in docs/RELEASE.md secret-rotation section.
 sign-tag = false
