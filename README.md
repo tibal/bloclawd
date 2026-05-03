@@ -4,23 +4,55 @@ Anonymous, user-triggered analytics for AI coding subscription limits.
 
 The `bloclawd` CLI reads local Claude Code or Codex session logs after you hit a provider limit, builds an anonymous token-usage payload for a fixed time window, shows the exact event that would be sent, and only submits after explicit confirmation.
 
+The aggregate dashboard at <https://bloclawd.com> renders 15-minute timeseries with spread bands so you can compare your experience to the wider community — broken down by model, subscription tier, harness, and coarse region. There are no accounts, no IP-based geolocation, no persistent device identifiers, and no per-event timestamps in the public dataset.
+
+For the full anonymity contract, see [THREAT-MODEL.md](./THREAT-MODEL.md).
+
 ## Install
 
-From this repository:
+Three install paths are supported on macOS (Apple Silicon + Intel) and Linux (x86_64-musl):
+
+### Via cargo (developers)
 
 ```sh
-cargo install --path crates/cli
+cargo install bloclawd
 ```
 
-That installs `bloclawd` to `$CARGO_HOME/bin/bloclawd`, usually `~/.cargo/bin/bloclawd`.
-
-For local development without installing:
+### Via Homebrew (macOS)
 
 ```sh
-cargo run -p bloclawd -- --cc --tier max20 --end 16:00 --5h --dry-run
+brew install <gh-org>/bloclawd/bloclawd
 ```
 
-Release distribution will use `cargo install bloclawd`, Homebrew, and a `curl | sh` installer with prebuilt binaries.
+Replace `<gh-org>` with the bloclawd GitHub organization (see the [latest release](https://github.com/<gh-org>/bloclawd/releases) page for the canonical tap path).
+
+### Via curl (universal)
+
+```sh
+curl -fsSL https://bloclawd.com/install.sh | sh
+```
+
+The `install.sh` script verifies a per-target sha256 hash before extracting the binary. You can audit the script before running it:
+
+```sh
+curl https://bloclawd.com/install.sh
+```
+
+macOS binaries are signed and notarized via Apple's `notarytool` starting with the first release after Apple Developer enrollment is active. Earlier `0.1.x` releases may trigger Gatekeeper friction on first launch; if you see "cannot be opened because the developer cannot be verified", right-click the binary and choose Open to bypass. This note will be removed once enrollment-completion confirms in plan 05-13 Checkpoint 1.
+
+## Quick start
+
+```sh
+# Show what would be submitted (no network)
+bloclawd --cc --tier max20 --end 16:00 --5h --dry-run
+
+# Submit (asks for confirmation)
+bloclawd --cc --tier max20 --end 16:00 --5h
+```
+
+`--tier` is persisted to `~/.config/bloclawd/config.toml` after first run.
+
+See <https://bloclawd.com/methodology> for the trust contract and <https://bloclawd.com/data> for the wire format.
 
 ## Supported Inputs
 
@@ -31,12 +63,14 @@ Release distribution will use `cargo install bloclawd`, Homebrew, and a `curl | 
 | Claude Code | `--cc` | `~/.claude/projects/**/*.jsonl` |
 | Codex | `--codex` | `$CODEX_HOME/sessions/**/*.jsonl`, defaulting to `~/.codex/sessions/**/*.jsonl` |
 
-Minimum supported producer versions are pinned in `crates/cli/src/min_version.rs`:
+## Supported Versions
 
-| Constant | Minimum version | Why |
-| --- | --- | --- |
-| `MIN_CC_VERSION` | `2.1.89` | Requires Claude Code assistant-message usage fields for input, output, cache read, and cache write counts. |
-| `MIN_CODEX_VERSION` | `0.125.0` | Requires Codex token-count events with input, output, and cached-input counts. |
+| Harness          | Minimum supported | Last tested |
+|------------------|-------------------|-------------|
+| Claude Code (cc) | 2.1.89            | TBD         |
+| Codex            | 0.125.0           | TBD         |
+
+Minimum versions are enforced as a non-fatal stderr warning at startup; below-minimum invocations still proceed (defensive parsing handles unknown shapes), but you'll see a warning. See [docs/SUPPORTED-VERSIONS.md](./docs/SUPPORTED-VERSIONS.md) for the smoke-updated table.
 
 ## Usage
 
@@ -54,8 +88,6 @@ bloclawd --cc --tier max20 --end 16:00 --5h
 bloclawd --codex --tier max20 --end 16:00 --5h --yes
 ```
 
-`--tier` is persisted to `~/.config/bloclawd/config.toml`. Later runs may omit `--tier` if the config exists.
-
 `--week` is currently dry-run only in v1:
 
 ```sh
@@ -72,22 +104,13 @@ max5   # $100 individual tier
 max20  # $200 individual tier
 ```
 
-## Fixture Anonymization
+## Privacy and Threat Model
 
-The repository keeps anonymized fixture JSONL under `crates/cli/tests/fixtures/`. To generate a new fixture from a real session:
+`bloclawd` is not background telemetry. It runs only when invoked by the user, derives the payload locally, and submits no account identity.
 
-```sh
-cargo run -p xtask -- anonymize-session --harness cc --input <real.jsonl> --output crates/cli/tests/fixtures/cc/<name>.jsonl
-cargo run -p xtask -- anonymize-session --harness codex --input <real.jsonl> --output crates/cli/tests/fixtures/codex/<name>.jsonl
-```
+Public outputs apply k-anonymity suppression (n ≥ 5), binned token counts, no public event IDs or nonces, and no persisted per-event timing.
 
-The anonymizer preserves model IDs, token counts, and JSON shape while replacing prompts, tool arguments, paths, UUIDs, and timestamps with deterministic placeholders.
-
-## Privacy And Threat Model
-
-The CLI is not background telemetry. It runs only when invoked by the user, derives the payload locally, and submits no account identity.
-
-Public outputs apply k-anonymity suppression, binned token counts, no public event IDs or nonces, and no persisted per-event timing.
+See [THREAT-MODEL.md](./THREAT-MODEL.md) for the full anonymity boundary, wire-integrity promises, and AS-IS non-promises.
 
 ## Exit Codes
 
@@ -98,3 +121,33 @@ Public outputs apply k-anonymity suppression, binned token counts, no public eve
 | `2` | No matching local events found in the selected window. |
 | `3` | PoW solve timeout. |
 | `4` | Server unavailable, Worker rejection, network failure, or provider probe convergence. |
+
+## Security
+
+To report a vulnerability, please follow the process in [SECURITY.md](./SECURITY.md).
+
+## Contributing
+
+The repository keeps anonymized fixture JSONL under `crates/cli/tests/fixtures/`. To generate a new fixture from a real session:
+
+```sh
+cargo run -p xtask -- anonymize-session --harness cc --input <real.jsonl> --output crates/cli/tests/fixtures/cc/<name>.jsonl
+cargo run -p xtask -- anonymize-session --harness codex --input <real.jsonl> --output crates/cli/tests/fixtures/codex/<name>.jsonl
+```
+
+The anonymizer preserves model IDs, token counts, and JSON shape while replacing prompts, tool arguments, paths, UUIDs, and timestamps with deterministic placeholders.
+
+## License
+
+Licensed under either of:
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](./LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
+- MIT license ([LICENSE-MIT](./LICENSE-MIT) or <https://opensource.org/licenses/MIT>)
+
+at your option.
+
+The aggregated public dataset at <https://data.bloclawd.com> is licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+
+### Contribution
+
+Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.
