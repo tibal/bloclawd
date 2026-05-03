@@ -1,6 +1,6 @@
 #![cfg(feature = "staging-smoke")]
 
-// Cron-health staging proof for Phase 4 (AGGR-14).
+// Cron-health staging proof.
 //
 // GATED:
 //   - cargo feature `staging-smoke`

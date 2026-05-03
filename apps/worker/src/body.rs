@@ -1,6 +1,6 @@
 //! Body cap helper for POST /event.
 //!
-//! D-42 requires both the Content-Length fast check and the materialized byte check.
+//! Enforces both the Content-Length fast check and the materialized byte check.
 
 use crate::errors::IngestError;
 use worker::Request;

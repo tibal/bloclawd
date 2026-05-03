@@ -3,19 +3,19 @@
 **Status:** Frozen for v1.
 **Standard:** [RFC 8785 - JSON Canonicalization Scheme (JCS)](https://datatracker.ietf.org/doc/html/rfc8785)
 **Last updated:** 2026-04-30
-**Implementation:** `serde_jcs = "0.2"`; `crates/event-schema::canonical_bytes` is the shared helper target.
+**Implementation:** `serde_jcs = "0.2"`; `crates/event-schema::canonical_bytes` is the shared helper.
 
 ## 1. Why This Exists
 
 `spec/pow-v1.md` section 2 binds `payload_hash = SHA-256(jcs_canonical_payload_bytes)` into the PoW input. The Rust CLI (solver) and the Rust Worker (verifier) must serialize a given logical JSON object to the exact same byte sequence.
 
-After Phase 1.5, the shared helper target is:
+The shared helper is:
 
 ```rust
 crates/event-schema::canonical_bytes
 ```
 
-That helper uses the single workspace JCS dependency `serde_jcs = "0.2"`. `crates/pow` and `xtask` still call the same pinned dependency inline until the Phase 2 verifier refactor replaces those calls. There is no protocol-critical TypeScript canonicalizer.
+That helper uses the single workspace JCS dependency `serde_jcs = "0.2"`. `crates/pow` and `xtask` still call the same pinned dependency inline until they are moved onto the shared helper. There is no protocol-critical TypeScript canonicalizer.
 
 Hand-rolled canonicalization historically drifts on:
 
@@ -31,11 +31,11 @@ RFC 8785 specifies these serialization rules. It does not normalize Unicode stri
 
 | Consumer | Implementation | Notes |
 |----------|----------------|-------|
-| Current `crates/pow::payload_hash` | Inline `serde_jcs = "0.2"` | Current Rust verifier source until Phase 2 switches it to `crates/event-schema::canonical_bytes`. |
+| Current `crates/pow::payload_hash` | Inline `serde_jcs = "0.2"` | Current Rust verifier source until it switches to `crates/event-schema::canonical_bytes`. |
 | Current `xtask gen-fixtures` | Inline `serde_jcs = "0.2"` | Fixture drift gate catches changes while using the same pinned workspace dependency. |
-| Rust CLI submission path | `crates/event-schema::canonical_bytes` target | Same bytes as Worker verification and dry-run display once the CLI path is wired. |
-| CLI `--dry-run` printer | `crates/event-schema::canonical_bytes` target | Dry-run bytes and submitted bytes must share the same formatter. |
-| Rust Worker verifier | `crates/event-schema::canonical_bytes` target | Phase 1.5 has the helper; runtime verifier wiring lands in the verifier refactor. |
+| Rust CLI submission path | `crates/event-schema::canonical_bytes` | Same bytes as Worker verification and dry-run display. |
+| CLI `--dry-run` printer | `crates/event-schema::canonical_bytes` | Dry-run bytes and submitted bytes must share the same formatter. |
+| Rust Worker verifier | `crates/event-schema::canonical_bytes` | Runtime verifier path uses the shared helper. |
 | Frontend `/data` page renderer | Reads the same canonical bytes re-encoded for display | The frontend renders protocol bytes; it does not reimplement JCS in TypeScript. |
 
 ## 3. Conformance Gate
@@ -71,8 +71,8 @@ The Worker verifier must perform step 1 server-side from the parsed request body
 - The CLI's `--dry-run` output prints `JCS(payload)` byte-for-byte once the CLI path is wired.
 - The CLI's `--yes` submit sends the same payload bytes from the same code path.
 - The Rust Worker recomputes `JCS(payload)` from the parsed request body using `crates/event-schema::canonical_bytes` once the runtime verifier path is wired.
-- Until the Phase 2 verifier refactor, `crates/pow` and `xtask` use the same pinned `serde_jcs = "0.2"` dependency inline.
-- The website's `/data` page renders the same canonical bytes for users. Phase 4 picks the exact build/fetch mechanism, but it must not create a second canonicalization implementation in the SPA.
+- `crates/pow` and `xtask` use the same pinned `serde_jcs = "0.2"` dependency inline until they move onto the shared helper.
+- The website's `/data` page renders the same canonical bytes for users and must not create a second canonicalization implementation in the SPA.
 
 ## 6. Edge Cases Enforced by Fixtures
 

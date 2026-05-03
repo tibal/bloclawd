@@ -52,7 +52,7 @@ function MethodologyPage() {
             For each cohort of tier, harness, region, and limit type, bloclawd
             computes one unified token cost per submission. Submissions outside
             plus or minus 2σ of the cohort mean are trimmed before percentile
-            computation. This Phase 4 policy replaces the earlier double-MAD
+            computation. This public policy replaces the earlier double-MAD
             rule and keeps model-specific token mixes comparable.
           </p>
           <p className="text-sm leading-6 text-muted-foreground">
@@ -151,9 +151,9 @@ function MethodologyPage() {
               className="text-primary underline underline-offset-4"
               href="https://github.com/tibal/bloclawd"
             >
-              published on GitHub
+            published on GitHub
             </a>
-            , with Phase 5 responsible for promoting the final public URL.
+            , and <code>data.bloclawd.com</code> is the public data URL.
           </p>
         </section>
       </div>

@@ -1,4 +1,4 @@
-//! CC session parser (D-58 + RESEARCH section 1).
+//! Claude Code session parser.
 //!
 //! Defensive: upstream JSONL is parsed with `serde_json::Value` and `.get()`
 //! chains only. Strict wire structs are for the Worker side, not this surface.

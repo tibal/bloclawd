@@ -1,7 +1,7 @@
-//! HTTP client plus GET /challenge and POST /event glue (CLI-16).
+//! HTTP client plus GET /challenge and POST /event glue.
 //!
-//! This module sends one event per call. Plan 07 owns orchestration over N
-//! per-model events in one CLI invocation.
+//! This module sends one event per call. The CLI orchestration layer handles
+//! all per-model events for one invocation.
 
 use std::time::Duration;
 
@@ -212,7 +212,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Plan 07 wires in-process run with fixtures; client-level scheme test is mandatory here"]
+    #[ignore = "In-process fixture coverage owns the full CLI path; this keeps the client-level scheme test documented"]
     fn cli_plain_http_orchestration_smoke() {}
 
     #[test]

@@ -1,4 +1,4 @@
-//! Plan 01.5 Rust Worker scaffold with Phase 2 ingest routes.
+//! Rust Worker entry point with ingest routes and scheduled aggregation.
 
 use worker::*;
 

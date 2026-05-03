@@ -82,7 +82,7 @@ jobs:
           fi
 
   log-boundary:
-    name: log-boundary — INGE-11 + Pitfall 6 grep gate
+    name: log-boundary grep gate
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -90,17 +90,17 @@ jobs:
       - name: Forbidden console_log content
         run: |
           if git grep -nE 'console_log!.*(event_id|nonce|submission_group_id|limit_type|cf-connecting-ip|elapsed|password|conn_string|hyperdrive\.connection_string)' apps/worker/ crates/; then
-            echo "::error::Forbidden log content detected. INGE-11 + Pitfall 6 violation."
+            echo "::error::Forbidden log content detected."
             exit 1
           fi
-          # CLI-side emitters (Phase 3 introduces crates/cli/) - same forbidden tokens.
+          # CLI-side emitters use the same forbidden-token boundary.
           if git grep -nE '(eprintln!|println!|tracing::(info|warn|error|debug|trace)!).*(event_id|nonce|submission_group_id|limit_type|cf-connecting-ip|password|conn_string)' apps/worker/ crates/; then
-            echo "::error::Forbidden log content detected. INGE-11 + Pitfall 6 violation."
+            echo "::error::Forbidden log content detected."
             exit 1
           fi
 
   size-check:
-    name: size-check — WASM bundle under 2.5 MiB (Pitfall 2)
+    name: size-check — WASM bundle under 2.5 MiB
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -132,12 +132,12 @@ jobs:
           size=$(wc -c < apps/worker/build/worker/index.wasm)
           echo "WASM size: $size bytes"
           if [ "$size" -ge 2621440 ]; then
-            echo "::error::WASM bundle $size bytes exceeds 2.5 MiB budget (Pitfall 2)."
+            echo "::error::WASM bundle $size bytes exceeds 2.5 MiB budget."
             exit 1
           fi
 
   strip-at-cron:
-    name: strip-at-cron — AGGR-07/08 grep gate
+    name: strip-at-cron grep gate
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -145,7 +145,7 @@ jobs:
       - name: Forbidden anonymity strings in cron emission
         run: |
           if git grep -nE '(submission_group_id|tz_offset|event_id|nonce)' apps/worker/src/cron/r2_emit.rs; then
-            echo "::error::Anonymity boundary leak: PII string in r2_emit.rs (AGGR-07/08)"
+            echo "::error::Anonymity boundary leak: PII string in r2_emit.rs"
             exit 1
           fi
           if git grep -nE '(submission_group_id|tz_offset|event_id|nonce)' apps/worker/src/cron/tests/fixtures/*.json; then
@@ -179,14 +179,12 @@ jobs:
           done
 
   frontend-build-test:
-    name: frontend — build + test (WEB-01)
+    name: frontend — build + test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
-        with:
-          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: 20

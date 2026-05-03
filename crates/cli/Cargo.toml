@@ -7,8 +7,7 @@ license.workspace = true
 repository.workspace = true
 
 [lib]
-# Library + bin split (CONTEXT.md Claude's Discretion L92): the lib is what
-# crates/cli/tests/fixtures_e2e.rs (Plan 07) calls in-process; the bin is
+# Library + bin split: integration tests call the lib in-process; the bin is
 # the thin entry users execute as `bloclawd`.
 
 [[bin]]

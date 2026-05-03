@@ -1,4 +1,4 @@
-//! _status.json builder + WEB-08/09 derivations (D-103, D-104, AGGR-14).
+//! _status.json builder and health derivations.
 //!
 //! Contributor count leaves this module only after 1-significant-digit fuzzy rounding.
 //! Logging boundary: status-write confirmation only; never log count values.
@@ -29,7 +29,7 @@ pub struct StatusJson {
     pub approximate_contributors_window_days: u32,
 }
 
-/// Round `n` to 1 significant digit. RESEARCH Pitfall 7 verbatim.
+/// Round `n` to 1 significant digit.
 pub fn fuzzy_round(n: u64) -> u64 {
     if n < 10 {
         return n;

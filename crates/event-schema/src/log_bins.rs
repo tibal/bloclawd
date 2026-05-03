@@ -1,12 +1,12 @@
-//! Powers-of-2 log bins for token counts (D-96).
+//! Powers-of-2 log bins for token counts.
 //!
-//! Edges are inlined into each top-level R2 file (D-94) so files are
+//! Edges are inlined into each top-level R2 file so files are
 //! self-contained for offline analysis -- the SPA reads `bin_edges` from
 //! the JSON rather than from a TS-side constant. This crate-side module
 //! is the single source of truth used by the cron percentile encoder.
 //!
 //! Audited in PR; changing edges is a public R2 schema break.
-//! No ts-rs binding emitted -- see PATTERNS.md "No LogBins.ts" rationale.
+//! No ts-rs binding emitted; public files carry their own bin edges.
 
 /// 19 edges from 2^10 (1 KiB) to 2^28 (~268M tokens).
 pub const EDGES: [u64; 19] = [

@@ -20,7 +20,7 @@ For local development without installing:
 cargo run -p bloclawd-cli -- --cc --tier max20 --end 16:00 --5h --dry-run
 ```
 
-Release distribution is planned for `cargo install bloclawd`, Homebrew, and a `curl | sh` installer with prebuilt binaries.
+Release distribution will use `cargo install bloclawd`, Homebrew, and a `curl | sh` installer with prebuilt binaries.
 
 ## Supported Inputs
 
@@ -67,9 +67,9 @@ bloclawd --cc --tier max20 --end 16:00 --week --dry-run
 `--tier` uses provider-neutral individual subscription price buckets for both Claude Code and Codex:
 
 ```text
-pro    # $20 individual plan
-max5   # $100 individual plan
-max20  # $200 individual plan
+pro    # $20 individual tier
+max5   # $100 individual tier
+max20  # $200 individual tier
 ```
 
 ## Fixture Anonymization
@@ -87,7 +87,7 @@ The anonymizer preserves model IDs, token counts, and JSON shape while replacing
 
 The CLI is not background telemetry. It runs only when invoked by the user, derives the payload locally, and submits no account identity.
 
-Phase 3's CLI threat model is documented in `.planning/phases/03-rust-cli/03-07-orchestration-fixtures-PLAN.md`. Later backend phases add the public-data anonymity controls: k-anonymity suppression, binned token counts, no public event IDs or nonces, and no persisted per-event timing.
+Public outputs apply k-anonymity suppression, binned token counts, no public event IDs or nonces, and no persisted per-event timing.
 
 ## Exit Codes
 

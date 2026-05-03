@@ -1,4 +1,4 @@
-//! Closed-enum mirror of the Worker error envelope (D-73).
+//! Closed-enum mirror of the Worker error envelope.
 //!
 //! Wire errors all converge to exit 4. Local-only CLI errors keep their
 //! documented exit codes.

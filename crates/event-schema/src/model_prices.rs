@@ -1,8 +1,8 @@
-//! Hand-curated per-model per-token pricing priors (D-102).
+//! Hand-curated per-model per-token pricing priors.
 //! Source: https://www.anthropic.com/pricing plus model release pages, and
 //! https://openai.com/api/pricing/, captured 2026-05-02. USD per token.
-//! Used as the ridge-regression prior for AGGR-15 weight fits.
-//! Audited in PR; tunable post-staging-UAT (D-100 + AGGR-15).
+//! Used as the ridge-regression prior for weight fits.
+//! Audited in PR; tunable after staging validation.
 
 use crate::enums::{Model, TokenType, Window};
 

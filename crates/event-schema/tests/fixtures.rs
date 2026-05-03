@@ -1,15 +1,14 @@
 //! Shared sample EventPayload fixture for testing.
 //!
-//! Per RESEARCH Discretion 13: the canonical "sample event" used by
-//! integration tests across the workspace. Phase 2's apps/worker/tests/e2e_staging.rs
-//! imports this file as a path module so the deployed staging proof and
-//! event-schema fixture tests share the same helper without adding a separate
-//! test-support crate.
+//! Canonical "sample event" used by integration tests across the workspace.
+//! apps/worker/tests/e2e_staging.rs imports this file as a path module so the
+//! deployed staging proof and event-schema fixture tests share the same helper
+//! without adding a separate test-support crate.
 //!
-//! Constraint (Assumption A5 in RESEARCH): canonical_bytes(payload) MUST be
-//! < 4 KB so the test stays well under the 8 KB POST /event body cap (D-42)
-//! after envelope fields (event_id, challenge_id, sig, nonce all base64url
-//! ~22 + 43 + 43 + 11 = ~119 bytes plus JSON overhead).
+//! Constraint: canonical_bytes(payload) MUST be < 4 KB so the test stays well
+//! under the 8 KB POST /event body cap after envelope fields (event_id,
+//! challenge_id, sig, nonce all base64url ~22 + 43 + 43 + 11 = ~119 bytes plus
+//! JSON overhead).
 
 use event_schema::{EventPayload, Harness, Model, Region, Tier, TokenCounts, canonical_bytes};
 
@@ -26,7 +25,7 @@ pub fn sample_event_payload() -> EventPayload {
     }
 }
 
-/// Sample TokenCounts within INGE-07 bounds (each field <= TOKEN_COUNT_MAX).
+/// Sample TokenCounts within accepted bounds (each field <= TOKEN_COUNT_MAX).
 pub fn sample_token_counts() -> TokenCounts {
     TokenCounts {
         input_5min: 12_345,
@@ -44,7 +43,7 @@ pub fn sample_token_counts() -> TokenCounts {
 fn sample_payload_validates() {
     let p = sample_event_payload();
     p.validate()
-        .expect("sample must satisfy INGE-07 bounds + v == 1");
+        .expect("sample must satisfy token bounds + v == 1");
 }
 
 #[test]

@@ -1,4 +1,4 @@
-//! In-process fixture lock (D-70 + CLI-17).
+//! In-process fixture lock.
 
 use std::collections::HashMap;
 use std::fs;

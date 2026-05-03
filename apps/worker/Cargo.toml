@@ -10,7 +10,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 worker = { version = "0.8.1", features = ["http"] }
-# Plan 01.5-02 expected devsnek/rust-postgres@unnamed-statement, but that
+# An earlier prototype expected devsnek/rust-postgres@unnamed-statement, but that
 # repository returned "Repository not found" on 2026-04-30. Upstream 0.7.17
 # exposes the js feature and pooler-safe typed query APIs; pinned by rev for
 # reproducibility. Rev captured: 35a85bdbfeeac465e092950f65a10d9192418175 on 2026-04-30.
@@ -30,9 +30,9 @@ uuid = { version = "1", features = ["v4", "js"] }
 
 [features]
 perf = []  # Enables synthetic-volume cron CPU benchmark in tests/cron_perf.rs (--ignored).
-# Phase 2 plan 02-05 end-to-end staging proof (D-46). Manually invoked only:
+# End-to-end staging proof. Manually invoked only:
 #   cargo test -p bloclawd-worker --features staging-smoke -- --ignored happy_path
-# NOT in CI (D-46 — manual to avoid per-PR row pollution and cold-start flakiness).
+# NOT in CI; manual to avoid per-PR row pollution and cold-start flakiness.
 staging-smoke = [
   "dep:reqwest",
   "dep:tokio",

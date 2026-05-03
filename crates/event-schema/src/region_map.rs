@@ -1,6 +1,6 @@
-//! Hand-curated ISO 3166-1 alpha-2 -> Region match (D-65).
-//! Source: UN M49 standard. AN included per D-65 (partition exhaustive even
-//! though no users derive it).
+//! Hand-curated ISO 3166-1 alpha-2 -> Region match.
+//! Source: UN M49 standard. AN included for partition exhaustiveness even
+//! though no users derive it.
 //! Audited in PR; do NOT swap for celes/iso_country crate (WASM-size + partition mismatch).
 
 use crate::enums::Region;
@@ -45,7 +45,7 @@ pub fn country_to_region(iso2: &str) -> Option<Region> {
             Some(Region::Af)
         }
 
-        // Antarctica (D-65: included for partition exhaustiveness)
+        // Antarctica, included for partition exhaustiveness.
         "AQ" | "BV" | "GS" | "HM" | "TF" => Some(Region::An),
 
         _ => None,

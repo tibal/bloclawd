@@ -1,12 +1,10 @@
 use std::path::PathBuf;
 
-use event_schema::{
-    EventPayload, Harness, LOG_BIN_EDGES, Model, Region, Tier, TokenCounts,
-};
+use event_schema::{EventPayload, Harness, LOG_BIN_EDGES, Model, Region, Tier, TokenCounts};
 use uuid::Uuid;
 
 use crate::cron::{
-    aggregate::{compute_cells, EventRow},
+    aggregate::{EventRow, compute_cells},
     percentile::encode_cell,
     r2_emit::BucketEnvelope,
 };

@@ -1,4 +1,4 @@
-//! Min-version assertion via JSONL field-shape heuristic (D-67 + D-68).
+//! Min-version assertion via JSONL field-shape heuristic.
 
 use serde_json::Value;
 

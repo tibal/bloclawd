@@ -1,12 +1,11 @@
-//! Cron aggregation numerics for unified-cost cells (AGGR-02/03/15/16).
+//! Cron aggregation numerics for unified-cost cells.
 //!
 //! W14 pinned the ridge target to `y_s = 1.0`: each submission represents one
 //! observed limit hit, so the learned weights map a submission's token vector to
 //! normalized "fraction of limit" cost. Priors from published model prices are
-//! rescaled to the cohort's typical token vector before fitting. D-83 pins the
-//! per-model "if only" projection to `unified_cost / mean(model_weights[0..8])`;
-//! 04-07 fills the percentile enum values, while this layer leaves the raw
-//! sorted unified costs available behind `#[serde(skip)]`.
+//! rescaled to the cohort's typical token vector before fitting. The per-model
+//! "if only" projection is `unified_cost / mean(model_weights[0..8])`; this
+//! layer leaves the raw sorted unified costs available behind `#[serde(skip)]`.
 #![allow(dead_code)]
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
@@ -302,7 +301,7 @@ fn group_by_submission_refs<'a>(rows: &[&'a EventRow]) -> HashMap<Uuid, Vec<&'a 
     })
 }
 
-fn ordered_submissions<'a>(map: HashMap<Uuid, Vec<&'a EventRow>>) -> Vec<Vec<&'a EventRow>> {
+fn ordered_submissions(map: HashMap<Uuid, Vec<&EventRow>>) -> Vec<Vec<&EventRow>> {
     let mut pairs: Vec<(Uuid, Vec<&EventRow>)> = map.into_iter().collect();
     pairs.sort_by_key(|(uuid, _)| *uuid);
     pairs.into_iter().map(|(_, rows)| rows).collect()

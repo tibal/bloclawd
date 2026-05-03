@@ -1,4 +1,4 @@
-//! Rate-limit signature classifiers (D-78 + RESEARCH sections 3 and 4).
+//! Rate-limit signature classifiers.
 //!
 //! Matching uses the lowercased union of stdout and stderr. Do not log inputs:
 //! they may contain user prompt content.

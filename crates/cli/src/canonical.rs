@@ -1,11 +1,11 @@
-//! CLI-10 single canonical formatter.
+//! Single canonical formatter.
 //!
 //! All CLI paths that need EventPayload bytes call this module. Dry-run output
 //! and PoW input binding must use the same byte source.
 //!
 //! Never implement JCS here. Delegate to the shared event-schema helper.
 //!
-//! Note (Phase 4 D-84): `limit_type` is a wire-envelope field and MUST NOT
+//! Note: `limit_type` is a wire-envelope field and MUST NOT
 //! enter JCS canonical payload bytes. The `EventPayload` parameter enforces
 //! this at the type level.
 

@@ -1,8 +1,8 @@
-//! Phase 2 ingest error envelope helpers.
+//! Ingest error envelope helpers.
 //!
 //! Wire contract:
-//! - Envelope is flat: `{"error": "<code>", ...extras}` (D-40).
-//! - 14 codes are locked in D-41; each has one HTTP status.
+//! - Envelope is flat: `{"error": "<code>", ...extras}`.
+//! - Each error code has one HTTP status.
 //! - `rate_limited` includes `route`, `retry_after_s`, and a `Retry-After` header.
 
 use serde_json::json;
@@ -113,7 +113,7 @@ impl IngestError {
         builder.from_json(&body)
     }
 
-    /// Map crates/pow verification variants to D-41 ingest error codes.
+    /// Map crates/pow verification variants to ingest error codes.
     pub fn from_verify(e: pow::VerifyError) -> Self {
         match e {
             pow::VerifyError::InvalidSig => Self::SignatureInvalid,
@@ -126,7 +126,7 @@ impl IngestError {
         }
     }
 
-    /// Classify serde_json display prefixes into D-41 ingest error codes.
+    /// Classify serde_json display prefixes into ingest error codes.
     pub fn classify_serde_error(e: serde_json::Error) -> Self {
         let msg = e.to_string();
         if msg.starts_with("unknown field") {

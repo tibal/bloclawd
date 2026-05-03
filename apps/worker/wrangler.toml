@@ -9,9 +9,9 @@ command = "cargo install -q worker-build@0.8.1 && worker-build --release"
 [placement]
 mode = "smart"
 
-# Phase 4 cron triggers - Workers Paid plan REQUIRED ($5/mo).
-# Free plan caps cron CPU at 10ms - insufficient for ridge fits + R2 writes.
-# See apps/worker/README.md "Phase 4 Cloudflare Workers Paid plan requirement".
+# Cron triggers require the Workers Paid subscription ($5/mo).
+# Free tier caps cron CPU at 10ms - insufficient for ridge fits + R2 writes.
+# See apps/worker/README.md "Cloudflare Workers Paid subscription requirement".
 [triggers]
 crons = ["0 3 * * *"]   # daily 03:00 UTC for `wrangler dev` defaults (matches production cadence)
 
@@ -40,7 +40,7 @@ bucket_name = "bloclawd-reports-staging"
 preview_bucket_name = "bloclawd-reports-staging"
 
 [env.staging.triggers]
-crons = ["*/15 * * * *"]   # 15-min ticks for staging UAT (D-87 - staging gets faster cadence to surface bugs)
+crons = ["*/15 * * * *"]   # 15-min ticks for staging validation
 
 [[env.staging.ratelimits]]
 name = "RL_CHALLENGE"
@@ -61,7 +61,7 @@ namespace_id = "1002"
 # ---------- production ----------
 # Deploy: wrangler deploy --env production
 # PlanetScale branch: main
-# Worker URL: bloclawd-worker.<account>.workers.dev (custom domain attachment deferred to Phase 5 per D-39)
+# Worker URL: bloclawd-worker.<account>.workers.dev (custom domain: api.bloclawd.com)
 # IMPORTANT: replace the production Hyperdrive placeholder before first production deploy.
 # See apps/worker/README.md section "Production Hyperdrive setup".
 [env.production]
@@ -77,7 +77,7 @@ binding = "BUCKET"
 bucket_name = "bloclawd-reports"
 
 [env.production.triggers]
-crons = ["0 3 * * *"]   # daily 03:00 UTC; v1 cadence (D-87 AGGR-01 amendment)
+crons = ["0 3 * * *"]   # daily 03:00 UTC; v1 cadence
 
 [[env.production.ratelimits]]
 name = "RL_CHALLENGE"

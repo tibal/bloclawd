@@ -1,11 +1,11 @@
-//! Wire body for POST /event (D-54).
+//! Wire body for POST /event.
 //!
 //! `SubmittedEvent` wraps `EventPayload` plus per-event identifiers and the
-//! per-INVOCATION `submission_group_id` (D-51). The id is a TRANSPORT field:
-//! it is NOT inside `payload` (D-52), NOT JCS-canonicalized, NOT bound into
+//! per-INVOCATION `submission_group_id`. The id is a TRANSPORT field:
+//! it is NOT inside `payload`, NOT JCS-canonicalized, NOT bound into
 //! the 72-byte PoW input. The Worker reads it from the wire body, validates
-//! UUIDv4 format, persists it on the row, and the Phase 4 cron strips it
-//! before any R2 emission (D-56).
+//! UUIDv4 format, persists it on the row, and cron strips it
+//! before any R2 emission.
 
 use crate::EventPayload;
 use serde::{Deserialize, Serialize};
@@ -19,7 +19,7 @@ pub struct SubmittedEvent {
     pub challenge_id: String,        // base64url no-padding 32 bytes
     pub sig: String,                 // base64url no-padding HMAC-SHA256 32 bytes
     pub nonce: String,               // base64url no-padding 8 bytes
-    pub submission_group_id: String, // base64url no-padding UUIDv4 (D-51)
+    pub submission_group_id: String, // base64url no-padding UUIDv4
     pub limit_type: crate::enums::LimitType,
     pub payload: EventPayload,
 }

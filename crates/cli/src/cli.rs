@@ -1,7 +1,7 @@
-//! clap derive Args. Flag set per CLI-02 + D-48 + D-50 + D-60 + D-61.
+//! clap derive Args.
 //!
 //! `CliTier` mirrors `event_schema::Tier` character-for-character via
-//! `#[value(name = "...")]` (RESEARCH Pitfall 5 lines 786-812).
+//! `#[value(name = "...")]` so CLI values match wire values.
 
 use clap::{ArgGroup, Parser, ValueEnum};
 use event_schema::{LimitType, Tier};
@@ -68,7 +68,7 @@ pub struct Args {
     /// 7-day window: [end - 7d, end].
     ///
     /// In v1, `--week` is parsed for forward compatibility but is supported
-    /// only on the dry-run path. Plan 07 rejects submit paths with exit 1.
+    /// only on the dry-run path; submit mode exits with code 1.
     #[arg(long)]
     pub week: bool,
 

@@ -1,5 +1,5 @@
 //! Per-request `tokio-postgres` smoke path over Cloudflare Hyperdrive.
-//! `GET /db-ping` proves BACK-08 and locks the INGE-08 open/query/drop idiom.
+//! `GET /db-ping` verifies the open/query/drop Hyperdrive connection idiom.
 //! The pinned tokio-postgres fork/rev keeps the Hyperdrive pooler contract stable.
 //! The spawned connection future is required; without it, client queries hang.
 

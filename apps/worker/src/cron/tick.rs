@@ -1,4 +1,4 @@
-//! Cron tick orchestrator (AGGR-01, AGGR-11, AGGR-17/18).
+//! Cron tick orchestrator.
 
 use std::str::FromStr;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};

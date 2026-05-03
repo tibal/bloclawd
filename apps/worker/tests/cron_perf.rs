@@ -2,7 +2,7 @@
 //!
 //! Gated by `#[ignore]` + `--features perf` so it only runs on demand.
 //! Threshold: wall-clock <= 25s on a developer laptop. The Workers Paid
-//! plan caps cron CPU at 30s per invocation. If this perf test fails,
+//! subscription caps cron CPU at 30s per invocation. If this perf test fails,
 //! shard cron work across more cron_state work items before deploying.
 
 #![cfg(feature = "perf")]
