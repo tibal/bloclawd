@@ -22,3 +22,8 @@ hex = { workspace = true }
 anyhow = { workspace = true }
 chrono = { workspace = true }
 zstd = { workspace = true }
+
+# Opt out of cargo-dist artifact generation: dev-time helper binary, never published.
+# Defense-in-depth alongside the existing `publish = false` flag.
+[package.metadata.dist]
+dist = false
