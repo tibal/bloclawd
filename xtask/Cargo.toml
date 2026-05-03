@@ -27,3 +27,9 @@ zstd = { workspace = true }
 # Defense-in-depth alongside the existing `publish = false` flag.
 [package.metadata.dist]
 dist = false
+
+# Opt out of cargo-release entirely: xtask is pinned at 0.0.0 (it's a dev-only
+# helper, never released or published). Without this, shared-version=true would
+# bump it alongside the publishable crates on every `cargo release patch`.
+[package.metadata.release]
+release = false
