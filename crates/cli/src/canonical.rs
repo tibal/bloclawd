@@ -50,7 +50,8 @@ mod tests {
     fn canonicalize_matches_event_schema_bytes() {
         let payload = sample_payload();
         let got = canonicalize(&payload).expect("canonicalize payload");
-        let expected = bloclawd_schema::canonical_bytes(&payload).expect("event-schema canonicalizes");
+        let expected =
+            bloclawd_schema::canonical_bytes(&payload).expect("event-schema canonicalizes");
         assert_eq!(got, expected);
     }
 

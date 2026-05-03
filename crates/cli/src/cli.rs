@@ -3,8 +3,8 @@
 //! `CliTier` mirrors `bloclawd_schema::Tier` character-for-character via
 //! `#[value(name = "...")]` so CLI values match wire values.
 
-use clap::{ArgGroup, Parser, ValueEnum};
 use bloclawd_schema::{LimitType, Tier};
+use clap::{ArgGroup, Parser, ValueEnum};
 
 #[derive(Clone, Copy, Debug, ValueEnum, PartialEq, Eq)]
 pub enum CliTier {
