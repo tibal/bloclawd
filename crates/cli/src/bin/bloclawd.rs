@@ -1,8 +1,8 @@
 use clap::Parser;
 
 fn main() {
-    let args = bloclawd_cli::Args::parse();
-    let exit_code = match bloclawd_cli::run(args) {
+    let args = bloclawd::Args::parse();
+    let exit_code = match bloclawd::run(args) {
         Ok(code) => code,
         Err(e) => {
             eprintln!("error: {e}");

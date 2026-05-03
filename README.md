@@ -17,7 +17,7 @@ That installs `bloclawd` to `$CARGO_HOME/bin/bloclawd`, usually `~/.cargo/bin/bl
 For local development without installing:
 
 ```sh
-cargo run -p bloclawd-cli -- --cc --tier max20 --end 16:00 --5h --dry-run
+cargo run -p bloclawd -- --cc --tier max20 --end 16:00 --5h --dry-run
 ```
 
 Release distribution will use `cargo install bloclawd`, Homebrew, and a `curl | sh` installer with prebuilt binaries.

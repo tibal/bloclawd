@@ -8,9 +8,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use bloclawd_cli::aggregate::WindowKind;
-use bloclawd_cli::parsers::{cc, codex};
-use bloclawd_cli::{Args, IngestCliError, run_inner_with_output};
+use bloclawd::aggregate::WindowKind;
+use bloclawd::parsers::{cc, codex};
+use bloclawd::{Args, IngestCliError, run_inner_with_output};
 use clap::Parser;
 use event_schema::{LimitType, Model, TokenCounts};
 use serde_json::{Map, Value};
@@ -244,7 +244,7 @@ fn cc_fixture_token_totals_match_expected() {
     let (events, failures) = cc_events_from_fixture();
     assert_eq!(failures, 0);
     let counts =
-        bloclawd_cli::aggregate::aggregate(&events, &[], WindowKind::FiveHour).expect("aggregate");
+        bloclawd::aggregate::aggregate(&events, &[], WindowKind::FiveHour).expect("aggregate");
     let expected_path = fixture_dir().join("cc/sample.expected.json");
     let generated = expected_fixture_json(counts, LimitType::FiveH);
     write_if_regen(&expected_path, &pretty_json(&generated));
@@ -299,7 +299,7 @@ fn codex_fixture_token_totals_match_expected() {
     let (events, failures) = codex_events_from_fixture();
     assert_eq!(failures, 0);
     let counts =
-        bloclawd_cli::aggregate::aggregate(&[], &events, WindowKind::FiveHour).expect("aggregate");
+        bloclawd::aggregate::aggregate(&[], &events, WindowKind::FiveHour).expect("aggregate");
     let expected_path = fixture_dir().join("codex/sample.expected.json");
     let generated = expected_fixture_json(counts, LimitType::FiveH);
     write_if_regen(&expected_path, &pretty_json(&generated));

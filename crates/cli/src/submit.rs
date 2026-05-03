@@ -17,7 +17,7 @@ use crate::api::{challenge_endpoint, event_endpoint};
 use crate::wire_error::{IngestCliError, from_wire};
 
 pub fn user_agent() -> &'static str {
-    concat!("bloclawd-cli/", env!("CARGO_PKG_VERSION"))
+    concat!("bloclawd/", env!("CARGO_PKG_VERSION"))
 }
 
 pub fn http_client() -> Result<reqwest::blocking::Client> {
@@ -219,7 +219,7 @@ mod tests {
     fn user_agent_contains_cli_version() {
         assert_eq!(
             user_agent(),
-            concat!("bloclawd-cli/", env!("CARGO_PKG_VERSION"))
+            concat!("bloclawd/", env!("CARGO_PKG_VERSION"))
         );
     }
 
