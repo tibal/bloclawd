@@ -61,3 +61,8 @@ sha2 = { workspace = true, optional = true }
 
 [dev-dependencies]
 # Intentionally empty: optional dev-dependencies are invalid Cargo manifests.
+
+# Opt out of cargo-dist artifact generation: this is a wasm32 cdylib for the
+# Cloudflare Worker runtime, not a regular binary; cargo-dist cannot package it.
+[package.metadata.dist]
+dist = false

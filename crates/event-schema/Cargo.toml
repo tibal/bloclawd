@@ -24,3 +24,8 @@ ts-export = []
 
 [dev-dependencies]
 serde_path_to_error = "0.1"
+
+# Opt out of cargo-dist artifact generation: this is a library crate published to
+# crates.io for downstream wire-protocol consumers; it ships no compiled binary.
+[package.metadata.dist]
+dist = false

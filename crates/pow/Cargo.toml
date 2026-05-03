@@ -23,3 +23,7 @@ thiserror = { workspace = true }
 
 [dev-dependencies]
 hex = { workspace = true }
+
+# Opt out of cargo-dist artifact generation: library crate, no compiled binary.
+[package.metadata.dist]
+dist = false
