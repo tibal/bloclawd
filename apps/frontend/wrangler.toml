@@ -2,6 +2,7 @@
 # Independent deploy from apps/worker; custom domains attach outside this file.
 name = "bloclawd-frontend"
 compatibility_date = "2026-04-01"
+main = "worker/index.ts"
 
 [assets]
 directory = "./dist"
@@ -23,3 +24,16 @@ name = "bloclawd-frontend"
 [env.production.assets]
 directory = "./dist"
 not_found_handling = "single-page-application"
+
+# Custom-domain attach (DIST-07). Cloudflare auto-creates the proxied
+# DNS record + edge cert on `wrangler deploy --env production`.
+# Pre-existing CNAME records for these names MUST be deleted before
+# deploy or the attach fails — operator handles this in docs/RELEASE.md
+# cutover sequence (plan 05-14).
+[[env.production.routes]]
+pattern = "bloclawd.com"
+custom_domain = true
+
+[[env.production.routes]]
+pattern = "www.bloclawd.com"
+custom_domain = true
