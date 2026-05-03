@@ -11,7 +11,7 @@ const headerLinks = [
 const footerLinks = [
   { label: "Methodology", href: "/methodology" },
   { label: "Data schema", href: "/data" },
-  { label: "Source", href: "https://github.com/tibal/bloclawd" },
+  { label: "Source", href: "https://github.com/bloclawd/bloclawd" },
   { label: "License", href: "https://creativecommons.org/licenses/by/4.0/" },
 ] as const;
 

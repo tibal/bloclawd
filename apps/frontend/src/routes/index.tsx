@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 
 import { Button } from "@/components/ui/button";
 
-const githubUrl = "https://github.com/tibal/bloclawd";
+const githubUrl = "https://github.com/bloclawd/bloclawd";
 
 export const Route = createFileRoute("/")({
   component: HomePage,

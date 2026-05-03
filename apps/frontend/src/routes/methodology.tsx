@@ -36,7 +36,7 @@ function MethodologyPage() {
             See{" "}
             <a
               className="text-primary underline underline-offset-4"
-              href="https://github.com/tibal/bloclawd/blob/main/spec/pow-v1.md"
+              href="https://github.com/bloclawd/bloclawd/blob/main/spec/pow-v1.md"
             >
               spec/pow-v1.md
             </a>{" "}
@@ -149,7 +149,7 @@ function MethodologyPage() {
             . The source repository is{" "}
             <a
               className="text-primary underline underline-offset-4"
-              href="https://github.com/tibal/bloclawd"
+              href="https://github.com/bloclawd/bloclawd"
             >
             published on GitHub
             </a>

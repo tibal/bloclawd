@@ -85,14 +85,14 @@ function DataPage() {
           See{" "}
           <a
             className="text-primary underline underline-offset-4"
-            href="https://github.com/tibal/bloclawd/blob/main/spec/event-schema.md"
+            href="https://github.com/bloclawd/bloclawd/blob/main/spec/event-schema.md"
           >
             spec/event-schema.md
           </a>{" "}
           and{" "}
           <a
             className="text-primary underline underline-offset-4"
-            href="https://github.com/tibal/bloclawd/blob/main/spec/payload-canonical.md"
+            href="https://github.com/bloclawd/bloclawd/blob/main/spec/payload-canonical.md"
           >
             spec/payload-canonical.md
           </a>
