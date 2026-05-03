@@ -14,9 +14,15 @@ members = [
 [workspace.package]
 edition = "2024"
 rust-version = "1.86"
-license = "Apache-2.0"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/tibal/bloclawd"
 authors = ["bloclawd maintainers"]
+description = "Anonymous community analytics for AI coding subscriptions: when do users hit rate limits, on what models, in what regions."
+homepage = "https://bloclawd.com"
+documentation = "https://bloclawd.com/methodology"
+readme = "README.md"
+keywords = ["analytics", "telemetry", "anonymous", "rate-limit", "claude"]
+categories = ["command-line-utilities", "development-tools::profiling"]
 
 [workspace.dependencies]
 # Pinned shared dependency versions; per-crate Cargo.toml files reference these via `workspace = true`.
