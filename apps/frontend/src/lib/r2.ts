@@ -96,11 +96,26 @@ export type BucketResult = {
   error: Error | null;
 };
 
+export class R2NotFoundError extends Error {
+  readonly status = 404;
+  constructor(url: string) {
+    super(`r2 404 ${url}`);
+    this.name = "R2NotFoundError";
+  }
+}
+
+export function isR2NotFound(error: unknown): error is R2NotFoundError {
+  return error instanceof R2NotFoundError;
+}
+
 export async function fetchR2<T>(url: string): Promise<T> {
   return pool.run(async () => {
     const response = await fetch(url, {
       headers: { accept: "application/json" },
     });
+    if (response.status === 404) {
+      throw new R2NotFoundError(url);
+    }
     if (!response.ok) {
       throw new Error(`r2 ${response.status} ${url}`);
     }
