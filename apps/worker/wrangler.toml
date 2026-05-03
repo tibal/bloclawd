@@ -94,3 +94,12 @@ namespace_id = "2002"
   [env.production.ratelimits.simple]
   limit = 3
   period = 60
+
+# Custom-domain attach (DIST-07). Cloudflare auto-creates the proxied
+# DNS record + edge cert on `wrangler deploy --env production`.
+# Pre-existing CNAME records for api.bloclawd.com MUST be deleted
+# before deploy or the attach fails — operator handles in
+# docs/RELEASE.md cutover sequence (plan 05-14).
+[[env.production.routes]]
+pattern = "api.bloclawd.com"
+custom_domain = true
