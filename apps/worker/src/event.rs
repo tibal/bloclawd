@@ -21,7 +21,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use event_schema::{SubmittedEvent, canonical_bytes};
-use pow::{ChallengeId, K_V1, Nonce, Sig, VerifyRequest};
+use bloclawd_pow::{ChallengeId, K_V1, Nonce, Sig, VerifyRequest};
 use serde::de::IntoDeserializer;
 use serde_json::json;
 use tokio_postgres::config::Config as PgConfig;
@@ -129,7 +129,7 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
             .into_response();
         }
     };
-    let payload_hash_recomputed = pow::payload_hash(&payload_value);
+    let payload_hash_recomputed = bloclawd_pow::payload_hash(&payload_value);
 
     let secret = match secret::worker_secret(&ctx.env) {
         Ok(secret) => secret,
@@ -150,7 +150,7 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
         difficulty: K_V1,
         now_ms,
     };
-    if let Err(e) = pow::verify(verify_req) {
+    if let Err(e) = bloclawd_pow::verify(verify_req) {
         return IngestError::from_verify(e).into_response();
     }
 

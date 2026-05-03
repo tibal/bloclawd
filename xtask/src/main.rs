@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, bail};
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use pow::{ChallengeId, Hash, Nonce, PayloadHash, leading_zero_bits, pow_hash, solve};
+use bloclawd_pow::{ChallengeId, Hash, Nonce, PayloadHash, leading_zero_bits, pow_hash, solve};
 use serde::Serialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};

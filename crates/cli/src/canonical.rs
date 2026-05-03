@@ -60,7 +60,7 @@ mod tests {
         let canonical = canonicalize(&payload).expect("canonicalize payload");
         let got = payload_hash(&canonical);
         let value = serde_json::to_value(&payload).expect("payload serializes");
-        let expected = pow::payload_hash(&value);
+        let expected = bloclawd_pow::payload_hash(&value);
         assert_eq!(got, expected.0);
     }
 

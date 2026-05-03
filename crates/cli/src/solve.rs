@@ -1,14 +1,14 @@
 //! PoW solver wrapper.
 //!
-//! Thin glue around crates/pow::solve. The 72-byte input layout stays inside
-//! crates/pow; this layer only canonicalizes the payload and supplies K=22.
+//! Thin glue around bloclawd_pow::solve. The 72-byte input layout stays inside
+//! crates/pow (package: bloclawd-pow); this layer only canonicalizes the payload and supplies K=22.
 
 use std::time::{Duration, Instant};
 
 use base64::Engine;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use event_schema::EventPayload;
-use pow::{ChallengeId, K_V1, Nonce, PayloadHash, PowError};
+use bloclawd_pow::{ChallengeId, K_V1, Nonce, PayloadHash, PowError};
 
 use crate::canonical::{canonicalize, payload_hash};
 use crate::wire_error::IngestCliError;
@@ -39,7 +39,7 @@ pub fn solve_until_deadline(
 ) -> Result<(Nonce, PayloadHash), IngestCliError> {
     let canonical = canonicalize(payload).map_err(|_| IngestCliError::SchemaMismatch)?;
     let ph = PayloadHash(payload_hash(&canonical));
-    match pow::solve(challenge_id, &ph, K_V1, 0, deadline) {
+    match bloclawd_pow::solve(challenge_id, &ph, K_V1, 0, deadline) {
         Ok((nonce, _hash)) => Ok((nonce, ph)),
         Err(PowError::Timeout) => Err(IngestCliError::PowTimeout),
     }
@@ -51,7 +51,7 @@ mod tests {
     use base64::Engine;
     use base64::engine::general_purpose::URL_SAFE_NO_PAD;
     use event_schema::{Harness, Model, Region, Tier, TokenCounts};
-    use pow::ChallengeId;
+    use bloclawd_pow::ChallengeId;
     use std::time::Instant;
 
     fn sample_payload() -> EventPayload {
@@ -82,8 +82,8 @@ mod tests {
         let cid = ChallengeId(cid_bytes);
         let (nonce, payload_hash) =
             solve_for_payload(&payload, &cid).expect("PoW solves within timeout");
-        let hash = pow::pow_hash(&cid, &payload_hash, &nonce);
-        assert!(pow::leading_zero_bits(&hash) >= pow::K_V1);
+        let hash = bloclawd_pow::pow_hash(&cid, &payload_hash, &nonce);
+        assert!(bloclawd_pow::leading_zero_bits(&hash) >= bloclawd_pow::K_V1);
     }
 
     #[test]
