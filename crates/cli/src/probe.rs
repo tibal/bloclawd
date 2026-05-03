@@ -1,4 +1,4 @@
-//! CLI-19 provider harness probe.
+//! Provider harness probe.
 
 use std::process::Stdio;
 use std::time::Duration;

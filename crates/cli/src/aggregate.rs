@@ -1,9 +1,9 @@
-//! Per-window-per-model token aggregator (CLI-06 + D-50).
+//! Per-window-per-model token aggregator.
 //!
-//! `TokenCounts` has two fixed slots. In Phase 3, `_5min` is the densest
-//! rolling 5-minute burst inside the selected window, while `_5h` is the total
-//! over that selected window. The submit path supports only `WindowKind::FiveHour`
-//! in v1; the dry-run layer may still reuse these counters for longer windows.
+//! `TokenCounts` has two fixed slots: `_5min` is the densest rolling 5-minute
+//! burst inside the selected window, while `_5h` is the total over that selected
+//! window. The submit path supports only `WindowKind::FiveHour` in v1; the
+//! dry-run layer may still reuse these counters for longer windows.
 
 use chrono::{DateTime, Utc};
 use std::collections::HashMap;

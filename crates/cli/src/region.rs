@@ -1,4 +1,4 @@
-//! Resolve the user's region (D-65 + D-66 + CLI-07).
+//! Resolve the user's region.
 
 use anyhow::{Result, anyhow};
 use event_schema::{Region, country_to_region};

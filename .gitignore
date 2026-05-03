@@ -1,5 +1,6 @@
-# Planning artifacts (local-only)
+# Local agent artifacts
 .planning/
+.claude/
 
 # Rust
 target/

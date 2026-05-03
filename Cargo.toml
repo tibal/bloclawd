@@ -1,6 +1,5 @@
 # Cargo workspace for the bloclawd Rust members.
-# Members are added as plans implement them: crates/pow (Plan 03), xtask (Plan 03).
-# crates/cli arrives in Phase 3.
+# Members include shared crates, the CLI, the Worker, and repository tooling.
 
 [workspace]
 resolver = "3"

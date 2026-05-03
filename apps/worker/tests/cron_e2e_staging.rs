@@ -1,6 +1,6 @@
 #![cfg(feature = "staging-smoke")]
 
-//! Phase 4 cron -> R2 staging proof.
+//! Cron -> R2 staging proof.
 //!
 //! GATED:
 //!   - cargo feature `staging-smoke`
@@ -11,7 +11,7 @@
 //!   STAGING_R2_BASE_URL='https://bloclawd-reports-staging.<account-hash>.r2.dev' \
 //!     cargo test -p bloclawd-worker --features staging-smoke --locked --test cron_e2e_staging -- --ignored --nocapture
 //!
-//! NEVER in CI. Manual invocation by an operator after applying Phase 4
+//! NEVER in CI. Manual invocation by an operator after applying aggregation
 //! migrations, provisioning R2, and deploying the staging worker.
 
 use std::time::Duration;

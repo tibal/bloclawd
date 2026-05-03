@@ -1,6 +1,6 @@
-//! Ingest API URL constants and env override (D-62 + D-63).
+//! Ingest API URL constants and env override.
 //!
-//! There is NO command-line API URL flag (D-63). The env-only override keeps
+//! There is NO command-line API URL flag. The env-only override keeps
 //! the user's shell config as the trust root.
 
 pub const BLOCLAWD_API_URL_DEFAULT: &str = "https://api.bloclawd.com";

@@ -1,4 +1,4 @@
-//! PoW solver wrapper (CLI-08).
+//! PoW solver wrapper.
 //!
 //! Thin glue around crates/pow::solve. The 72-byte input layout stays inside
 //! crates/pow; this layer only canonicalizes the payload and supplies K=22.

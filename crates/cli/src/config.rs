@@ -1,4 +1,4 @@
-//! TOML config at ~/.config/bloclawd/config.toml (D-48 + D-49).
+//! TOML config at ~/.config/bloclawd/config.toml.
 
 use anyhow::{Context, Result, anyhow};
 use serde::{Deserialize, Serialize};

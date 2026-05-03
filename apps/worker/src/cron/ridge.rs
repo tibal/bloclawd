@@ -1,4 +1,4 @@
-//! Closed-form ridge solver for cron aggregation weights (AGGR-15).
+//! Closed-form ridge solver for cron aggregation weights.
 //!
 //! Computes `w = prior + (X^T X + lambda I)^-1 X^T (y - X * prior)`.
 //! The system is small and dense, so hand-rolled partial-pivot Gaussian
@@ -29,8 +29,8 @@ pub fn fit_ridge(x: &[Vec<f64>], y: &[f64], prior: &[f64], lambda: f64) -> Ridge
     let mut y_shift = vec![0.0; n];
     for i in 0..n {
         let mut s = y[i];
-        for j in 0..p {
-            s -= x[i][j] * prior[j];
+        for (j, prior_j) in prior.iter().copied().enumerate().take(p) {
+            s -= x[i][j] * prior_j;
         }
         y_shift[i] = s;
     }
@@ -80,7 +80,7 @@ fn solve_dense(a: &mut [Vec<f64>], b: &mut [f64]) -> Option<Vec<f64>> {
         b.swap(k, max_row);
 
         if a[k][k].abs() < 1e-12 {
-            // Singular system; caller falls back to next stratum (D-100).
+            // Singular system; caller falls back to next stratum.
             return None;
         }
 

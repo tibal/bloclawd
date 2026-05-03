@@ -1,6 +1,6 @@
 //! POST /event - full ingest validation chain and idempotent INSERT.
 //!
-//! Locked validation order (D-43 - DO NOT REORDER):
+//! Locked validation order - DO NOT REORDER:
 //! 1. RL_EVENT rate-limit -> 429 rate_limited
 //! 2. Body size cap -> 413 body_too_large
 //! 3. serde_json::from_slice -> WireRequest -> 400 bad_json
@@ -8,12 +8,12 @@
 //! 5. EventPayload bound validation -> 400 token_out_of_range | version_invalid
 //! 6. HMAC-SHA256 sig verify, folded into pow -> 401 signature_invalid
 //! 7. Expiry + clock-skew check, folded into pow -> 401 challenge_expired | clock_skew
-//! 8. payload_hash recompute from canonical payload (INGE-04, INGE-09) -> 401 payload_hash_mismatch
+//! 8. payload_hash recompute from canonical payload -> 401 payload_hash_mismatch
 //! 9. PoW K=22 over the locked 72-byte input -> 401 pow_invalid
 //! 10. INSERT ... ON CONFLICT DO UPDATE RETURNING -> 503 server_unavailable | 200 {ok, bucket_ts}
 //!
-//! D-47 requires the same success body shape for fresh inserts and silent duplicates.
-//! INGE-11: no event_id, nonce, sig, payload_hash, IP, secret, or per-event timing logs.
+//! Fresh inserts and silent duplicates return the same success body shape.
+//! Do not log event_id, nonce, sig, payload_hash, IP, secret, or per-event timing.
 
 use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -38,18 +38,18 @@ use crate::secret;
 type WireRequest = SubmittedEvent;
 
 pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Response> {
-    // Step 1: RL_EVENT rate-limit (INGE-10).
+    // Step 1: RL_EVENT rate-limit.
     if let Err(e) = ratelimit::check(&req, &ctx.env, "RL_EVENT", "event").await {
         return e.into_response();
     }
 
-    // Step 2: 8 KB body cap (D-42).
+    // Step 2: 8 KB body cap.
     let body_bytes = match body::read_capped(&mut req, BODY_CAP_EVENT).await {
         Ok(b) => b,
         Err(e) => return e.into_response(),
     };
 
-    // Step 3: parse JSON body (D-43.3).
+    // Step 3: parse JSON body.
     let wire_value: serde_json::Value = match serde_json::from_slice(&body_bytes) {
         Ok(v) => v,
         Err(e) => {

@@ -1,4 +1,4 @@
-//! Codex session parser (D-59 + RESEARCH section 2).
+//! Codex session parser.
 
 use anyhow::{Context, Result, anyhow};
 use chrono::{DateTime, Datelike, Utc};

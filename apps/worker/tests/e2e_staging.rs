@@ -1,6 +1,6 @@
 #![cfg(feature = "staging-smoke")]
 
-// End-to-end happy-path proof for Phase 2 (D-46).
+// End-to-end happy-path staging proof.
 //
 // GATED:
 //   - cargo feature `staging-smoke` (declared in apps/worker/Cargo.toml)
@@ -173,7 +173,7 @@ async fn happy_path() {
     assert_eq!(
         status2.as_u16(),
         200,
-        "duplicate is 200 (D-47), got {status2}: {text2}"
+        "duplicate is 200, got {status2}: {text2}"
     );
     let body2: serde_json::Value = serde_json::from_str(&text2).expect("body");
     assert_eq!(body2["ok"], serde_json::Value::Bool(true));

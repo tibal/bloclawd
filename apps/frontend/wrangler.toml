@@ -1,5 +1,5 @@
 # Frontend Worker - static assets only; no Hyperdrive, no PoW, no cron.
-# Independent deploy from apps/worker (D-106). Custom domain attaches in Phase 5 (DIST-07).
+# Independent deploy from apps/worker; custom domains attach outside this file.
 name = "bloclawd-frontend"
 compatibility_date = "2026-04-01"
 

@@ -2,20 +2,20 @@
 
 Cloudflare Worker (Rust -> WASM via workers-rs 0.8.1) implementing the bloclawd ingest endpoints (`GET /challenge`, `POST /event`). Backed by PlanetScale Postgres via Cloudflare Hyperdrive. Built with `worker-build 0.8.1`.
 
-See `.planning/phases/02-ingest-backbone/02-CONTEXT.md` for the locked phase decisions and `spec/pow-v1.md` / `spec/event-schema.md` for the wire contract.
+See `spec/pow-v1.md` and `spec/event-schema.md` for the wire contract.
 
 ## Environments
 
 | Env | Worker name | PlanetScale branch | Worker URL |
 |-----|-------------|-------------------|------------|
 | staging | `bloclawd-worker-staging` | `staging` | `bloclawd-worker-staging.<account>.workers.dev` |
-| production | `bloclawd-worker` | `main` | `bloclawd-worker.<account>.workers.dev` (custom domain `api.bloclawd.com` deferred to Phase 5 per D-39) |
+| production | `bloclawd-worker` | `main` | `bloclawd-worker.<account>.workers.dev` (custom domain `api.bloclawd.com`) |
 
-Both envs share one PlanetScale Postgres database (PS-5 HA tier - see `.planning/decisions/ADR-001-planetscale-tier.md`) with two branches per D-37. Branch isolation is the staging-vs-prod boundary; do not move events across branches.
+Both envs share one PlanetScale Postgres database with separate staging and production branches. Branch isolation is the staging-vs-production boundary; do not move events across branches.
 
 ## One-time setup
 
-### 1. Apply schema to each branch (D-33, D-34)
+### 1. Apply schema to each branch
 
 The schema in `sql/0001_events.sql` is strict: re-running fails loud. Apply once per branch when bootstrapping a new database. To re-apply after a schema change, drop the old table first via a separate migration script.
 
@@ -32,18 +32,18 @@ psql "$PLANETSCALE_MAIN_URL"    < apps/worker/sql/0001_events.sql
 
 PlanetScale branching does NOT auto-replicate DDL. Each branch must be applied to manually.
 
-### 0002 - Add submission_group_id (Phase 3)
+### 0002 - Add submission_group_id
 
-The Phase 3 CLI submits events with a per-invocation `submission_group_id` (D-51). Apply this migration BEFORE the first Phase 3 CLI submission lands on either branch.
+The CLI submits events with a per-invocation `submission_group_id`. Apply this migration before the first CLI submission lands on either branch.
 
 ```bash
 psql "$PLANETSCALE_STAGING_URL" < apps/worker/sql/0002_add_submission_group_id.sql
 psql "$PLANETSCALE_MAIN_URL"    < apps/worker/sql/0002_add_submission_group_id.sql
 ```
 
-The migration is `NOT NULL` safe at v1 because Phase 2 only proved staging via the D-46 e2e test and no production rows exist on the main branch. If rows exist on staging at apply time, follow the safe ADD ... NULL -> backfill -> SET NOT NULL pattern instead.
+The migration is `NOT NULL` safe for initial v1 rollout because production has no rows. If rows exist on staging at apply time, follow the safe ADD ... NULL -> backfill -> SET NOT NULL pattern instead.
 
-### Phase 4 migrations
+### Aggregation migrations
 
 Apply per-branch in order:
 
@@ -57,27 +57,27 @@ psql "$PLANETSCALE_MAIN_URL" < apps/worker/sql/0004_add_limit_type.sql
 ```
 
 Operator notes:
-- `0004` is `NOT NULL` without `DEFAULT`. On staging, where Phase 3 D-69 staging-smoke rows exist, run `TRUNCATE TABLE events;` immediately before applying 0004 (CLI fixtures regenerate on next staging run). Production has no rows.
+- `0004` is `NOT NULL` without `DEFAULT`. On staging, run `TRUNCATE TABLE events;` immediately before applying 0004 if smoke-test rows exist. Production has no rows before initial rollout.
 - `0003_cron_state.sql` uses `TEXT + CHECK` for `state`, NOT a Postgres ENUM type - see file header for rationale (Hyperdrive prepared-statement pitfall avoidance).
 
-### Phase 4 R2 bucket provisioning (one-time, before first cron deploy)
+### R2 bucket provisioning (one-time, before first cron deploy)
 
-The cron handler (Phase 4 plan 04-08) writes to R2 via the `BUCKET` binding declared per-env in `wrangler.toml`. Buckets must exist before deploy:
+The cron handler writes to R2 via the `BUCKET` binding declared per-env in `wrangler.toml`. Buckets must exist before deploy:
 
 ```bash
 wrangler r2 bucket create bloclawd-reports-staging
 wrangler r2 bucket create bloclawd-reports
 ```
 
-The `bloclawd-reports` (production) bucket gets the `data.bloclawd.com` custom-domain attachment in Phase 5 (DIST-07). Until then, Phase 4 staging UAT addresses files via the enabled R2 dev URL (`https://pub-<r2-dev-url-hash>.r2.dev` from `wrangler r2 bucket dev-url get bloclawd-reports-staging`).
+The `bloclawd-reports` production bucket is served from `data.bloclawd.com`. Staging reads files through the enabled R2 dev URL (`https://pub-<r2-dev-url-hash>.r2.dev` from `wrangler r2 bucket dev-url get bloclawd-reports-staging`).
 
-### Phase 4 Cloudflare Workers Paid plan requirement
+### Cloudflare Workers Paid subscription requirement
 
-The `#[event(scheduled)]` cron handler requires the Workers Paid plan ($5/mo). Free-plan caps cron at 10ms CPU per invocation, which is insufficient for ridge fits + R2 writes. Confirm the Cloudflare account is on the Paid plan before deploying Phase 4. The cron `wrangler.toml` `[triggers] crons` block (added in plan 04-10) is the deploy trigger - without the Paid plan it fails at deploy time with a quota error.
+The `#[event(scheduled)]` cron handler requires the Workers Paid subscription ($5/mo). The free tier caps cron at 10ms CPU per invocation, which is insufficient for ridge fits and R2 writes. Confirm the Cloudflare account has the paid subscription before deploying cron triggers; otherwise deploy fails with a quota error.
 
-### 2. Set the per-env WORKER_SECRET (D-38)
+### 2. Set the per-env WORKER_SECRET
 
-`WORKER_SECRET` is the HMAC key used to sign and verify `GET /challenge` outputs. Per D-38, the staging and production secrets MUST be distinct >=256-bit values; a leaked staging secret cannot forge production challenges.
+`WORKER_SECRET` is the HMAC key used to sign and verify `GET /challenge` outputs. The staging and production secrets MUST be distinct >=256-bit values; a leaked staging secret cannot forge production challenges.
 
 ```bash
 # Generate a 64-byte (512-bit) hex secret per env. openssl rand is acceptable; any
@@ -86,9 +86,9 @@ openssl rand -hex 64 | wrangler secret put WORKER_SECRET --env staging
 openssl rand -hex 64 | wrangler secret put WORKER_SECRET --env production
 ```
 
-Per Pitfall 8 (RESEARCH.md): `wrangler secret put WORKER_SECRET` (no `--env`) sets the unscoped top-level secret only; it is NOT inherited into `[env.*]` deployments. Always pass `--env`.
+`wrangler secret put WORKER_SECRET` without `--env` sets the unscoped top-level secret only; it is NOT inherited into `[env.*]` deployments. Always pass `--env`.
 
-Rotation (manual; v2 will introduce key id + 2-key overlap per CONTEXT.md `<deferred>`): repeat the per-env command above when rotating; old challenges issued with the previous secret will fail HMAC verify within 60s and clients will get fresh ones.
+Rotation is manual: repeat the per-env command above when rotating; old challenges issued with the previous secret will fail HMAC verify within 60s and clients will get fresh ones.
 
 ### 3. Hyperdrive configs (one-time per env)
 
@@ -103,7 +103,7 @@ To add a new env (or rotate after a credential change):
 2. Copy the resulting `id` (UUID-shape) into the corresponding `[[env.<name>.hyperdrive]] id` in `apps/worker/wrangler.toml`.
 3. Commit the wrangler.toml change.
 
-Per Pitfall 7: if the PlanetScale branch URL changes (credential rotation), update the matching Hyperdrive config in the dashboard AND redeploy the Worker.
+If the PlanetScale branch URL changes during credential rotation, update the matching Hyperdrive config in the dashboard and redeploy the Worker.
 
 ## Deploy
 
@@ -112,7 +112,7 @@ wrangler deploy --env staging       # Always do this first.
 wrangler deploy --env production    # After staging smoke-tests pass.
 ```
 
-## End-to-end smoke test (D-46)
+## End-to-end smoke test
 
 A native Rust integration test exercises the full PoW flow against a deployed staging Worker. It is gated behind a cargo feature and `#[ignore]`, so regular `cargo test` does NOT run it.
 
@@ -127,19 +127,19 @@ The test:
 - Builds a sample EventPayload, canonicalizes via `event_schema::canonical_bytes`, computes payload_hash via SHA-256.
 - Solves PoW (K=22, ~1s on dev hardware) via `pow::solve`.
 - `POST /event` with the solved nonce + UUIDv4 event_id.
-- Asserts `200 {"ok": true, "bucket_ts": "<rfc3339>"}` per D-47.
+- Asserts `200 {"ok": true, "bucket_ts": "<rfc3339>"}`.
 - SELECTs the row from PlanetScale staging via direct `tokio-postgres` (NOT Hyperdrive; Hyperdrive is Worker-only) to confirm persistence.
-- Re-POSTs the same `event_id` to verify D-47 idempotency: the duplicate must return `200 {"ok": true, "bucket_ts": "<same as first POST>"}` (no 409, no new row, no shape change). This validates the `ON CONFLICT DO UPDATE SET event_id = events.event_id RETURNING bucket_ts` idiom.
+- Re-POSTs the same `event_id` to verify idempotency: the duplicate must return `200 {"ok": true, "bucket_ts": "<same as first POST>"}` (no 409, no new row, no shape change). This validates the `ON CONFLICT DO UPDATE SET event_id = events.event_id RETURNING bucket_ts` idiom.
 
-## Logging boundary (INGE-11)
+## Logging boundary
 
 No log emitter may include `event_id`, `nonce`, `submission_group_id`, `cf-connecting-ip`, `payload_hash`, `sig`, `WORKER_SECRET`, the Hyperdrive `connection_string`, or per-event timing.
 The CI grep gate at `.github/workflows/pow.yml` enforces this.
 The only allowed Worker log shape is the connection-task lifecycle message without request context.
 
-## Phase 4 staging proof: cron to R2 to dashboard
+## Staging proof: cron to R2 to dashboard
 
-Run this after Phase 4 migrations, R2 bucket provisioning, and a staging Worker deploy. It proves the scheduled cron path can materialize public R2 files and the staging frontend can render them.
+Run this after aggregation migrations, R2 bucket provisioning, and a staging Worker deploy. It proves the scheduled cron path can materialize public R2 files and the staging frontend can render them.
 
 Staging URL placeholders:
 

@@ -39,9 +39,8 @@ pub struct TokenCounts {
 }
 
 impl EventPayload {
-    /// Hand-rolled bound checks. Per RESEARCH.md Don't Hand-Roll: garde adds 30+ kB
-    /// WASM weight for what is 8 lines of validation. INGE-07 is satisfied here plus
-    /// serde's native rejection of unknown enum values (closed enum sets).
+    /// Hand-rolled bound checks keep the Worker WASM small for simple numeric
+    /// validation while serde rejects unknown enum values.
     pub fn validate(&self) -> Result<(), String> {
         if self.v != 1 {
             return Err(format!("unsupported v: {} (expected 1)", self.v));

@@ -65,8 +65,6 @@ Verification ordering is: HMAC -> expiry -> payload-hash -> PoW -> DB insert.
 
 ## 4. Replay defense layers (in order)
 
-Per `01-CONTEXT.md` D-07:
-
 1. **Cryptographic** - PoW input binds `payload_hash`. A solved challenge cannot be reused with a different payload because the PoW would need to be re-solved.
 2. **Database** - `event_id UUID PRIMARY KEY` with `INSERT ... ON CONFLICT (event_id) DO NOTHING`. A replay of the exact same request is silently absorbed.
 3. **Temporal** - 60s expiry on `challenge_id`. The replay window is bounded.
@@ -89,4 +87,4 @@ K=22 is fixed for v1. Tunable via Worker env var `POW_DIFFICULTY_K` (defaults to
 
 ## 7. Worked example
 
-A single canonical example is provided in `spec/pow-fixtures.json`. The shared `crates/pow` is the verifier/solver implementation used by the Rust CLI and the Rust Worker. It must round-trip every fixture in that file. CI verifies this in `.github/workflows/pow.yml` via `cargo test -p pow` plus the deterministic-fixture drift gate `cargo xtask gen-fixtures --check`. Pre-Phase-1.5 used a transitional bilingual gate; Phase 1.5 retired that bridge and made `crates/pow` the only verifier implementation.
+A single canonical example is provided in `spec/pow-fixtures.json`. The shared `crates/pow` is the verifier/solver implementation used by the Rust CLI and the Rust Worker. It must round-trip every fixture in that file. CI verifies this in `.github/workflows/pow.yml` via `cargo test -p pow` plus the deterministic-fixture drift gate `cargo xtask gen-fixtures --check`.

@@ -1,8 +1,7 @@
-//! cron_state work-queue helpers (AGGR-17/18, D-85).
+//! cron_state work-queue helpers.
 //!
 //! Each helper opens its own per-call Hyperdrive connection per
-//! research/PITFALLS.md Pitfall 5 (Worker I/O Lifecycle Leaks);
-//! NO shared client across calls.
+//! Worker I/O lifecycle constraints; NO shared client across calls.
 //!
 //! Logging boundary: emit COUNTS only - never log tier value,
 //! bucket_ts value, worker_id, or last_error content. The pow.yml
@@ -17,7 +16,7 @@ use tokio_postgres::tls::NoTls;
 use tokio_postgres::types::Type;
 use worker::{Env, Hyperdrive, Result, console_log};
 
-pub const STALE_CLAIM_MULT: i64 = 5; // tunable post-staging-UAT
+pub const STALE_CLAIM_MULT: i64 = 5; // tunable after staging validation
 
 fn tier_interval(tier: &str) -> &'static str {
     match tier {
