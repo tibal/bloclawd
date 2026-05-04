@@ -136,8 +136,8 @@ fn gen_canonical_fixture(input: &Path, output: &Path) -> Result<()> {
 }
 
 fn gen_catalog(check: bool) -> Result<()> {
-    let mut rendered = serde_json::to_string_pretty(&bloclawd_schema::CATALOG)
-        .context("serialize catalog")?;
+    let mut rendered =
+        serde_json::to_string_pretty(&bloclawd_schema::CATALOG).context("serialize catalog")?;
     rendered.push('\n');
 
     if check {
@@ -155,8 +155,7 @@ fn gen_catalog(check: bool) -> Result<()> {
     if let Some(parent) = Path::new(CATALOG_JSON_PATH).parent() {
         fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
     }
-    fs::write(CATALOG_JSON_PATH, rendered)
-        .with_context(|| format!("write {CATALOG_JSON_PATH}"))?;
+    fs::write(CATALOG_JSON_PATH, rendered).with_context(|| format!("write {CATALOG_JSON_PATH}"))?;
     println!("wrote {CATALOG_JSON_PATH}");
     Ok(())
 }

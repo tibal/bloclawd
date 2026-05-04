@@ -94,14 +94,46 @@ const fn full_window_prices(
     cached_write: f64,
 ) -> [PricePoint; 8] {
     [
-        PricePoint { token_type: TokenType::Input, window: Window::FiveMin, usd_per_token: input },
-        PricePoint { token_type: TokenType::Output, window: Window::FiveMin, usd_per_token: output },
-        PricePoint { token_type: TokenType::CachedRead, window: Window::FiveMin, usd_per_token: cached_read },
-        PricePoint { token_type: TokenType::CachedWrite, window: Window::FiveMin, usd_per_token: cached_write },
-        PricePoint { token_type: TokenType::Input, window: Window::FiveH, usd_per_token: input },
-        PricePoint { token_type: TokenType::Output, window: Window::FiveH, usd_per_token: output },
-        PricePoint { token_type: TokenType::CachedRead, window: Window::FiveH, usd_per_token: cached_read },
-        PricePoint { token_type: TokenType::CachedWrite, window: Window::FiveH, usd_per_token: cached_write },
+        PricePoint {
+            token_type: TokenType::Input,
+            window: Window::FiveMin,
+            usd_per_token: input,
+        },
+        PricePoint {
+            token_type: TokenType::Output,
+            window: Window::FiveMin,
+            usd_per_token: output,
+        },
+        PricePoint {
+            token_type: TokenType::CachedRead,
+            window: Window::FiveMin,
+            usd_per_token: cached_read,
+        },
+        PricePoint {
+            token_type: TokenType::CachedWrite,
+            window: Window::FiveMin,
+            usd_per_token: cached_write,
+        },
+        PricePoint {
+            token_type: TokenType::Input,
+            window: Window::FiveH,
+            usd_per_token: input,
+        },
+        PricePoint {
+            token_type: TokenType::Output,
+            window: Window::FiveH,
+            usd_per_token: output,
+        },
+        PricePoint {
+            token_type: TokenType::CachedRead,
+            window: Window::FiveH,
+            usd_per_token: cached_read,
+        },
+        PricePoint {
+            token_type: TokenType::CachedWrite,
+            window: Window::FiveH,
+            usd_per_token: cached_write,
+        },
     ]
 }
 
@@ -468,7 +500,10 @@ mod tests {
                     (Provider::OpenAI, Harness::Codex) => true,
                     _ => false,
                 };
-                assert!(valid, "{plan:?} harness {harness:?} mismatched with provider");
+                assert!(
+                    valid,
+                    "{plan:?} harness {harness:?} mismatched with provider"
+                );
             }
         }
     }
@@ -522,14 +557,26 @@ mod tests {
 
     #[test]
     fn provider_serializes_lowercase() {
-        assert_eq!(serde_json::to_string(&Provider::Anthropic).unwrap(), r#""anthropic""#);
-        assert_eq!(serde_json::to_string(&Provider::OpenAI).unwrap(), r#""openai""#);
+        assert_eq!(
+            serde_json::to_string(&Provider::Anthropic).unwrap(),
+            r#""anthropic""#
+        );
+        assert_eq!(
+            serde_json::to_string(&Provider::OpenAI).unwrap(),
+            r#""openai""#
+        );
     }
 
     #[test]
     fn plan_serializes_with_provider_prefix() {
-        assert_eq!(serde_json::to_string(&Plan::AnthropicPro).unwrap(), r#""anthropic-pro""#);
-        assert_eq!(serde_json::to_string(&Plan::OpenAIPro).unwrap(), r#""openai-pro""#);
+        assert_eq!(
+            serde_json::to_string(&Plan::AnthropicPro).unwrap(),
+            r#""anthropic-pro""#
+        );
+        assert_eq!(
+            serde_json::to_string(&Plan::OpenAIPro).unwrap(),
+            r#""openai-pro""#
+        );
     }
 
     #[test]

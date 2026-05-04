@@ -19,7 +19,12 @@ pub static MODEL_PRICES: std::sync::LazyLock<Vec<(Model, TokenType, Window, f64)
         let mut rows = Vec::new();
         for info in MODELS {
             for price in info.prices {
-                rows.push((info.model, price.token_type, price.window, price.usd_per_token));
+                rows.push((
+                    info.model,
+                    price.token_type,
+                    price.window,
+                    price.usd_per_token,
+                ));
             }
         }
         rows
