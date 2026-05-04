@@ -9,16 +9,20 @@ export const SITE_NAME = "bloclawd" as const;
 export const SITE_TAGLINE =
   "When do AI subscription users actually hit limits?" as const;
 export const SITE_DESCRIPTION =
-  "An anonymous, k-anonymized public dataset of Claude Code and Codex rate-limit events. Submit your own with one CLI command. No login, no telemetry, k ≥ 5." as const;
+  "Live cohort percentiles for Claude Code and Codex rate limits. See where Pro, Max5, and Max20 caps actually fire — and how they drift week to week. Open dataset, one CLI command to contribute, anonymous by construction." as const;
 export const SITE_KEYWORDS = [
-  "claude code",
-  "codex",
-  "rate limit",
-  "ai subscription",
-  "tokens",
+  "claude code rate limit",
+  "codex rate limit",
+  "claude max20",
+  "claude max5",
+  "claude pro",
+  "5 hour limit",
+  "weekly limit",
+  "tokens to limit",
+  "ai subscription tracker",
+  "rate limit drift",
   "anthropic",
   "openai",
-  "k-anonymity",
   "open dataset",
 ] as const;
 export const TWITTER_HANDLE = "@bloclawd" as const;
@@ -71,13 +75,13 @@ export const ROUTES: RouteSeo[] = [
     description: SITE_DESCRIPTION,
     jsonLd: SITE_JSON_LD,
     noscript:
-      "bloclawd is an anonymous, public timeline of Claude Code and Codex rate-limit hits. Submit your own with a single CLI command. No accounts, no telemetry, k-anonymized at n ≥ 5. Visit the dashboard to see live aggregates.",
+      "bloclawd shows where Claude Code and Codex rate limits actually fire — for everyone, not just you. Compare your last bonked window to the live cohort, watch the envelope drift week to week, and contribute your own with one CLI command. Anonymous by construction, k ≥ 5.",
   },
   {
     path: "/dashboard",
-    title: "Dashboard · live tokens-to-limit aggregates",
+    title: "Dashboard · Claude Code & Codex limits by tier (Pro / Max5 / Max20)",
     description:
-      "Live percentile envelope of tokens consumed before Claude Code and Codex rate limits trigger. Filter by tier, harness, region, and model. K-anonymized at n ≥ 5.",
+      "Where your tier's limits actually fire. Live p10–p90 envelope of tokens consumed before Claude Code and Codex rate limits trigger, broken down by Pro, Max5, and Max20. Filter by harness, region, and model.",
     jsonLd: {
       "@context": "https://schema.org",
       "@type": "Dataset",
@@ -109,7 +113,7 @@ export const ROUTES: RouteSeo[] = [
       ],
     },
     noscript:
-      "Live dashboard of rate-limit aggregates from Claude Code and Codex. Pick a tier (pro / max5 / max20) to see the percentile envelope, or compare tiers side-by-side. Cells with fewer than five contributors are suppressed for anonymity.",
+      "Where your tier's limits actually fire. Pick Pro, Max5, or Max20 for the live percentile envelope, or compare tiers side-by-side to spot drift. Cells with fewer than five contributors are suppressed for anonymity.",
   },
   {
     path: "/methodology",
