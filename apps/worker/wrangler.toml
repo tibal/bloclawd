@@ -4,7 +4,11 @@ compatibility_date = "2026-04-01"
 main = "build/worker/shim.mjs"
 
 [build]
-command = "cargo install -q worker-build@0.8.1 && worker-build --release"
+# --locked: respect worker-build's published Cargo.lock so cargo doesn't
+# resolve transitive deps (e.g. `time`) to versions requiring a newer
+# rustc than the one pinned in rust-toolchain.toml. Without --locked the
+# CI install fails on bumped MSRV from time@0.3.47.
+command = "cargo install -q worker-build@0.8.1 --locked && worker-build --release"
 
 [placement]
 mode = "smart"
@@ -25,9 +29,13 @@ localConnectionString = "postgres://localhost:5432/bloclawd_dev"
 # ---------- staging ----------
 # Deploy: wrangler deploy --env staging
 # PlanetScale branch: staging
-# Worker URL: bloclawd-worker-staging.<account>.workers.dev
+# Worker URL: api-staging.bloclawd.com (custom domain; behind Cloudflare Access)
+# workers_dev = false kills the public *.workers.dev preview URL so the only
+# reachable hostname is api-staging.bloclawd.com, which is then policy-gated
+# by the Access application. See docs/STAGING-ACCESS.md.
 [env.staging]
 name = "bloclawd-worker-staging"
+workers_dev = false
 
 [[env.staging.hyperdrive]]
 binding = "DB"
@@ -57,6 +65,13 @@ namespace_id = "1002"
   [env.staging.ratelimits.simple]
   limit = 3
   period = 60
+
+# Custom-domain attach for staging. Pre-existing CNAME for
+# api-staging.bloclawd.com MUST be deleted before first deploy or the
+# attach fails (same trap as prod; see docs/STAGING-ACCESS.md preflight).
+[[env.staging.routes]]
+pattern = "api-staging.bloclawd.com"
+custom_domain = true
 
 # ---------- production ----------
 # Deploy: wrangler deploy --env production
