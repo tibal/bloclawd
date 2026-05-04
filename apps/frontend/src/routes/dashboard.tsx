@@ -261,6 +261,14 @@ function KpiRow({ kpis, hasData }: { kpis: ComputedKpis; hasData: boolean }) {
         : "no contributors",
     },
     {
+      label: "p50 change",
+      value: hasData ? formatDriftPct(kpis.driftPct) : "—",
+      sub:
+        hasData && kpis.driftPct !== null
+          ? "second half vs first half of window"
+          : "needs ≥ 4 buckets",
+    },
+    {
       label: "p25 — p75 spread",
       value: hasData ? formatTokens(kpis.iqr) : "—",
       sub: hasData ? "interquartile range" : "—",
@@ -269,11 +277,6 @@ function KpiRow({ kpis, hasData }: { kpis: ComputedKpis; hasData: boolean }) {
       label: "p10 — p90 spread",
       value: hasData ? formatTokens(kpis.outerSpread) : "—",
       sub: hasData ? "outer envelope" : "—",
-    },
-    {
-      label: "Submissions",
-      value: kpis.submissionsLabel,
-      sub: "k-anonymized · n ≥ 5",
     },
   ];
 
@@ -378,6 +381,7 @@ interface ComputedKpis {
   iqr: number;
   outerSpread: number;
   submissionsLabel: string;
+  driftPct: number | null;
 }
 
 function computeKpis(data: uPlot.AlignedData): ComputedKpis {
@@ -400,7 +404,27 @@ function computeKpis(data: uPlot.AlignedData): ComputedKpis {
     iqr,
     outerSpread,
     submissionsLabel: p50.length > 0 ? `${p50.length}` : "0",
+    driftPct: computeDriftPct(p50),
   };
+}
+
+function computeDriftPct(p50: number[]): number | null {
+  if (p50.length < 4) return null;
+
+  const mid = Math.floor(p50.length / 2);
+  const firstHalf = mean(p50.slice(0, mid));
+  const secondHalf = mean(p50.slice(mid));
+
+  if (firstHalf === 0) return null;
+
+  return ((secondHalf - firstHalf) / firstHalf) * 100;
+}
+
+export function formatDriftPct(value: number | null): string {
+  if (value === null) return "—";
+  if (Math.abs(value) < 0.05) return "±0%";
+  const sign = value > 0 ? "+" : "−";
+  return `${sign}${Math.abs(value).toFixed(1)}%`;
 }
 
 function numericArray(values: uPlot.AlignedData[number] | undefined): number[] {
