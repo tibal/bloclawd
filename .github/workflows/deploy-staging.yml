@@ -127,6 +127,7 @@ jobs:
           for attempt in 1 2 3 4 5; do
             body=$(mktemp); hdrs=$(mktemp)
             code=$(curl -sS --max-time 10 -o "$body" -D "$hdrs" -w '%{http_code}' \
+                -A "Mozilla/5.0 (X11; Linux x86_64) bloclawd-deploy-smoke/1.0" \
                 -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
                 -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
                 https://api-staging.bloclawd.com/challenge || echo "curl-err")
@@ -198,8 +199,11 @@ jobs:
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           set -euo pipefail
+          # Custom UA: default curl/* triggers Cloudflare AI Labyrinth
+          # (Link Maze) which fires before Access and returns 403.
           for attempt in 1 2 3 4 5; do
             if curl -fsS --max-time 10 -o /dev/null \
+                -A "Mozilla/5.0 (X11; Linux x86_64) bloclawd-deploy-smoke/1.0" \
                 -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
                 -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
                 https://staging.bloclawd.com/; then
