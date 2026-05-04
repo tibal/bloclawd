@@ -88,6 +88,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-wasm-
 
+      # worker-build@0.8.1 pulls time@0.3.47 (MSRV 1.88), but our pinned
+      # rust-toolchain.toml is 1.86. Pre-install worker-build with stable
+      # so wrangler.toml's [build] (which also calls cargo install) sees
+      # the binary already on PATH and short-circuits the compile.
+      - name: Install worker-build with stable Rust (sidesteps MSRV drift)
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          cargo +stable install -q worker-build@0.8.1 --locked
+
       - name: Deploy worker (wrangler.toml [build] runs worker-build automatically)
         uses: cloudflare/wrangler-action@v3
         with:
