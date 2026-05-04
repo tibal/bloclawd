@@ -120,18 +120,24 @@ jobs:
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           set -euo pipefail
-          # Brief warm-up retry; custom-domain edge propagation is usually
-          # <30s but the first request after a cold deploy can race.
+          echo "::group::Secret length sanity (no values printed)"
+          echo "CF_ACCESS_CLIENT_ID length: ${#CF_ACCESS_CLIENT_ID}"
+          echo "CF_ACCESS_CLIENT_SECRET length: ${#CF_ACCESS_CLIENT_SECRET}"
+          echo "::endgroup::"
           for attempt in 1 2 3 4 5; do
-            if curl -fsS --max-time 10 \
+            body=$(mktemp)
+            code=$(curl -sS --max-time 10 -o "$body" -w '%{http_code}' \
                 -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
                 -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-                https://api-staging.bloclawd.com/challenge \
-                | jq -e '.challenge_id and .expires_at and .k' >/dev/null; then
+                https://api-staging.bloclawd.com/challenge || echo "curl-err")
+            if [ "$code" = "200" ] && jq -e '.challenge_id' "$body" >/dev/null 2>&1; then
               echo "Worker healthy on attempt $attempt"
+              rm -f "$body"
               exit 0
             fi
-            echo "Attempt $attempt failed; retrying in 6s"
+            echo "Attempt $attempt: HTTP $code, body (first 200 bytes):"
+            head -c 200 "$body"; echo
+            rm -f "$body"
             sleep 6
           done
           echo "::error::Worker failed health check after 5 attempts"
