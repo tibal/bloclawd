@@ -82,6 +82,7 @@ jobs:
           workingDirectory: apps/worker
           command: deploy --env production
           wranglerVersion: '4.34.0'
+          packageManager: pnpm
 
       - name: Health check (challenge endpoint)
         run: |
@@ -142,6 +143,7 @@ jobs:
           workingDirectory: apps/frontend
           command: deploy --env production
           wranglerVersion: '4.34.0'
+          packageManager: pnpm
 
       - name: Health check (root + install.sh content-type)
         # SPA fallback (not_found_handling = "single-page-application") would

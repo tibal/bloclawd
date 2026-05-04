@@ -96,6 +96,7 @@ jobs:
           workingDirectory: apps/worker
           command: deploy --env staging
           wranglerVersion: '4.34.0'
+          packageManager: pnpm
 
       - name: Health check (challenge endpoint, via Access service token)
         env:
@@ -156,6 +157,7 @@ jobs:
           workingDirectory: apps/frontend
           command: deploy --env staging
           wranglerVersion: '4.34.0'
+          packageManager: pnpm
 
       - name: Health check (root, via Access service token)
         env:
