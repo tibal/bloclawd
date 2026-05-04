@@ -3,6 +3,7 @@ import { m, type Variants } from "motion/react";
 import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
+import { HomeTimelinePreview } from "@/components/HomeTimelinePreview";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useStatus } from "@/lib/r2";
 import { routeHead } from "@/lib/route-head";
@@ -171,6 +172,8 @@ function HomePage() {
           </m.article>
         ))}
       </section>
+
+      <HomeTimelinePreview />
 
       <section
         aria-label="Trust guarantees"

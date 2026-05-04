@@ -36,7 +36,7 @@ describe("Chart", () => {
     const { container, cleanup } = render(
       <Chart
         ariaLabel="Unified cost p50 with percentile band"
-        bands={{ mode: "p25-p75" }}
+        envelope="neighbors"
         data={sampleData()}
       />,
     );
@@ -58,7 +58,7 @@ describe("Chart", () => {
     const { container, cleanup } = render(
       <Chart
         ariaLabel="Unified cost wide band"
-        bands={{ mode: "p10-p90" }}
+        envelope="wide"
         data={sampleData()}
       />,
     );
@@ -77,7 +77,7 @@ describe("Chart", () => {
     const { container, cleanup } = render(
       <Chart
         ariaLabel="Compare tiers"
-        bands={{ mode: "p25-p75" }}
+        envelope="neighbors"
         compareMode={{
           tiers: [
             { tier: "pro", data },

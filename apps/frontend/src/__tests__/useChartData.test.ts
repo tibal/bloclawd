@@ -31,7 +31,10 @@ const BASE_FILTERS: DashboardSearch = {
   harness: "claude-code",
   limit_type: "5h",
   window: "7d",
-  bands: "p25-p75",
+  primary: "p50",
+  envelope: "neighbors",
+  brush_start: 0,
+  brush_end: 1,
   compare: false,
 };
 

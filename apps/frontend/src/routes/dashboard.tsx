@@ -3,13 +3,19 @@ import { useMemo, type ReactNode } from "react";
 import type uPlot from "uplot";
 import { z } from "zod";
 
-import { BandToggle } from "@/components/BandToggle";
 import { Chart } from "@/components/Chart";
 import { Chrome } from "@/components/Chrome";
 import { DataTable, type DataTableRow } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
+import { EnvelopeToggle } from "@/components/EnvelopeToggle";
 import { Filters } from "@/components/Filters";
+import { PercentilePicker } from "@/components/PercentilePicker";
 import { TierToggle } from "@/components/TierToggle";
+import { BreakdownTable } from "@/components/BreakdownTable";
+import { TokenMixPanel } from "@/components/TokenMixPanel";
+import { CostEquivalentPanel } from "@/components/CostEquivalentPanel";
+import { Brush } from "@/components/Brush";
+import { mockLatestBucket, pickCell } from "@/lib/mock-cohort";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChartData, useDelayedLoading } from "@/lib/dashboard-data";
 import { isR2NotFound, useStatus, type StatusJson } from "@/lib/r2";
@@ -47,7 +53,10 @@ export const dashboardSearchSchema = z.object({
   tier: z.enum(TIER_VALUES).optional(),
   limit_type: z.enum(["5h", "weekly"]).default("5h"),
   window: z.enum(["24h", "7d", "30d", "90d"]).default("7d"),
-  bands: z.enum(["p25-p75", "p10-p90"]).default("p25-p75"),
+  primary: z.enum(["p10", "p25", "p50", "p75", "p90"]).default("p50"),
+  envelope: z.enum(["off", "neighbors", "wide"]).default("neighbors"),
+  brush_start: z.number().min(0).max(1).default(0),
+  brush_end: z.number().min(0).max(1).default(1),
   compare: z.boolean().default(false),
 });
 
@@ -123,7 +132,8 @@ function DashboardPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <BandToggle />
+            <PercentilePicker />
+            <EnvelopeToggle />
             <TierToggle />
           </div>
         </div>
@@ -152,7 +162,41 @@ function DashboardPage() {
           />
         </div>
       </div>
+
+      <CohortPanels search={search} />
     </section>
+  );
+}
+
+// Bottom-row cohort panels: by-model breakdown, typical token mix, and the
+// cost-equivalent comparison. Sourced from mock cohort data in dev — the
+// real backend has not shipped representative_mix yet.
+function CohortPanels({ search }: { search: DashboardSearch }) {
+  if (!import.meta.env.DEV) return null;
+
+  const bucket = mockLatestBucket();
+  const cell = pickCell(bucket, {
+    tier: search.tier ?? "max20",
+    harness: search.harness,
+    region: search.region ?? "NA",
+    limit_type: search.limit_type,
+  });
+  if (!cell) return null;
+
+  return (
+    <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr]">
+      <BreakdownTable cell={cell} primary={search.primary} />
+      <TokenMixPanel cell={cell} primary={search.primary} />
+      <CostEquivalentPanel
+        bucket={bucket}
+        primary={search.primary}
+        filterCell={{
+          harness: search.harness,
+          limit_type: search.limit_type,
+          region: search.region,
+        }}
+      />
+    </div>
   );
 }
 
@@ -229,12 +273,24 @@ function ChartArea({
 
       <Chart
         ariaLabel={chartAriaLabel(search)}
-        bands={{ mode: search.bands }}
+        primary={search.primary}
+        envelope={search.envelope}
         compareMode={compareMode}
         data={chartData}
+        brush={{ start: search.brush_start, end: search.brush_end }}
       />
 
-      <ChartLegend mode={search.bands} compare={search.compare} />
+      <Brush
+        data={chartData}
+        start={search.brush_start}
+        end={search.brush_end}
+      />
+
+      <ChartLegend
+        primary={search.primary}
+        envelope={search.envelope}
+        compare={search.compare}
+      />
 
       <details className="group rounded-xl border border-border bg-[var(--bg-1)]/60">
         <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-[var(--bg-1)]">
@@ -296,10 +352,12 @@ function KpiRow({ kpis, hasData }: { kpis: ComputedKpis; hasData: boolean }) {
 }
 
 function ChartLegend({
-  mode,
+  primary,
+  envelope,
   compare,
 }: {
-  mode: DashboardSearch["bands"];
+  primary: DashboardSearch["primary"];
+  envelope: DashboardSearch["envelope"];
   compare: boolean;
 }) {
   if (compare) {
@@ -317,6 +375,11 @@ function ChartLegend({
     );
   }
 
+  const ORDER = ["p10", "p25", "p50", "p75", "p90"] as const;
+  const idx = ORDER.indexOf(primary);
+  const lo = ORDER[Math.max(0, idx - 1)];
+  const hi = ORDER[Math.min(ORDER.length - 1, idx + 1)];
+
   return (
     <div className="flex flex-wrap items-center gap-4 text-[11.5px] text-muted-foreground">
       <span className="inline-flex items-center gap-2">
@@ -324,16 +387,18 @@ function ChartLegend({
           className="block h-[2px] w-4 rounded"
           style={{ background: "var(--chart-1)" }}
         />
-        p50 median
+        {primary} line
       </span>
-      <span className="inline-flex items-center gap-2">
-        <span
-          className="block h-2 w-3.5 rounded-sm"
-          style={{ background: "color-mix(in oklch, var(--chart-1) 32%, transparent)" }}
-        />
-        p25 — p75
-      </span>
-      {mode === "p10-p90" ? (
+      {envelope === "neighbors" ? (
+        <span className="inline-flex items-center gap-2">
+          <span
+            className="block h-2 w-3.5 rounded-sm"
+            style={{ background: "color-mix(in oklch, var(--chart-1) 32%, transparent)" }}
+          />
+          {lo} — {hi}
+        </span>
+      ) : null}
+      {envelope === "wide" ? (
         <span className="inline-flex items-center gap-2">
           <span
             className="block h-2 w-3.5 rounded-sm"

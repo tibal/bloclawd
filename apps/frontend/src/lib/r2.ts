@@ -50,12 +50,52 @@ export type PercentileEncoding =
   | { Mean: Percentiles }
   | { Bin: Percentiles };
 
+// Re-exported from generated rust types (apps/web/src/generated/TokenType.ts).
+// SSOT: crates/event-schema/src/enums.rs.
+export type { TokenType } from "@web/TokenType";
+import type { TokenType } from "@web/TokenType";
+
+export const TOKEN_TYPES: readonly TokenType[] = [
+  "input",
+  "output",
+  "cached_read",
+  "cached_write",
+] as const;
+
+// Per (model, token_type) "tokens-at-limit-if-only" estimation. Each bucket
+// reports the percentile distribution of tokens-burned-at-limit assuming the
+// user spent on that single (model, token_type). Lets the UI show "if you
+// spent only opus output, you'd hit limit at p50 = 86k".
+export type TokenTypeCell = {
+  token_type: TokenType;
+  n_with_type: number;
+  // Percentiles of tokens-to-limit-if-only this token type were spent.
+  tokens_to_limit_if_only: PercentileEncoding | null;
+  // Percentiles of the share of total spend this token type represents
+  // across cohort submissions (0..1).
+  share: PercentileEncoding | null;
+};
+
 export type ModelCell = {
   model: string;
   n_with_model: number;
   weights: readonly number[];
   weight_source: WeightSource;
   tokens_to_limit_if_only: PercentileEncoding | null;
+  // OPTIONAL — per-token-type breakdown for this model. When present, sums
+  // of tokens.tokens_to_limit_if_only across types should reconcile with the
+  // model-level estimate.
+  tokens?: readonly TokenTypeCell[];
+};
+
+// Cohort-level representative mix. Each entry's `share` is a percentile
+// distribution of the fraction of total spend allocated to that
+// (model, token_type) across submitters in the cohort. Lets the UI render
+// "the typical user spent X% on output, with p10..p90 spread".
+export type RepresentativeMixCell = {
+  model: string;
+  token_type: TokenType;
+  share: PercentileEncoding;
 };
 
 export type BucketCell = {
@@ -69,6 +109,9 @@ export type BucketCell = {
   unified_cost: PercentileEncoding | null;
   models: ModelCell[];
   insufficient_data: boolean;
+  // OPTIONAL — token-type breakdowns at cohort level. Pre-computed so the
+  // dashboard can avoid re-aggregating from `models`.
+  representative_mix?: readonly RepresentativeMixCell[];
 };
 
 export type BucketEnvelope = {
