@@ -54,13 +54,13 @@ describe("home page CTAs", () => {
     try {
       const links = Array.from(container.querySelectorAll<HTMLAnchorElement>("a"));
       const dashboard = links.find(
-        (link) => link.textContent === "Open dashboard",
+        (link) => link.textContent === "See the cohort",
       );
       const methodology = links.find(
         (link) => link.textContent === "Read the methodology",
       );
 
-      expect(dashboard?.textContent).toBe("Open dashboard");
+      expect(dashboard?.textContent).toBe("See the cohort");
       expect(dashboard?.getAttribute("href")).toBe("/dashboard");
       expect(methodology?.textContent).toBe("Read the methodology");
       expect(methodology?.getAttribute("href")).toBe("/methodology");
