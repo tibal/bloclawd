@@ -13,14 +13,26 @@ run_worker_first = true
 [placement]
 mode = "smart"
 
+# Staging is policy-gated by Cloudflare Access on staging.bloclawd.com.
+# workers_dev = false kills the public *.workers.dev preview URL so the
+# only reachable hostname is the custom-domain one, which Access then
+# requires authentication for. See docs/STAGING-ACCESS.md.
 [env.staging]
 name = "bloclawd-frontend-staging"
+workers_dev = false
 
 [env.staging.assets]
 directory = "./dist/client"
 not_found_handling = "single-page-application"
 binding = "ASSETS"
 run_worker_first = true
+
+# Custom-domain attach for staging. Pre-existing CNAME for
+# staging.bloclawd.com MUST be deleted before first deploy or the
+# attach fails. See docs/STAGING-ACCESS.md preflight.
+[[env.staging.routes]]
+pattern = "staging.bloclawd.com"
+custom_domain = true
 
 [env.production]
 name = "bloclawd-frontend"

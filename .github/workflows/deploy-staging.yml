@@ -1,0 +1,178 @@
+# Deploy worker + frontend to the Cloudflare staging environment on every
+# push to `main`. No `pull_request` trigger: fork PRs must NOT receive the
+# Cloudflare API token (exfil risk on public OSS repos).
+#
+# Staging hostnames are policy-gated by Cloudflare Access:
+#   - https://api-staging.bloclawd.com  (worker)
+#   - https://staging.bloclawd.com      (frontend)
+# The `*.workers.dev` URLs are disabled (workers_dev = false in
+# wrangler.toml). Browser access requires Cloudflare SSO; CI uses a
+# service token (CF_ACCESS_CLIENT_*) for the post-deploy health checks.
+# Setup runbook: docs/STAGING-ACCESS.md.
+#
+# Required GitHub secrets (scoped to the `staging` GitHub Environment):
+#   - CLOUDFLARE_API_TOKEN: token with permissions:
+#       * Account -> Workers Scripts: Edit
+#       * Account -> Workers R2 Storage: Edit
+#       * Zone   -> Zone: Edit         (zone: bloclawd.com)
+#       * Zone   -> DNS: Edit          (zone: bloclawd.com)
+#     Zone perms are required for the [[env.staging.routes]] custom_domain
+#     attach in apps/{worker,frontend}/wrangler.toml.
+#   - CLOUDFLARE_ACCOUNT_ID: Cloudflare account UUID.
+#   - CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET: Access service-token
+#     credentials. Used only by the health-check curl to bypass the SSO
+#     gate. Distinct from the prod values.
+#
+# WORKER_SECRET is NOT managed here. It is set once per env via
+# `wrangler secret put WORKER_SECRET --env staging` (see apps/worker/README.md);
+# `wrangler deploy` preserves existing secrets across deploys.
+#
+# Production deploys ride .github/workflows/deploy-production.yml on
+# release.published with a required reviewer on the `production`
+# Environment.
+#
+# Security notes:
+#   - No untrusted github.event.* inputs are interpolated into run: blocks.
+#   - permissions: contents: read only; no write tokens granted.
+#   - Concurrency group serializes deploys; cancel-in-progress: false avoids
+#     half-applied wrangler runs.
+#   - Service-token secrets are read into env: vars and referenced as
+#     "$VAR" in run: blocks (never template-interpolated into shell).
+
+name: deploy-staging
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/worker/**'
+      - 'apps/frontend/**'
+      - 'crates/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'pnpm-lock.yaml'
+      - 'package.json'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/deploy-staging.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-staging
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-worker:
+    name: worker -> api-staging.bloclawd.com
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://api-staging.bloclawd.com
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain (rust-toolchain.toml drives version)
+        run: rustup show
+
+      - name: Cache cargo registry + target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-wasm-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml', 'rust-toolchain.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-wasm-
+
+      - name: Deploy worker (wrangler.toml [build] runs worker-build automatically)
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/worker
+          command: deploy --env staging
+          wranglerVersion: '4.34.0'
+
+      - name: Health check (challenge endpoint, via Access service token)
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          # Brief warm-up retry; custom-domain edge propagation is usually
+          # <30s but the first request after a cold deploy can race.
+          for attempt in 1 2 3 4 5; do
+            if curl -fsS --max-time 10 \
+                -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+                -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+                https://api-staging.bloclawd.com/challenge \
+                | jq -e '.challenge_id and .expires_at and .k' >/dev/null; then
+              echo "Worker healthy on attempt $attempt"
+              exit 0
+            fi
+            echo "Attempt $attempt failed; retrying in 6s"
+            sleep 6
+          done
+          echo "::error::Worker failed health check after 5 attempts"
+          exit 1
+
+  deploy-frontend:
+    name: frontend -> staging.bloclawd.com
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.bloclawd.com
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.2
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20.18.0
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm --filter ./apps/frontend build
+
+      - name: Verify build artifacts exist
+        run: |
+          test -f apps/frontend/dist/client/index.html
+          test -d apps/frontend/dist/client/assets
+
+      - name: Deploy frontend
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/frontend
+          command: deploy --env staging
+          wranglerVersion: '4.34.0'
+
+      - name: Health check (root, via Access service token)
+        env:
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            if curl -fsS --max-time 10 -o /dev/null \
+                -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+                -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+                https://staging.bloclawd.com/; then
+              echo "Frontend healthy on attempt $attempt"
+              exit 0
+            fi
+            echo "Attempt $attempt failed; retrying in 6s"
+            sleep 6
+          done
+          echo "::error::Frontend failed health check after 5 attempts"
+          exit 1

@@ -3,8 +3,7 @@
     {
       "allowed": {
         "origins": [
-          "https://bloclawd-frontend-staging.<account-subdomain>.workers.dev",
-          "https://bloclawd-frontend.<account-subdomain>.workers.dev"
+          "https://staging.bloclawd.com"
         ],
         "methods": ["GET", "HEAD"],
         "headers": ["accept"]
