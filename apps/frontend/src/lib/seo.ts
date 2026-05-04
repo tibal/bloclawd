@@ -9,16 +9,20 @@ export const SITE_NAME = "bloclawd" as const;
 export const SITE_TAGLINE =
   "When do AI subscription users actually hit limits?" as const;
 export const SITE_DESCRIPTION =
-  "An anonymous, k-anonymized public dataset of Claude Code and Codex rate-limit events. Submit your own with one CLI command. No login, no telemetry, k ≥ 5." as const;
+  "Live cohort percentiles for Claude Code and Codex rate limits. See where Pro, Max5, and Max20 caps actually fire — and how they drift week to week. Open dataset, one CLI command to contribute, anonymous by construction." as const;
 export const SITE_KEYWORDS = [
-  "claude code",
-  "codex",
-  "rate limit",
-  "ai subscription",
-  "tokens",
+  "claude code rate limit",
+  "codex rate limit",
+  "claude max20",
+  "claude max5",
+  "claude pro",
+  "5 hour limit",
+  "weekly limit",
+  "tokens to limit",
+  "ai subscription tracker",
+  "rate limit drift",
   "anthropic",
   "openai",
-  "k-anonymity",
   "open dataset",
 ] as const;
 export const TWITTER_HANDLE = "@bloclawd" as const;
@@ -71,13 +75,13 @@ export const ROUTES: RouteSeo[] = [
     description: SITE_DESCRIPTION,
     jsonLd: SITE_JSON_LD,
     noscript:
-      "bloclawd is an anonymous, public timeline of Claude Code and Codex rate-limit hits. Submit your own with a single CLI command. No accounts, no telemetry, k-anonymized at n ≥ 5. Visit the dashboard to see live aggregates.",
+      "bloclawd shows where Claude Code and Codex rate limits actually fire — for everyone, not just you. Compare your last bonked window to the live cohort, watch the envelope drift week to week, and contribute your own with one CLI command. Anonymous by construction, k ≥ 5.",
   },
   {
     path: "/dashboard",
-    title: "Dashboard · live tokens-to-limit aggregates",
+    title: "Dashboard · Claude Code & Codex limits by tier (Pro / Max5 / Max20)",
     description:
-      "Live percentile envelope of tokens consumed before Claude Code and Codex rate limits trigger. Filter by tier, harness, region, and model. K-anonymized at n ≥ 5.",
+      "Where your tier's limits actually fire. Live p10–p90 envelope of tokens consumed before Claude Code and Codex rate limits trigger, broken down by Pro, Max5, and Max20. Filter by harness, region, and model.",
     jsonLd: {
       "@context": "https://schema.org",
       "@type": "Dataset",
@@ -109,7 +113,7 @@ export const ROUTES: RouteSeo[] = [
       ],
     },
     noscript:
-      "Live dashboard of rate-limit aggregates from Claude Code and Codex. Pick a tier (pro / max5 / max20) to see the percentile envelope, or compare tiers side-by-side. Cells with fewer than five contributors are suppressed for anonymity.",
+      "Where your tier's limits actually fire. Pick Pro, Max5, or Max20 for the live percentile envelope, or compare tiers side-by-side to spot drift. Cells with fewer than five contributors are suppressed for anonymity.",
   },
   {
     path: "/methodology",
@@ -154,6 +158,62 @@ export const ROUTES: RouteSeo[] = [
       "The exact wire payload bloclawd sends, before signing: fields, types, canonical ordering, redacted values, and the diff a dry-run shows.",
     noscript:
       "Data contract: the exact wire payload your CLI submits, the canonical ordering applied before signing, redacted fields, and the diff a dry-run shows you before any network call.",
+  },
+  {
+    path: "/compare",
+    title: "Pro vs Max5 vs Max20 · live tier comparison",
+    description:
+      "Side-by-side percentile envelope of tokens consumed before Claude Code and Codex rate limits trigger, broken down by Pro, Max5, and Max20. Real bonks from real users, anonymized.",
+    jsonLd: [
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        name: "Pro vs Max5 vs Max20 · live tier comparison",
+        url: `${SITE_URL}/compare`,
+        description:
+          "Side-by-side percentile envelope of tokens consumed before Claude Code and Codex rate limits trigger, broken down by Pro, Max5, and Max20.",
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: [
+          {
+            "@type": "Question",
+            name: "Does $200/mo Max20 really give you 20× the headroom of Pro?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Compare the p50 envelope side-by-side over a 30-day window. The relationship between sticker-price ratio and observed headroom is rarely linear and shifts week to week.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "Why does my tier look tighter than the cohort?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Either you've hit a heavier model mix, or you may be in a cohort the provider is silently A/B testing. The drift chart shows shifts before any official changelog mentions them.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "How is 'tokens to limit' defined across tiers?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "It is the unified token cost summed over the 5-hour or weekly window leading into a rate-limit hit. Per-model token weights are fit with ridge regression toward published per-token prices.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "Why are some cells suppressed?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Any cell with fewer than 5 distinct contributors is suppressed for anonymity. Widen the window or relax a filter if you see gaps.",
+            },
+          },
+        ],
+      },
+    ],
+    noscript:
+      "Pro vs Max5 vs Max20: live percentile envelope of tokens consumed before Claude Code and Codex rate limits trigger, broken down by subscription tier. Real bonks from real users, anonymized at k ≥ 5.",
   },
 ];
 

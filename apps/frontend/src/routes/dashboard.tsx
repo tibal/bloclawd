@@ -91,10 +91,10 @@ function DashboardPage() {
             Tokens to rate limit · {limitTypeLabel(search.limit_type)}
           </h1>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-            Community-sourced rate-limit signal from Claude Code and Codex.
-            K-anonymized at n ≥ 5, binned, no per-event timestamps. Pick a
-            tier to see the percentile envelope or toggle compare mode for
-            side-by-side tiers.
+            Where your tier's limits actually fire. Pick Pro, Max5, or Max20
+            for the live percentile envelope, or toggle Compare for
+            tier-to-tier drift. Cells with fewer than 5 contributors are
+            suppressed for anonymity.
           </p>
           <Chrome />
           {statusNotice?.kind === "degraded" ? (
@@ -199,7 +199,7 @@ function ChartArea({
     return (
       <EmptyState
         heading="Pick a tier"
-        subhead="Choose Pro / Max5 / Max20 above, or toggle Compare tiers to see all three."
+        subhead="Start with your own — Pro, Max5, or Max20. Or toggle Compare to see all three side-by-side and spot tier-to-tier drift."
       />
     );
   }
@@ -208,7 +208,7 @@ function ChartArea({
     return (
       <EmptyState
         heading="Not enough data yet"
-        subhead="Every cell in this view has fewer than 5 contributors, so percentiles are suppressed for anonymity. Try widening the window or relaxing a filter - or check back after the next daily aggregation."
+        subhead="Fewer than 5 contributors in this slice, so percentiles are suppressed for anonymity. Widen the window, drop a filter, or check back tomorrow — the next aggregate runs at 03:00 UTC."
       />
     );
   }
