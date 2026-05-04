@@ -60,6 +60,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # wrangler 4.87+ requires Node >= 22; runner default is 20.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
       - name: Install Rust toolchain (rust-toolchain.toml drives version)
         run: rustup show
 
@@ -129,7 +134,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.18.0
+          node-version: 22.x
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
