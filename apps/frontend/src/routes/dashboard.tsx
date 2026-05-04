@@ -40,6 +40,16 @@ const MODEL_VALUES = [
 const HARNESS_VALUES = ["cc", "claude-code", "codex"] as const;
 const REGION_VALUES = ["NA", "EU", "AS", "SA", "OC", "AF", "AN"] as const;
 const TIER_VALUES = ["pro", "max5", "max20"] as const;
+// Provider / Plan literal tuples must mirror `crates/event-schema/src/catalog.rs`.
+// `Filters.test` asserts that the catalog JSON matches these values.
+const PROVIDER_VALUES = ["anthropic", "openai"] as const;
+const PLAN_VALUES = [
+  "anthropic-pro",
+  "anthropic-max5",
+  "anthropic-max20",
+  "openai-plus",
+  "openai-pro",
+] as const;
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 const EMPTY_DATA: uPlot.AlignedData = [[], [], [], [], [], []];
 
@@ -51,6 +61,8 @@ export const dashboardSearchSchema = z.object({
     .default("claude-code")
     .transform((value) => (value === "cc" ? "claude-code" : value)),
   tier: z.enum(TIER_VALUES).optional(),
+  provider: z.enum(PROVIDER_VALUES).optional(),
+  plan: z.enum(PLAN_VALUES).optional(),
   limit_type: z.enum(["5h", "weekly"]).default("5h"),
   window: z.enum(["24h", "7d", "30d", "90d"]).default("7d"),
   primary: z.enum(["p10", "p25", "p50", "p75", "p90"]).default("p50"),

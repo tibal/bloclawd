@@ -11,6 +11,7 @@ use std::time::{Duration, Instant};
 mod anonymize_session;
 
 const FIXTURE_PATH: &str = "spec/pow-fixtures.json";
+const CATALOG_JSON_PATH: &str = "apps/web/src/generated/catalog.json";
 
 #[derive(Clone, Copy)]
 enum ChallengeIdPattern {
@@ -54,6 +55,10 @@ fn main() -> Result<()> {
         "gen-fixtures" => {
             let check = args.any(|arg| arg == "--check");
             gen_fixtures(check)
+        }
+        "gen-catalog" => {
+            let check = args.any(|arg| arg == "--check");
+            gen_catalog(check)
         }
         "gen-canonical-fixture" => {
             let input = args.next();
@@ -99,6 +104,8 @@ fn usage() {
     eprintln!("usage:");
     eprintln!("  cargo run -p xtask -- gen-fixtures");
     eprintln!("  cargo run -p xtask -- gen-fixtures --check");
+    eprintln!("  cargo run -p xtask -- gen-catalog");
+    eprintln!("  cargo run -p xtask -- gen-catalog --check");
     eprintln!("  cargo run -p xtask -- gen-canonical-fixture <input.json> <output.bytes.txt>");
     eprintln!(
         "  cargo run -p xtask -- anonymize-session --harness <cc|codex> --input <path> --output <path>"
@@ -125,6 +132,31 @@ fn gen_canonical_fixture(input: &Path, output: &Path) -> Result<()> {
     }
     fs::write(output, hex_encoded).with_context(|| format!("write {}", output.display()))?;
     println!("wrote {}", output.display());
+    Ok(())
+}
+
+fn gen_catalog(check: bool) -> Result<()> {
+    let mut rendered =
+        serde_json::to_string_pretty(&bloclawd_schema::CATALOG).context("serialize catalog")?;
+    rendered.push('\n');
+
+    if check {
+        let existing = fs::read_to_string(CATALOG_JSON_PATH)
+            .with_context(|| format!("read committed {CATALOG_JSON_PATH}"))?;
+        if existing == rendered {
+            println!("OK");
+            return Ok(());
+        }
+        eprintln!("catalog drift detected in {CATALOG_JSON_PATH}");
+        emit_line_diff(&existing, &rendered);
+        bail!("{CATALOG_JSON_PATH} differs from deterministic xtask output");
+    }
+
+    if let Some(parent) = Path::new(CATALOG_JSON_PATH).parent() {
+        fs::create_dir_all(parent).with_context(|| format!("create {}", parent.display()))?;
+    }
+    fs::write(CATALOG_JSON_PATH, rendered).with_context(|| format!("write {CATALOG_JSON_PATH}"))?;
+    println!("wrote {CATALOG_JSON_PATH}");
     Ok(())
 }
 

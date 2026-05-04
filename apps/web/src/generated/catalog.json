@@ -1,0 +1,452 @@
+{
+  "providers": [
+    "anthropic",
+    "openai"
+  ],
+  "plans": [
+    {
+      "plan": "anthropic-pro",
+      "provider": "anthropic",
+      "display_name": "Pro",
+      "monthly_cost_usd": 20.0,
+      "harnesses": [
+        "claude-code"
+      ],
+      "models": [
+        "claude-sonnet-4-6",
+        "claude-sonnet-4-5",
+        "claude-haiku-4-5"
+      ],
+      "limit_types": [
+        "5h",
+        "weekly"
+      ],
+      "tier_alias": "pro"
+    },
+    {
+      "plan": "anthropic-max5",
+      "provider": "anthropic",
+      "display_name": "Max 5x",
+      "monthly_cost_usd": 100.0,
+      "harnesses": [
+        "claude-code"
+      ],
+      "models": [
+        "claude-opus-4-7",
+        "claude-sonnet-4-6",
+        "claude-sonnet-4-5",
+        "claude-haiku-4-5"
+      ],
+      "limit_types": [
+        "5h",
+        "weekly"
+      ],
+      "tier_alias": "max5"
+    },
+    {
+      "plan": "anthropic-max20",
+      "provider": "anthropic",
+      "display_name": "Max 20x",
+      "monthly_cost_usd": 200.0,
+      "harnesses": [
+        "claude-code"
+      ],
+      "models": [
+        "claude-opus-4-7",
+        "claude-sonnet-4-6",
+        "claude-sonnet-4-5",
+        "claude-haiku-4-5"
+      ],
+      "limit_types": [
+        "5h",
+        "weekly"
+      ],
+      "tier_alias": "max20"
+    },
+    {
+      "plan": "openai-plus",
+      "provider": "openai",
+      "display_name": "ChatGPT Plus",
+      "monthly_cost_usd": 20.0,
+      "harnesses": [
+        "codex"
+      ],
+      "models": [
+        "gpt-5"
+      ],
+      "limit_types": [
+        "5h",
+        "weekly"
+      ],
+      "tier_alias": null
+    },
+    {
+      "plan": "openai-pro",
+      "provider": "openai",
+      "display_name": "ChatGPT Pro",
+      "monthly_cost_usd": 200.0,
+      "harnesses": [
+        "codex"
+      ],
+      "models": [
+        "gpt-5",
+        "gpt-5.5",
+        "gpt-5-codex"
+      ],
+      "limit_types": [
+        "5h",
+        "weekly"
+      ],
+      "tier_alias": null
+    }
+  ],
+  "models": [
+    {
+      "model": "claude-opus-4-7",
+      "provider": "anthropic",
+      "display_name": "Claude Opus 4.7",
+      "prices": [
+        {
+          "token_type": "input",
+          "window": "5min",
+          "usd_per_token": 5e-6
+        },
+        {
+          "token_type": "output",
+          "window": "5min",
+          "usd_per_token": 0.000025
+        },
+        {
+          "token_type": "cached_read",
+          "window": "5min",
+          "usd_per_token": 5e-7
+        },
+        {
+          "token_type": "cached_write",
+          "window": "5min",
+          "usd_per_token": 6.25e-6
+        },
+        {
+          "token_type": "input",
+          "window": "5h",
+          "usd_per_token": 5e-6
+        },
+        {
+          "token_type": "output",
+          "window": "5h",
+          "usd_per_token": 0.000025
+        },
+        {
+          "token_type": "cached_read",
+          "window": "5h",
+          "usd_per_token": 5e-7
+        },
+        {
+          "token_type": "cached_write",
+          "window": "5h",
+          "usd_per_token": 6.25e-6
+        }
+      ]
+    },
+    {
+      "model": "claude-sonnet-4-6",
+      "provider": "anthropic",
+      "display_name": "Claude Sonnet 4.6",
+      "prices": [
+        {
+          "token_type": "input",
+          "window": "5min",
+          "usd_per_token": 3e-6
+        },
+        {
+          "token_type": "output",
+          "window": "5min",
+          "usd_per_token": 0.000015
+        },
+        {
+          "token_type": "cached_read",
+          "window": "5min",
+          "usd_per_token": 3e-7
+        },
+        {
+          "token_type": "cached_write",
+          "window": "5min",
+          "usd_per_token": 3.75e-6
+        },
+        {
+          "token_type": "input",
+          "window": "5h",
+          "usd_per_token": 3e-6
+        },
+        {
+          "token_type": "output",
+          "window": "5h",
+          "usd_per_token": 0.000015
+        },
+        {
+          "token_type": "cached_read",
+          "window": "5h",
+          "usd_per_token": 3e-7
+        },
+        {
+          "token_type": "cached_write",
+          "window": "5h",
+          "usd_per_token": 3.75e-6
+        }
+      ]
+    },
+    {
+      "model": "claude-sonnet-4-5",
+      "provider": "anthropic",
+      "display_name": "Claude Sonnet 4.5",
+      "prices": [
+        {
+          "token_type": "input",
+          "window": "5min",
+          "usd_per_token": 3e-6
+        },
+        {
+          "token_type": "output",
+          "window": "5min",
+          "usd_per_token": 0.000015
+        },
+        {
+          "token_type": "cached_read",
+          "window": "5min",
+          "usd_per_token": 3e-7
+        },
+        {
+          "token_type": "cached_write",
+          "window": "5min",
+          "usd_per_token": 3.75e-6
+        },
+        {
+          "token_type": "input",
+          "window": "5h",
+          "usd_per_token": 3e-6
+        },
+        {
+          "token_type": "output",
+          "window": "5h",
+          "usd_per_token": 0.000015
+        },
+        {
+          "token_type": "cached_read",
+          "window": "5h",
+          "usd_per_token": 3e-7
+        },
+        {
+          "token_type": "cached_write",
+          "window": "5h",
+          "usd_per_token": 3.75e-6
+        }
+      ]
+    },
+    {
+      "model": "claude-haiku-4-5",
+      "provider": "anthropic",
+      "display_name": "Claude Haiku 4.5",
+      "prices": [
+        {
+          "token_type": "input",
+          "window": "5min",
+          "usd_per_token": 1e-6
+        },
+        {
+          "token_type": "output",
+          "window": "5min",
+          "usd_per_token": 5e-6
+        },
+        {
+          "token_type": "cached_read",
+          "window": "5min",
+          "usd_per_token": 1e-7
+        },
+        {
+          "token_type": "cached_write",
+          "window": "5min",
+          "usd_per_token": 1.25e-6
+        },
+        {
+          "token_type": "input",
+          "window": "5h",
+          "usd_per_token": 1e-6
+        },
+        {
+          "token_type": "output",
+          "window": "5h",
+          "usd_per_token": 5e-6
+        },
+        {
+          "token_type": "cached_read",
+          "window": "5h",
+          "usd_per_token": 1e-7
+        },
+        {
+          "token_type": "cached_write",
+          "window": "5h",
+          "usd_per_token": 1.25e-6
+        }
+      ]
+    },
+    {
+      "model": "gpt-5",
+      "provider": "openai",
+      "display_name": "GPT-5",
+      "prices": [
+        {
+          "token_type": "input",
+          "window": "5min",
+          "usd_per_token": 1.25e-6
+        },
+        {
+          "token_type": "output",
+          "window": "5min",
+          "usd_per_token": 0.00001
+        },
+        {
+          "token_type": "cached_read",
+          "window": "5min",
+          "usd_per_token": 1.25e-7
+        },
+        {
+          "token_type": "cached_write",
+          "window": "5min",
+          "usd_per_token": 1.25e-6
+        },
+        {
+          "token_type": "input",
+          "window": "5h",
+          "usd_per_token": 1.25e-6
+        },
+        {
+          "token_type": "output",
+          "window": "5h",
+          "usd_per_token": 0.00001
+        },
+        {
+          "token_type": "cached_read",
+          "window": "5h",
+          "usd_per_token": 1.25e-7
+        },
+        {
+          "token_type": "cached_write",
+          "window": "5h",
+          "usd_per_token": 1.25e-6
+        }
+      ]
+    },
+    {
+      "model": "gpt-5.5",
+      "provider": "openai",
+      "display_name": "GPT-5.5",
+      "prices": [
+        {
+          "token_type": "input",
+          "window": "5min",
+          "usd_per_token": 5e-6
+        },
+        {
+          "token_type": "output",
+          "window": "5min",
+          "usd_per_token": 0.00003
+        },
+        {
+          "token_type": "cached_read",
+          "window": "5min",
+          "usd_per_token": 5e-7
+        },
+        {
+          "token_type": "cached_write",
+          "window": "5min",
+          "usd_per_token": 5e-6
+        },
+        {
+          "token_type": "input",
+          "window": "5h",
+          "usd_per_token": 5e-6
+        },
+        {
+          "token_type": "output",
+          "window": "5h",
+          "usd_per_token": 0.00003
+        },
+        {
+          "token_type": "cached_read",
+          "window": "5h",
+          "usd_per_token": 5e-7
+        },
+        {
+          "token_type": "cached_write",
+          "window": "5h",
+          "usd_per_token": 5e-6
+        }
+      ]
+    },
+    {
+      "model": "gpt-5-codex",
+      "provider": "openai",
+      "display_name": "GPT-5 Codex",
+      "prices": [
+        {
+          "token_type": "input",
+          "window": "5min",
+          "usd_per_token": 1.25e-6
+        },
+        {
+          "token_type": "output",
+          "window": "5min",
+          "usd_per_token": 0.00001
+        },
+        {
+          "token_type": "cached_read",
+          "window": "5min",
+          "usd_per_token": 1.25e-7
+        },
+        {
+          "token_type": "cached_write",
+          "window": "5min",
+          "usd_per_token": 1.25e-6
+        },
+        {
+          "token_type": "input",
+          "window": "5h",
+          "usd_per_token": 1.25e-6
+        },
+        {
+          "token_type": "output",
+          "window": "5h",
+          "usd_per_token": 0.00001
+        },
+        {
+          "token_type": "cached_read",
+          "window": "5h",
+          "usd_per_token": 1.25e-7
+        },
+        {
+          "token_type": "cached_write",
+          "window": "5h",
+          "usd_per_token": 1.25e-6
+        }
+      ]
+    }
+  ],
+  "harnesses": [
+    "claude-code",
+    "codex"
+  ],
+  "limit_types": [
+    "5h",
+    "weekly"
+  ],
+  "token_types": [
+    "input",
+    "output",
+    "cached_read",
+    "cached_write"
+  ],
+  "windows": [
+    "5min",
+    "5h"
+  ]
+}
