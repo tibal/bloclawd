@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 import { EmptyState } from "@/components/EmptyState";
+import { routeHead } from "@/lib/route-head";
 
 export const Route = createFileRoute("/methodology/changelog")({
   component: MethodologyChangelogPage,
+  head: () => routeHead("/methodology/changelog"),
 });
 
 function MethodologyChangelogPage() {

@@ -28,6 +28,7 @@ mode = "smart"
 [env.staging]
 name = "bloclawd-frontend-staging"
 workers_dev = false
+vars = { ENVIRONMENT = "staging" }
 
 [env.staging.assets]
 directory = "./dist/client"
@@ -52,6 +53,7 @@ custom_domain = true
 
 [env.production]
 name = "bloclawd-frontend"
+vars = { ENVIRONMENT = "production" }
 
 [env.production.assets]
 directory = "./dist/client"

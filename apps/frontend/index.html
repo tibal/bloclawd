@@ -2,11 +2,31 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>bloclawd</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b0d12" />
+    <meta name="author" content="bloclawd" />
+    <meta name="keywords" content="claude code, codex, rate limit, ai subscription, tokens, anthropic, openai, k-anonymity, open dataset" />
+
+    <!-- Per-route SEO (title, description, OG, Twitter, canonical, JSON-LD) is
+         injected by scripts/prerender.ts at build time, and kept synced
+         after client navigation by <HeadContent /> in __root.tsx. -->
+    <!-- @@seo-head@@ -->
+
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+
+    <link rel="dns-prefetch" href="https://github.com" />
+    <link rel="preconnect" href="https://github.com" crossorigin />
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      <!-- @@noscript@@ -->
+    </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

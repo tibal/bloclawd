@@ -12,12 +12,21 @@ interface EmptyStateProps {
 
 export function EmptyState({ heading, subhead }: EmptyStateProps) {
   return (
-    <Card className="mx-auto w-full max-w-2xl rounded-lg border-border bg-card">
-      <CardHeader className="gap-3">
+    <Card className="mx-auto w-full max-w-2xl rounded-lg border-border bg-card text-center">
+      <CardHeader className="items-center gap-3 py-12">
+        <img
+          alt=""
+          aria-hidden
+          className="empty-state-mark"
+          decoding="async"
+          height={56}
+          src="/logo.png"
+          width={56}
+        />
         <CardTitle className="text-xl font-semibold leading-tight">
           {heading}
         </CardTitle>
-        <CardDescription className="text-base leading-6">
+        <CardDescription className="max-w-md text-base leading-6">
           {subhead}
         </CardDescription>
       </CardHeader>

@@ -33,9 +33,16 @@ export function RouteShell({ children }: RouteShellProps) {
         <header className="nav-wrap">
           <nav aria-label="Primary" className="nav-pill">
             <div className="nav-brand-group">
-              <span aria-hidden className="nav-mark" />
-              <a className="nav-brand-link" href="/">
-                bloclawd
+              <a aria-label="bloclawd home" className="nav-brand-link" href="/">
+                <img
+                  alt=""
+                  className="nav-mark"
+                  decoding="async"
+                  height={26}
+                  src="/logo.png"
+                  width={26}
+                />
+                <span>bloclawd</span>
               </a>
               <span aria-hidden className="nav-brand-tag">public dataset</span>
             </div>
@@ -71,7 +78,18 @@ export function RouteShell({ children }: RouteShellProps) {
 
         <Separator />
         <footer className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-6 text-sm text-muted-foreground sm:px-6 lg:px-8">
-          <p>Anonymous. PoW-gated. Open data (CC BY 4.0).</p>
+          <div className="flex items-center gap-3">
+            <img
+              alt=""
+              aria-hidden
+              className="footer-mark"
+              decoding="async"
+              height={20}
+              src="/logo.png"
+              width={20}
+            />
+            <p>Anonymous. PoW-gated. Open data (CC BY 4.0).</p>
+          </div>
           <nav aria-label="Footer" className="flex flex-wrap items-center gap-2">
             {footerLinks.map((link, index) => (
               <span className="inline-flex items-center gap-2" key={link.href}>

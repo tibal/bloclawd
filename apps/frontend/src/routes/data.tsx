@@ -4,10 +4,12 @@ import { CodeBlock } from "@/components/CodeBlock";
 import { FieldAnnotation } from "@/components/FieldAnnotation";
 import sampleFixture from "@/__tests__/canonical-fixtures/cli-dryrun.json";
 import { canonicalize } from "@/lib/canonical";
+import { routeHead } from "@/lib/route-head";
 import type { EventPayload } from "@web/EventPayload";
 
 export const Route = createFileRoute("/data")({
   component: DataPage,
+  head: () => routeHead("/data"),
 });
 
 const samplePayload = (sampleFixture as { payload: EventPayload }).payload;

@@ -3,9 +3,11 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { routeHead } from "@/lib/route-head";
 
 export const Route = createFileRoute("/install")({
   component: InstallPage,
+  head: () => routeHead("/install"),
 });
 
 const TABS = [

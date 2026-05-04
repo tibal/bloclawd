@@ -20,6 +20,7 @@ import {
   type TierName,
 } from "@/lib/chart-tokens";
 import { formatTokens } from "@/lib/format";
+import { routeHead } from "@/lib/route-head";
 
 const MODEL_VALUES = [
   "claude-opus-4-7",
@@ -55,6 +56,7 @@ export type DashboardSearch = z.infer<typeof dashboardSearchSchema>;
 export const Route = createFileRoute("/dashboard")({
   validateSearch: (search) => dashboardSearchSchema.parse(search),
   component: DashboardPage,
+  head: () => routeHead("/dashboard"),
 });
 
 function DashboardPage() {

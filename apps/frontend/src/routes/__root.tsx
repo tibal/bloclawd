@@ -1,12 +1,15 @@
-import { Outlet, createRootRoute } from "@tanstack/react-router";
+import { HeadContent, Outlet, createRootRoute } from "@tanstack/react-router";
 
 import { RouteShell } from "@/components/RouteShell";
 
 function RootComponent() {
   return (
-    <RouteShell>
-      <Outlet />
-    </RouteShell>
+    <>
+      <HeadContent />
+      <RouteShell>
+        <Outlet />
+      </RouteShell>
+    </>
   );
 }
 

@@ -1,0 +1,219 @@
+/**
+ * Single source of truth for site-wide SEO metadata.
+ * Dependency-free so both browser code and the Node prerender script
+ * import from here.
+ */
+
+export const SITE_URL = "https://bloclawd.com" as const;
+export const SITE_NAME = "bloclawd" as const;
+export const SITE_TAGLINE =
+  "When do AI subscription users actually hit limits?" as const;
+export const SITE_DESCRIPTION =
+  "An anonymous, k-anonymized public dataset of Claude Code and Codex rate-limit events. Submit your own with one CLI command. No login, no telemetry, k ≥ 5." as const;
+export const SITE_KEYWORDS = [
+  "claude code",
+  "codex",
+  "rate limit",
+  "ai subscription",
+  "tokens",
+  "anthropic",
+  "openai",
+  "k-anonymity",
+  "open dataset",
+] as const;
+export const TWITTER_HANDLE = "@bloclawd" as const;
+export const OG_IMAGE_PATH = "/og-image.png" as const;
+export const OG_IMAGE_ALT = `${SITE_NAME} — ${SITE_TAGLINE}` as const;
+export const BRAND_BG_HEX = "#0b0d12" as const;
+
+export type RouteSeo = {
+  /** Path with leading slash, no trailing slash (except "/"). */
+  path: string;
+  /** Route-specific title (will be combined with site name in template). */
+  title: string;
+  /** 140–160 char meta description. */
+  description: string;
+  /** Optional JSON-LD payload (object — will be serialized). */
+  jsonLd?: object | object[];
+  /** Optional plain-text noscript fallback shown to non-JS bots. */
+  noscript?: string;
+  /** Whether to allow indexing (false → noindex). Defaults to true. */
+  index?: boolean;
+};
+
+const SITE_JSON_LD = [
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: SITE_NAME,
+    url: SITE_URL,
+    logo: `${SITE_URL}/logo.png`,
+    sameAs: ["https://github.com/bloclawd/bloclawd"],
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: SITE_NAME,
+    url: SITE_URL,
+    description: SITE_DESCRIPTION,
+    potentialAction: {
+      "@type": "SearchAction",
+      target: `${SITE_URL}/dashboard?model={search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
+  },
+] as const;
+
+export const ROUTES: RouteSeo[] = [
+  {
+    path: "/",
+    title: SITE_TAGLINE,
+    description: SITE_DESCRIPTION,
+    jsonLd: SITE_JSON_LD,
+    noscript:
+      "bloclawd is an anonymous, public timeline of Claude Code and Codex rate-limit hits. Submit your own with a single CLI command. No accounts, no telemetry, k-anonymized at n ≥ 5. Visit the dashboard to see live aggregates.",
+  },
+  {
+    path: "/dashboard",
+    title: "Dashboard · live tokens-to-limit aggregates",
+    description:
+      "Live percentile envelope of tokens consumed before Claude Code and Codex rate limits trigger. Filter by tier, harness, region, and model. K-anonymized at n ≥ 5.",
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "Dataset",
+      name: "bloclawd — AI subscription rate-limit dataset",
+      description:
+        "Community-sourced, k-anonymized aggregates of Claude Code and Codex rate-limit events: tokens consumed, harness, tier, region, and model. Updated daily.",
+      url: `${SITE_URL}/dashboard`,
+      keywords: SITE_KEYWORDS.join(", "),
+      license: "https://creativecommons.org/licenses/by/4.0/",
+      isAccessibleForFree: true,
+      creator: {
+        "@type": "Organization",
+        name: SITE_NAME,
+        url: SITE_URL,
+      },
+      distribution: [
+        {
+          "@type": "DataDownload",
+          encodingFormat: "application/json",
+          contentUrl: `${SITE_URL}/reports/v1/manifest.json`,
+        },
+      ],
+      variableMeasured: [
+        "tokens_to_limit_p10",
+        "tokens_to_limit_p25",
+        "tokens_to_limit_p50",
+        "tokens_to_limit_p75",
+        "tokens_to_limit_p90",
+      ],
+    },
+    noscript:
+      "Live dashboard of rate-limit aggregates from Claude Code and Codex. Pick a tier (pro / max5 / max20) to see the percentile envelope, or compare tiers side-by-side. Cells with fewer than five contributors are suppressed for anonymity.",
+  },
+  {
+    path: "/methodology",
+    title: "Methodology · how bloclawd computes what you see",
+    description:
+      "How bloclawd derives public aggregates from local CLI submissions: canonicalization, k-anonymity, log-scale binning, weighting, and the cron pipeline.",
+    noscript:
+      "How bloclawd computes what you see: canonicalization of submissions, proof-of-work admission control, k-anonymity at n ≥ 5, log-scale binning, weighting, and the daily aggregation pipeline.",
+  },
+  {
+    path: "/methodology/changelog",
+    title: "Methodology changelog",
+    description:
+      "Versioned record of changes to the bloclawd aggregation methodology, schema, and binning policy.",
+    noscript:
+      "Methodology changelog: versioned record of every change to the bloclawd aggregation methodology, schema, and binning policy.",
+  },
+  {
+    path: "/install",
+    title: "Install bloclawd · macOS & Linux",
+    description:
+      "Install the bloclawd CLI via curl, cargo, or Homebrew. One command after a 5-hour or weekly rate-limit hit submits a canonicalized, signed event.",
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      name: "bloclawd CLI",
+      operatingSystem: "macOS, Linux",
+      applicationCategory: "DeveloperApplication",
+      url: `${SITE_URL}/install`,
+      downloadUrl: `${SITE_URL}/install.sh`,
+      softwareVersion: "1.x",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+      author: { "@type": "Organization", name: SITE_NAME, url: SITE_URL },
+    },
+    noscript:
+      "Install the bloclawd CLI on macOS or Linux: curl -fsSL https://bloclawd.com/install.sh | sh — or cargo install bloclawd, or brew install bloclawd/tap/bloclawd. One command after you hit a rate limit submits a canonicalized, signed event.",
+  },
+  {
+    path: "/data",
+    title: "Data contract · what your CLI submits",
+    description:
+      "The exact wire payload bloclawd sends, before signing: fields, types, canonical ordering, redacted values, and the diff a dry-run shows.",
+    noscript:
+      "Data contract: the exact wire payload your CLI submits, the canonical ordering applied before signing, redacted fields, and the diff a dry-run shows you before any network call.",
+  },
+];
+
+export function buildPageTitle(routeTitle: string): string {
+  if (routeTitle === SITE_TAGLINE) {
+    return `${SITE_NAME} — ${SITE_TAGLINE}`;
+  }
+  return `${routeTitle} · ${SITE_NAME}`;
+}
+
+export function canonicalUrl(path: string): string {
+  return path === "/" ? `${SITE_URL}/` : `${SITE_URL}${path}`;
+}
+
+export type KnownPath = (typeof ROUTES)[number]["path"];
+
+export type MetaEntry =
+  | { kind: "title"; content: string }
+  | { kind: "name"; name: string; content: string }
+  | { kind: "property"; property: string; content: string }
+  | { kind: "link"; rel: string; href: string }
+  | { kind: "ld"; payload: object };
+
+export function composeMeta(route: RouteSeo): MetaEntry[] {
+  const title = buildPageTitle(route.title);
+  const canonical = canonicalUrl(route.path);
+  const ogImage = `${SITE_URL}${OG_IMAGE_PATH}`;
+  const robots =
+    route.index === false
+      ? "noindex, nofollow"
+      : "index, follow, max-image-preview:large, max-snippet:-1";
+
+  const entries: MetaEntry[] = [
+    { kind: "title", content: title },
+    { kind: "name", name: "description", content: route.description },
+    { kind: "name", name: "robots", content: robots },
+    { kind: "link", rel: "canonical", href: canonical },
+    { kind: "property", property: "og:type", content: "website" },
+    { kind: "property", property: "og:site_name", content: SITE_NAME },
+    { kind: "property", property: "og:title", content: title },
+    { kind: "property", property: "og:description", content: route.description },
+    { kind: "property", property: "og:url", content: canonical },
+    { kind: "property", property: "og:image", content: ogImage },
+    { kind: "property", property: "og:image:width", content: "1200" },
+    { kind: "property", property: "og:image:height", content: "630" },
+    { kind: "property", property: "og:image:alt", content: OG_IMAGE_ALT },
+    { kind: "property", property: "og:locale", content: "en_US" },
+    { kind: "name", name: "twitter:card", content: "summary_large_image" },
+    { kind: "name", name: "twitter:site", content: TWITTER_HANDLE },
+    { kind: "name", name: "twitter:creator", content: TWITTER_HANDLE },
+    { kind: "name", name: "twitter:title", content: title },
+    { kind: "name", name: "twitter:description", content: route.description },
+    { kind: "name", name: "twitter:image", content: ogImage },
+    { kind: "name", name: "twitter:image:alt", content: OG_IMAGE_ALT },
+  ];
+
+  if (route.jsonLd) {
+    const payloads = Array.isArray(route.jsonLd) ? route.jsonLd : [route.jsonLd];
+    for (const payload of payloads) entries.push({ kind: "ld", payload });
+  }
+
+  return entries;
+}
