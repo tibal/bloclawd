@@ -2,6 +2,8 @@ import { useCallback } from "react";
 import type { Harness } from "@web/Harness";
 import type { LimitType } from "@web/LimitType";
 import type { Model } from "@web/Model";
+import type { Plan } from "@web/Plan";
+import type { Provider } from "@web/Provider";
 import type { Region } from "@web/Region";
 import type { Tier } from "@web/Tier";
 
@@ -13,28 +15,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  cascade,
+  harnessOptions,
+  limitTypeOptions,
+  modelOptions,
+  planOptions,
+  providerOptions,
+  tierOptions,
+  type CatalogFilters,
+} from "@/lib/catalog";
 import { Route, type DashboardSearch } from "@/routes/dashboard";
 
 type SearchPatch = Partial<DashboardSearch>;
 type HarnessParam = DashboardSearch["harness"];
 type WindowParam = DashboardSearch["window"];
-type FilterOption = string | { value: string; label: string };
 
-const MODEL_OPTIONS = [
-  "claude-opus-4-7",
-  "claude-sonnet-4-6",
-  "claude-sonnet-4-5",
-  "claude-haiku-4-5",
-  "gpt-5",
-  "gpt-5.5",
-  "gpt-5-codex",
-] as const satisfies readonly Model[];
-
-const TIER_OPTIONS = ["pro", "max5", "max20"] as const satisfies readonly Tier[];
-const HARNESS_OPTIONS = [
-  { value: "claude-code", label: "claude-code" },
-  { value: "codex", label: "codex" },
-] as const satisfies readonly { value: HarnessParam; label: Harness }[];
 const REGION_OPTIONS = [
   "NA",
   "EU",
@@ -45,79 +41,132 @@ const REGION_OPTIONS = [
   "AN",
 ] as const satisfies readonly Region[];
 const WINDOW_OPTIONS = ["24h", "7d", "30d", "90d"] as const satisfies readonly WindowParam[];
-const LIMIT_TYPE_OPTIONS = ["5h", "weekly"] as const satisfies readonly LimitType[];
 
 export function Filters() {
   const search = Route.useSearch();
   const updateSearch = useDashboardSearchUpdater();
 
+  const filters: CatalogFilters = {
+    provider: search.provider as Provider | undefined,
+    plan: search.plan as Plan | undefined,
+    model: search.model,
+    tier: search.tier,
+    harness: harnessFromSearch(search.harness),
+    limit_type: search.limit_type,
+  };
+
+  const handleProviderChange = useCallback(
+    (value: string) => {
+      const next = cascade(filters, {
+        provider: optionalValue<Provider>(value),
+      });
+      updateSearch(searchPatchFor(next));
+    },
+    [filters, updateSearch],
+  );
+
+  const handlePlanChange = useCallback(
+    (value: string) => {
+      const next = cascade(filters, { plan: optionalValue<Plan>(value) });
+      updateSearch(searchPatchFor(next));
+    },
+    [filters, updateSearch],
+  );
+
   const handleModelChange = useCallback(
-    (value: string) =>
-      updateSearch({ model: optionalValue(value) as Model | undefined }),
-    [updateSearch],
+    (value: string) => {
+      const next = cascade(filters, { model: optionalValue<Model>(value) });
+      updateSearch(searchPatchFor(next));
+    },
+    [filters, updateSearch],
   );
+
   const handleTierChange = useCallback(
-    (value: string) =>
-      updateSearch({ tier: optionalValue(value) as Tier | undefined }),
-    [updateSearch],
+    (value: string) => {
+      const next = cascade(filters, { tier: optionalValue<Tier>(value) });
+      updateSearch(searchPatchFor(next));
+    },
+    [filters, updateSearch],
   );
+
   const handleHarnessChange = useCallback(
-    (value: string) => updateSearch({ harness: value as HarnessParam }),
-    [updateSearch],
+    (value: string) => {
+      const harness = value as Harness;
+      const next = cascade(filters, { harness });
+      updateSearch({ ...searchPatchFor(next), harness: harness as HarnessParam });
+    },
+    [filters, updateSearch],
   );
+
   const handleRegionChange = useCallback(
     (value: string) =>
-      updateSearch({ region: optionalValue(value) as Region | undefined }),
+      updateSearch({ region: optionalValue<Region>(value) }),
     [updateSearch],
   );
+
   const handleWindowChange = useCallback(
     (value: string) => updateSearch({ window: value as WindowParam }),
     [updateSearch],
   );
+
   const handleLimitTypeChange = useCallback(
     (value: string) => updateSearch({ limit_type: value as LimitType }),
     [updateSearch],
   );
 
   return (
-    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+    <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+      <FilterSelect
+        label="Provider"
+        onValueChange={handleProviderChange}
+        options={providerOptions()}
+        value={filters.provider ?? "all"}
+        withAll
+      />
+      <FilterSelect
+        label="Plan"
+        onValueChange={handlePlanChange}
+        options={planOptions(filters)}
+        value={filters.plan ?? "all"}
+        withAll
+      />
       <FilterSelect
         label="Model"
         onValueChange={handleModelChange}
-        options={MODEL_OPTIONS}
-        value={search.model ?? "all"}
+        options={modelOptions(filters)}
+        value={filters.model ?? "all"}
         withAll
       />
       <FilterSelect
         label="Tier"
         onValueChange={handleTierChange}
-        options={TIER_OPTIONS}
-        value={search.tier ?? "all"}
+        options={tierOptions()}
+        value={filters.tier ?? "all"}
         withAll
       />
       <FilterSelect
         label="Harness"
         onValueChange={handleHarnessChange}
-        options={HARNESS_OPTIONS}
-        value={search.harness}
+        options={harnessOptions(filters)}
+        value={filters.harness ?? "claude-code"}
       />
       <FilterSelect
         label="Region"
         onValueChange={handleRegionChange}
-        options={REGION_OPTIONS}
+        options={REGION_OPTIONS.map((r) => ({ value: r, label: r }))}
         value={search.region ?? "all"}
         withAll
       />
       <FilterSelect
         label="Window"
         onValueChange={handleWindowChange}
-        options={WINDOW_OPTIONS}
+        options={WINDOW_OPTIONS.map((w) => ({ value: w, label: w }))}
         value={search.window}
       />
       <FilterSelect
         label="Limit type"
         onValueChange={handleLimitTypeChange}
-        options={LIMIT_TYPE_OPTIONS}
+        options={limitTypeOptions(filters)}
         value={search.limit_type}
       />
     </div>
@@ -133,7 +182,7 @@ function FilterSelect({
 }: {
   label: string;
   onValueChange: (value: string) => void;
-  options: readonly FilterOption[];
+  options: readonly { value: string; label: string }[];
   value: string;
   withAll?: boolean;
 }) {
@@ -149,22 +198,14 @@ function FilterSelect({
         <SelectContent>
           {withAll ? <SelectItem value="all">all</SelectItem> : null}
           {options.map((option) => (
-            <SelectItem key={optionValue(option)} value={optionValue(option)}>
-              {optionLabel(option)}
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
     </div>
   );
-}
-
-function optionValue(option: FilterOption): string {
-  return typeof option === "string" ? option : option.value;
-}
-
-function optionLabel(option: FilterOption): string {
-  return typeof option === "string" ? option : option.label;
 }
 
 function useDashboardSearchUpdater() {
@@ -186,6 +227,20 @@ function normalizeSearch(search: DashboardSearch): DashboardSearch {
   ) as DashboardSearch;
 }
 
-function optionalValue(value: string): string | undefined {
-  return value === "all" ? undefined : value;
+function optionalValue<T extends string>(value: string): T | undefined {
+  return value === "all" ? undefined : (value as T);
+}
+
+function harnessFromSearch(value: HarnessParam): Harness {
+  return value === "claude-code" ? "claude-code" : "codex";
+}
+
+function searchPatchFor(filters: CatalogFilters): SearchPatch {
+  return {
+    provider: filters.provider,
+    plan: filters.plan,
+    model: filters.model,
+    tier: filters.tier,
+    limit_type: filters.limit_type,
+  };
 }

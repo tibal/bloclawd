@@ -87,7 +87,7 @@ describe("Filters", () => {
 
     try {
       expect(container.querySelector('[aria-label="Model"]')?.textContent).toContain(
-        "claude-opus-4-7",
+        "Claude Opus 4.7",
       );
       expect(container.querySelector('[aria-label="Tier"]')?.textContent).toContain(
         "max20",
