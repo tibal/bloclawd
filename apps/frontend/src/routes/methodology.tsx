@@ -1,8 +1,11 @@
 import { Outlet, createFileRoute, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
+import { routeHead } from "@/lib/route-head";
+
 export const Route = createFileRoute("/methodology")({
   component: MethodologyPage,
+  head: () => routeHead("/methodology"),
 });
 
 interface Section {

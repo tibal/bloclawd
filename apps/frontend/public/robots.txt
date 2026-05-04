@@ -1,0 +1,26 @@
+# bloclawd — production robots policy
+# https://bloclawd.com/
+
+User-agent: *
+Allow: /
+Disallow: /reports/v1/
+Disallow: /install.sh
+
+# AI scrapers — opt out of training corpora; allow live retrieval bots
+# (those that fetch on-demand for citation, not training).
+User-agent: GPTBot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+Sitemap: https://bloclawd.com/sitemap.xml

@@ -20,6 +20,7 @@
 export interface Env {
   ASSETS: Fetcher;
   BUCKET?: R2Bucket;
+  ENVIRONMENT?: "production" | "staging" | "development";
 }
 
 const REPORTS_PREFIX = "/reports/v1/";
@@ -37,12 +38,8 @@ export default {
 
     const response = await env.ASSETS.fetch(request);
 
-    // /install.sh: override Content-Type + Cache-Control per D-123.
-    // Cloudflare's default for `.sh` would be application/octet-stream
-    // or text/x-shellscript with default cache; D-123 demands
-    // text/plain so curl-pipe-sh users see the script source on
-    // GET-without-pipe, and 5-min cache so install.sh PR merges
-    // propagate to fresh installers within ~5 minutes.
+    // /install.sh: D-123 — text/plain so curl-pipe-sh users see source on
+    // GET-without-pipe; 5-min cache so install.sh PR merges propagate fast.
     if (url.pathname === "/install.sh") {
       const newResponse = new Response(response.body, response);
       newResponse.headers.set("Content-Type", "text/plain; charset=utf-8");
@@ -50,7 +47,17 @@ export default {
         "Cache-Control",
         "public, max-age=300, must-revalidate",
       );
+      newResponse.headers.set("X-Robots-Tag", "noindex");
       return newResponse;
+    }
+
+    // Any deploy that isn't production gets X-Robots-Tag: noindex so a
+    // leaked staging/preview URL can't poison search results. ENVIRONMENT
+    // is set per env in wrangler.toml ([env.production], [env.staging]).
+    if (env.ENVIRONMENT !== "production") {
+      const noindexed = new Response(response.body, response);
+      noindexed.headers.set("X-Robots-Tag", "noindex, nofollow");
+      return noindexed;
     }
 
     return response;
