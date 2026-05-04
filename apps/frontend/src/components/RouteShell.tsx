@@ -77,6 +77,8 @@ export function RouteShell({ children }: RouteShellProps) {
           {children}
         </main>
 
+        <SubmitCtaStrip pathname={pathname} />
+
         <Separator />
         <footer className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-6 text-sm text-muted-foreground sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
@@ -115,4 +117,36 @@ export function RouteShell({ children }: RouteShellProps) {
 function isActiveLink(pathname: string, href: string): boolean {
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(href + "/");
+}
+
+const SUBMIT_CTA_HIDDEN_PATHS = new Set(["/install"]);
+
+function SubmitCtaStrip({ pathname }: { pathname: string }) {
+  if (SUBMIT_CTA_HIDDEN_PATHS.has(pathname)) return null;
+
+  return (
+    <aside
+      aria-label="Contribute"
+      className="mx-auto w-full max-w-6xl px-4 pb-8 sm:px-6 lg:px-8"
+    >
+      <div className="surface-card flex flex-wrap items-center justify-between gap-4 p-5">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">
+            Bonked a 5-hour or weekly cap?
+          </p>
+          <p className="text-sm leading-6 text-muted-foreground">
+            One CLI command turns it into a public data point — anonymous,
+            PoW-gated, dry-run first.
+          </p>
+        </div>
+        <a
+          className="nav-cta whitespace-nowrap"
+          data-testid="submit-cta"
+          href="/install"
+        >
+          Submit yours →
+        </a>
+      </div>
+    </aside>
+  );
 }
