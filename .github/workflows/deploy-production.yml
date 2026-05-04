@@ -60,6 +60,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # wrangler 4.87+ requires Node >= 22; runner default is 20.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
       - name: Install Rust toolchain (rust-toolchain.toml drives version)
         run: rustup show
 
@@ -74,6 +79,15 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-wasm-
 
+      # worker-build@0.8.1 pulls time@0.3.47 (MSRV 1.88), but our pinned
+      # rust-toolchain.toml is 1.86. Pre-install worker-build with stable
+      # so wrangler.toml's [build] (which also calls cargo install) sees
+      # the binary already on PATH and short-circuits the compile.
+      - name: Install worker-build with stable Rust (sidesteps MSRV drift)
+        run: |
+          rustup toolchain install stable --profile minimal --no-self-update
+          cargo +stable install -q worker-build@0.8.1 --locked
+
       - name: Deploy worker (wrangler.toml [build] runs worker-build automatically)
         uses: cloudflare/wrangler-action@v3
         with:
@@ -81,8 +95,10 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/worker
           command: deploy --env production
-          wranglerVersion: '4.34.0'
-          packageManager: pnpm
+          wranglerVersion: '4.87.0'
+          # apps/worker has no package.json; default 'npm' is harmless and
+          # avoids requiring pnpm on PATH (which is set up only in the
+          # frontend job).
 
       - name: Health check (challenge endpoint)
         run: |
@@ -118,12 +134,18 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20.18.0
+          node-version: 22.x
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm --filter ./apps/frontend build
+      # @cloudflare/vite-plugin owns env selection: must be set at build
+      # time via CLOUDFLARE_ENV; passing --env to wrangler deploy is now
+      # rejected when a vite-redirected wrangler.json exists.
+      - name: Build frontend (CLOUDFLARE_ENV=production)
+        env:
+          CLOUDFLARE_ENV: production
+        run: pnpm --filter ./apps/frontend build
 
       - name: Verify build artifacts exist
         # install.sh is not asserted here: release.yml's update-install-sh
@@ -141,8 +163,10 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/frontend
-          command: deploy --env production
-          wranglerVersion: '4.34.0'
+          # No --env: vite plugin baked the env into the redirected
+          # wrangler.json at build time (CLOUDFLARE_ENV above).
+          command: deploy
+          wranglerVersion: '4.87.0'
           packageManager: pnpm
 
       - name: Health check (root + install.sh content-type)
