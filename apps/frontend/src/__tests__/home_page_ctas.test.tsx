@@ -22,6 +22,16 @@ vi.mock("@/lib/r2", async (importOriginal) => {
       isLoading: false,
       error: null,
     }),
+    useManifest: () => ({
+      data: {
+        schema_version: "v1",
+        last_updated_ts: new Date().toISOString(),
+        tiers: { q15: [], h1: [], d1: [] },
+      },
+      isLoading: false,
+      error: null,
+    }),
+    useBuckets: () => [],
   };
 });
 

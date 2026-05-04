@@ -1,10 +1,10 @@
-import type uPlot from "uplot";
+import type { Series as AlignedSeries } from "@/lib/chart-data";
 
 export type Point = { x: number; y: number };
 export type Series = ReadonlyArray<number | null | undefined>;
 
-export function asSeries(values: uPlot.AlignedData[number] | undefined): Series {
-  return (values ?? []) as Series;
+export function asSeries(values: AlignedSeries | undefined): Series {
+  return values ?? [];
 }
 
 export function pointsFor(

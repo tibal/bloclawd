@@ -1,5 +1,5 @@
-// Shared symbolic indices into uPlot.AlignedData rows so chart and dashboard
-// don't pass raw 1..5 magic numbers around.
+// Shared symbolic indices into the local AlignedData rows so chart and
+// dashboard don't pass raw 1..5 magic numbers around.
 export const PERCENTILE_INDEX = {
   p10: 1,
   p25: 2,

@@ -164,6 +164,10 @@ export function isR2NotFound(error: unknown): error is R2NotFoundError {
 }
 
 export async function fetchR2<T>(url: string): Promise<T> {
+  if (import.meta.env.DEV) {
+    const mocked = await mockFetch<T>(url);
+    if (mocked !== UNHANDLED) return mocked;
+  }
   return pool.run(async () => {
     const response = await fetch(url, {
       headers: { accept: "application/json" },
@@ -176,6 +180,16 @@ export async function fetchR2<T>(url: string): Promise<T> {
     }
     return (await response.json()) as T;
   });
+}
+
+const UNHANDLED = Symbol("r2-unhandled");
+
+async function mockFetch<T>(url: string): Promise<T | typeof UNHANDLED> {
+  const { isMockableUrl, mockResponseFor } = await import("@/lib/mock-r2");
+  if (!isMockableUrl(url)) return UNHANDLED;
+  const data = mockResponseFor(url);
+  if (data === null) throw new R2NotFoundError(url);
+  return data as T;
 }
 
 export function useManifest() {

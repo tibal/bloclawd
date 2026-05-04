@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, type ReactNode } from "react";
-import type uPlot from "uplot";
 import { z } from "zod";
 
 import { Chart } from "@/components/Chart";
@@ -15,16 +14,32 @@ import { BreakdownTable } from "@/components/BreakdownTable";
 import { TokenMixPanel } from "@/components/TokenMixPanel";
 import { CostEquivalentPanel } from "@/components/CostEquivalentPanel";
 import { Brush } from "@/components/Brush";
-import { mockLatestBucket, pickCell } from "@/lib/mock-cohort";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChartData, useDelayedLoading } from "@/lib/dashboard-data";
-import { isR2NotFound, useStatus, type StatusJson } from "@/lib/r2";
+import {
+  isR2NotFound,
+  useBucket,
+  useManifest,
+  useStatus,
+  type BucketCell,
+  type BucketEnvelope,
+  type StatusJson,
+} from "@/lib/r2";
 import {
   PERCENTILE_INDEX,
   TIER_COLOR_VAR,
   TIER_DASH,
   type TierName,
 } from "@/lib/chart-tokens";
+import {
+  EMPTY_ALIGNED_DATA,
+  alignedDataHasValues,
+  sliceByBrush,
+  sliceMetaByBrush,
+  type AlignedData,
+  type ChartMeta,
+  type Series,
+} from "@/lib/chart-data";
 import { formatTokens } from "@/lib/format";
 import { routeHead } from "@/lib/route-head";
 
@@ -51,7 +66,6 @@ const PLAN_VALUES = [
   "openai-pro",
 ] as const;
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
-const EMPTY_DATA: uPlot.AlignedData = [[], [], [], [], [], []];
 
 export const dashboardSearchSchema = z.object({
   model: z.enum(MODEL_VALUES).optional(),
@@ -83,8 +97,15 @@ export const Route = createFileRoute("/dashboard")({
 function DashboardPage() {
   const search = Route.useSearch();
   const status = useStatus();
-  const { data, compareData, loading, error, bucketsLoaded, bucketsTotal } =
-    useChartData(search);
+  const {
+    data,
+    compareData,
+    meta,
+    loading,
+    error,
+    bucketsLoaded,
+    bucketsTotal,
+  } = useChartData(search);
   const delayedLoading = useDelayedLoading(loading);
   const statusNotice = status.data ? statusNoticeFor(status.data) : null;
   const chartData = primaryChartData(data, compareData);
@@ -93,7 +114,22 @@ function DashboardPage() {
     : alignedDataHasValues(data);
   const bucketPartial =
     !loading && bucketsLoaded > 0 && bucketsLoaded < bucketsTotal;
-  const kpis = useMemo(() => computeKpis(chartData), [chartData]);
+  const brush = useMemo(
+    () => ({ start: search.brush_start, end: search.brush_end }),
+    [search.brush_start, search.brush_end],
+  );
+  const brushedData = useMemo(
+    () => sliceByBrush(chartData, brush),
+    [chartData, brush],
+  );
+  const brushedMeta = useMemo(
+    () => sliceMetaByBrush(meta ?? undefined, chartData[0]?.length ?? 0, brush),
+    [meta, chartData, brush],
+  );
+  const kpis = useMemo(
+    () => computeKpis(brushedData, brushedMeta),
+    [brushedData, brushedMeta],
+  );
   const compareModeProp = useMemo(
     () =>
       search.compare && compareData ? { tiers: compareData } : undefined,
@@ -164,12 +200,14 @@ function DashboardPage() {
 
         <div className="px-5 pb-5">
           <ChartArea
+            brush={brush}
             bucketPartial={bucketPartial}
             chartData={chartData}
             compareMode={compareModeProp}
             delayedLoading={delayedLoading}
             error={error}
             hasChartData={hasChartData}
+            meta={meta}
             search={search}
           />
         </div>
@@ -180,23 +218,28 @@ function DashboardPage() {
   );
 }
 
-// Sourced from mock cohort data in dev — the real backend has not shipped
-// representative_mix yet. Hoisted at module level so the deterministic
-// build doesn't run per render.
-const MOCK_BUCKET = import.meta.env.DEV ? mockLatestBucket() : null;
-
+// Cohort panels are pinned to the latest h1 bucket — they answer "what does
+// the typical user look like right now", not "what did this slice of the
+// timeline look like". The brush only shapes the chart and KPIs; cohort
+// composition stays globally current so panels still mean something when
+// the user zooms into a sparse window.
 function CohortPanels({ search }: { search: DashboardSearch }) {
-  if (!MOCK_BUCKET) return null;
+  const manifest = useManifest();
+  const latestPath = manifest.data?.tiers.h1.at(-1);
+  const bucketQuery = useBucket("h1", latestPath ?? "");
+  const bucket = latestPath ? bucketQuery.data : undefined;
 
   const cell = useMemo(
     () =>
-      pickCell(MOCK_BUCKET, {
-        tier: search.tier ?? "max20",
-        harness: search.harness,
-        region: search.region ?? "NA",
-        limit_type: search.limit_type,
-      }),
-    [search.tier, search.harness, search.region, search.limit_type],
+      bucket
+        ? pickCellFromBucket(bucket, {
+            tier: search.tier ?? "max20",
+            harness: search.harness,
+            region: search.region ?? "NA",
+            limit_type: search.limit_type,
+          })
+        : null,
+    [bucket, search.tier, search.harness, search.region, search.limit_type],
   );
   const filterCell = useMemo(
     () => ({
@@ -207,14 +250,14 @@ function CohortPanels({ search }: { search: DashboardSearch }) {
     [search.harness, search.limit_type, search.region],
   );
 
-  if (!cell) return null;
+  if (!bucket || !cell) return null;
 
   return (
     <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr]">
       <BreakdownTable cell={cell} primary={search.primary} />
       <TokenMixPanel cell={cell} primary={search.primary} />
       <CostEquivalentPanel
-        bucket={MOCK_BUCKET}
+        bucket={bucket}
         primary={search.primary}
         filterCell={filterCell}
       />
@@ -222,23 +265,45 @@ function CohortPanels({ search }: { search: DashboardSearch }) {
   );
 }
 
+function pickCellFromBucket(
+  bucket: BucketEnvelope,
+  match: Partial<Pick<BucketCell, "tier" | "harness" | "region" | "limit_type">>,
+): BucketCell | null {
+  return (
+    bucket.cells.find(
+      (cell) =>
+        (match.tier == null || cell.tier === match.tier) &&
+        (match.harness == null || cell.harness === match.harness) &&
+        (match.region == null || cell.region === match.region) &&
+        (match.limit_type == null || cell.limit_type === match.limit_type) &&
+        !cell.insufficient_data,
+    ) ??
+    bucket.cells.find((cell) => !cell.insufficient_data) ??
+    null
+  );
+}
+
 interface ChartAreaProps {
+  brush: { start: number; end: number };
   bucketPartial: boolean;
-  chartData: uPlot.AlignedData;
-  compareMode: { tiers: { tier: TierName; data: uPlot.AlignedData }[] } | undefined;
+  chartData: AlignedData;
+  compareMode: { tiers: { tier: TierName; data: AlignedData }[] } | undefined;
   delayedLoading: boolean;
   error: Error | null;
   hasChartData: boolean;
+  meta: ChartMeta | null;
   search: DashboardSearch;
 }
 
 function ChartArea({
+  brush,
   bucketPartial,
   chartData,
   compareMode,
   delayedLoading,
   error,
   hasChartData,
+  meta,
   search,
 }: ChartAreaProps): ReactNode {
   if (error) {
@@ -279,11 +344,6 @@ function ChartArea({
     );
   }
 
-  const brush = useMemo(
-    () => ({ start: search.brush_start, end: search.brush_end }),
-    [search.brush_start, search.brush_end],
-  );
-
   return (
     <div className="space-y-4">
       {bucketPartial ? (
@@ -305,6 +365,7 @@ function ChartArea({
         compareMode={compareMode}
         data={chartData}
         brush={brush}
+        meta={meta ?? undefined}
       />
 
       <Brush
@@ -473,7 +534,10 @@ interface ComputedKpis {
   driftPct: number | null;
 }
 
-function computeKpis(data: uPlot.AlignedData): ComputedKpis {
+function computeKpis(
+  data: AlignedData,
+  meta: ChartMeta | undefined,
+): ComputedKpis {
   const p10 = numericArray(data[PERCENTILE_INDEX.p10]);
   const p25 = numericArray(data[PERCENTILE_INDEX.p25]);
   const p50 = numericArray(data[PERCENTILE_INDEX.p50]);
@@ -486,13 +550,28 @@ function computeKpis(data: uPlot.AlignedData): ComputedKpis {
   const iqr = mean(p75.map((v, i) => v - (p25[i] ?? v)));
   const outerSpread = mean(p90.map((v, i) => v - (p10[i] ?? v)));
 
+  let submissionTotal = 0;
+  let submissionsKnown = false;
+  if (meta?.submissions) {
+    for (const v of meta.submissions) {
+      if (typeof v === "number" && Number.isFinite(v)) {
+        submissionTotal += v;
+        submissionsKnown = true;
+      }
+    }
+  }
+
   return {
     medianP50: median,
     peak,
     peakIdx: peakIdx === -1 ? 0 : peakIdx,
     iqr,
     outerSpread,
-    submissionsLabel: p50.length > 0 ? `${p50.length}` : "0",
+    submissionsLabel: submissionsKnown
+      ? submissionTotal.toLocaleString()
+      : p50.length > 0
+        ? `${p50.length}`
+        : "0",
     driftPct: computeDriftPct(p50),
   };
 }
@@ -516,7 +595,7 @@ export function formatDriftPct(value: number | null): string {
   return `${sign}${Math.abs(value).toFixed(1)}%`;
 }
 
-function numericArray(values: uPlot.AlignedData[number] | undefined): number[] {
+function numericArray(values: Series | undefined): number[] {
   if (!values) return [];
   const out: number[] = [];
   for (let i = 0; i < values.length; i++) {
@@ -571,9 +650,9 @@ function statusNoticeFor(
 }
 
 function primaryChartData(
-  data: uPlot.AlignedData | null,
-  compareData: { data: uPlot.AlignedData }[] | null,
-): uPlot.AlignedData {
+  data: AlignedData | null,
+  compareData: { data: AlignedData }[] | null,
+): AlignedData {
   if (data) {
     return data;
   }
@@ -582,27 +661,17 @@ function primaryChartData(
     compareData?.find(({ data: tierData }) => alignedDataHasValues(tierData))
       ?.data ??
     compareData?.[0]?.data ??
-    EMPTY_DATA
+    EMPTY_ALIGNED_DATA
   );
 }
 
 function compareDataHasValues(
-  compareData: { data: uPlot.AlignedData }[] | null,
+  compareData: { data: AlignedData }[] | null,
 ): boolean {
   return compareData?.some(({ data }) => alignedDataHasValues(data)) ?? false;
 }
 
-function alignedDataHasValues(data: uPlot.AlignedData | null): boolean {
-  if (!data) {
-    return false;
-  }
-
-  return Array.from(data[PERCENTILE_INDEX.p50] ?? []).some(
-    (value) => typeof value === "number" && Number.isFinite(value),
-  );
-}
-
-function alignedDataToRows(data: uPlot.AlignedData): DataTableRow[] {
+function alignedDataToRows(data: AlignedData): DataTableRow[] {
   const [xs, p10, p25, p50, p75, p90] = data;
 
   return Array.from(xs).map((ts, index) => ({

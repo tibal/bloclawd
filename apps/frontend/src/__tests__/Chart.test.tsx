@@ -1,11 +1,11 @@
-import type uPlot from "uplot";
 import { describe, expect, it } from "vitest";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
 import { Chart } from "@/components/Chart";
+import type { AlignedData } from "@/lib/chart-data";
 
-function sampleData(): uPlot.AlignedData {
+function sampleData(): AlignedData {
   const xs = Array.from({ length: 10 }, (_, idx) => 1_700_000_000 + idx * 60);
   return [
     xs,
