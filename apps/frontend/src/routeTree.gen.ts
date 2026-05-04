@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as MethodologyRouteImport } from './routes/methodology'
+import { Route as InstallRouteImport } from './routes/install'
 import { Route as DataRouteImport } from './routes/data'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as IndexRouteImport } from './routes/index'
@@ -18,6 +19,11 @@ import { Route as MethodologyChangelogRouteImport } from './routes/methodology.c
 const MethodologyRoute = MethodologyRouteImport.update({
   id: '/methodology',
   path: '/methodology',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InstallRoute = InstallRouteImport.update({
+  id: '/install',
+  path: '/install',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DataRoute = DataRouteImport.update({
@@ -45,6 +51,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/data': typeof DataRoute
+  '/install': typeof InstallRoute
   '/methodology': typeof MethodologyRouteWithChildren
   '/methodology/changelog': typeof MethodologyChangelogRoute
 }
@@ -52,6 +59,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/data': typeof DataRoute
+  '/install': typeof InstallRoute
   '/methodology': typeof MethodologyRouteWithChildren
   '/methodology/changelog': typeof MethodologyChangelogRoute
 }
@@ -60,6 +68,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/data': typeof DataRoute
+  '/install': typeof InstallRoute
   '/methodology': typeof MethodologyRouteWithChildren
   '/methodology/changelog': typeof MethodologyChangelogRoute
 }
@@ -69,15 +78,23 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/data'
+    | '/install'
     | '/methodology'
     | '/methodology/changelog'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/data' | '/methodology' | '/methodology/changelog'
+  to:
+    | '/'
+    | '/dashboard'
+    | '/data'
+    | '/install'
+    | '/methodology'
+    | '/methodology/changelog'
   id:
     | '__root__'
     | '/'
     | '/dashboard'
     | '/data'
+    | '/install'
     | '/methodology'
     | '/methodology/changelog'
   fileRoutesById: FileRoutesById
@@ -86,6 +103,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   DashboardRoute: typeof DashboardRoute
   DataRoute: typeof DataRoute
+  InstallRoute: typeof InstallRoute
   MethodologyRoute: typeof MethodologyRouteWithChildren
 }
 
@@ -96,6 +114,13 @@ declare module '@tanstack/react-router' {
       path: '/methodology'
       fullPath: '/methodology'
       preLoaderRoute: typeof MethodologyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/install': {
+      id: '/install'
+      path: '/install'
+      fullPath: '/install'
+      preLoaderRoute: typeof InstallRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/data': {
@@ -145,6 +170,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   DashboardRoute: DashboardRoute,
   DataRoute: DataRoute,
+  InstallRoute: InstallRoute,
   MethodologyRoute: MethodologyRouteWithChildren,
 }
 export const routeTree = rootRouteImport
