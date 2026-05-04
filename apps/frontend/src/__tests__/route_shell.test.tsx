@@ -11,7 +11,10 @@ import { describe, expect, it } from "vitest";
 
 import { RouteShell } from "@/components/RouteShell";
 
-async function renderInRouter(child: React.ReactNode) {
+async function renderInRouter(
+  child: React.ReactNode,
+  initialEntry: string = "/",
+) {
   const rootRoute = createRootRoute({
     component: () => <RouteShell>{child}</RouteShell>,
   });
@@ -20,9 +23,14 @@ async function renderInRouter(child: React.ReactNode) {
     path: "/",
     component: () => null,
   });
+  const installRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/install",
+    component: () => null,
+  });
   const router = createRouter({
-    history: createMemoryHistory({ initialEntries: ["/"] }),
-    routeTree: rootRoute.addChildren([indexRoute]),
+    history: createMemoryHistory({ initialEntries: [initialEntry] }),
+    routeTree: rootRoute.addChildren([indexRoute, installRoute]),
   });
 
   const container = document.createElement("div");
@@ -64,6 +72,38 @@ describe("RouteShell", () => {
         "Source",
         "License",
       ]);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("renders the submit-CTA strip on non-install routes", async () => {
+    const { container, cleanup } = await renderInRouter(<p>x</p>, "/");
+
+    try {
+      const cta = container.querySelector<HTMLAnchorElement>(
+        '[data-testid="submit-cta"]',
+      );
+
+      expect(cta?.textContent?.trim()).toBe("Submit yours →");
+      expect(cta?.getAttribute("href")).toBe("/install");
+      expect(container.textContent).toContain(
+        "Bonked a 5-hour or weekly cap?",
+      );
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("hides the submit-CTA strip on /install to avoid a self-link", async () => {
+    const { container, cleanup } = await renderInRouter(
+      <p>x</p>,
+      "/install",
+    );
+
+    try {
+      const cta = container.querySelector('[data-testid="submit-cta"]');
+      expect(cta).toBeNull();
     } finally {
       cleanup();
     }
