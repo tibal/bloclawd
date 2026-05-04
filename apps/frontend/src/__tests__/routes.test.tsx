@@ -63,6 +63,7 @@ describe("frontend routes", () => {
   it.each([
     ["/", "When do AI subscription users actually hit limits?"],
     ["/dashboard", "Pick a tier"],
+    ["/compare", "Pro vs Max5 vs Max20"],
     ["/methodology", "How bloclawd computes what you see"],
     ["/methodology/changelog", "Methodology changelog"],
     ["/data", "What your CLI submits"],

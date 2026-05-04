@@ -1,12 +1,10 @@
 # bloclawd
 
-Anonymous, user-triggered analytics for AI coding subscription limits.
+Live cohort percentiles for Claude Code and Codex rate limits — see where **Pro, Max5, and Max20** caps actually fire, how they **drift week to week**, and how your last bonked window compares to the cohort.
 
-The `bloclawd` CLI reads local Claude Code or Codex session logs after you hit a provider limit, builds an anonymous token-usage payload for a fixed time window, shows the exact event that would be sent, and only submits after explicit confirmation.
+The dashboard at <https://bloclawd.com> renders a percentile envelope (p10–p90) for every tier × harness × model combination, with daily aggregates over 24h / 7d / 30d / 90d windows. The dataset is contributed by users themselves: after you hit a 5-hour or weekly cap, the `bloclawd` CLI reads your local Claude Code or Codex session logs, builds a canonicalized payload for a fixed window, shows you the exact event that would be sent, and only submits after explicit confirmation.
 
-The aggregate dashboard at <https://bloclawd.com> renders 15-minute timeseries with spread bands so you can compare your experience to the wider community — broken down by model, subscription tier, harness, and coarse region. There are no accounts, no IP-based geolocation, no persistent device identifiers, and no per-event timestamps in the public dataset.
-
-For the full anonymity contract, see [THREAT-MODEL.md](./THREAT-MODEL.md).
+There are no accounts, no telemetry, no IP-based geolocation, no persistent device identifiers, and no per-event timestamps in the public dataset. Submission is gated by a local proof-of-work, not identity. Public cells require ≥ 5 distinct contributors. For the full anonymity contract, see [THREAT-MODEL.md](./THREAT-MODEL.md). For the wire format, see <https://bloclawd.com/data>. For the math, see <https://bloclawd.com/methodology>.
 
 ## Install
 

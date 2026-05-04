@@ -79,8 +79,9 @@ function HomePage() {
             className="flex flex-wrap items-center gap-2"
             variants={heroItem}
           >
-            <span className="tag dot">community-sourced</span>
-            <span className="tag">no telemetry · no accounts</span>
+            <span className="tag dot">cohort percentiles</span>
+            <span className="tag">drift over time</span>
+            <span className="tag">anonymous by construction</span>
           </m.div>
 
           <m.h1
@@ -96,10 +97,10 @@ function HomePage() {
             className="max-w-xl text-base leading-7 text-muted-foreground"
             variants={heroItem}
           >
-            An anonymous, public timeline of Claude Code &amp; Codex
-            rate-limit hits. Submit your own with one CLI command after you
-            bonk a 5-hour or weekly cap. No login, no tracking, k-anonymized
-            at <span className="font-mono text-foreground">n ≥ 5</span>.
+            See where Claude Code &amp; Codex limits actually fire — for
+            everyone, not just you. Compare your last bonked window to the
+            live cohort. Watch the envelope drift week to week. One CLI
+            command, anonymous by construction.
           </m.p>
 
           <m.div
@@ -107,7 +108,7 @@ function HomePage() {
             variants={heroItem}
           >
             <Button asChild className="whitespace-nowrap" size="lg">
-              <a href="/dashboard">Open dashboard</a>
+              <a href="/dashboard">See the cohort</a>
             </Button>
             <Button
               asChild
@@ -142,16 +143,16 @@ function HomePage() {
       <section className="grid gap-3 sm:grid-cols-3">
         {[
           {
-            t: "Loginless by design",
-            d: "No accounts, no fingerprinting, no IP-based geolocation. Submission is gated by a local proof-of-work, not identity.",
+            t: "See the cohort, not just yourself",
+            d: "Live p10–p90 envelope for every tier × harness × model. Find out whether your last 5-hour bonk is normal — or you're sitting in a tighter cohort than your tier-mates.",
           },
           {
-            t: "k-anonymized aggregates",
-            d: "Public cells require n ≥ 5. Token counts are binned. No public event IDs, no per-event timestamps.",
+            t: "Watch the line move",
+            d: "Daily aggregates over 24h / 7d / 30d / 90d. Limits tightening? Loosening? You'll see the envelope shift before any changelog admits it.",
           },
           {
-            t: "Auditable end-to-end",
-            d: "CLI, schema, worker and frontend are open source. The wire payload is canonicalized before signing — diffable in dry-run.",
+            t: "Catch silent A/B buckets",
+            d: "Compare Pro / Max5 / Max20 side-by-side. If one tier or region suddenly tightens vs another, the chart shows it — even when no one announces it.",
           },
         ].map((p, i) => (
           <m.article
@@ -169,6 +170,20 @@ function HomePage() {
             <p className="text-sm leading-6 text-muted-foreground">{p.d}</p>
           </m.article>
         ))}
+      </section>
+
+      <section
+        aria-label="Trust guarantees"
+        className="text-center text-xs leading-6 text-muted-foreground"
+      >
+        Anonymous by construction · k ≥ 5 · proof-of-work admission · open
+        source ·{" "}
+        <a
+          className="text-primary underline underline-offset-4"
+          href="/data"
+        >
+          see the wire bytes
+        </a>
       </section>
     </div>
   );
@@ -216,7 +231,7 @@ function KpiStrip() {
       value: kpiValue(isLoading, ready, `~${contributors}`, "w-20"),
       label: `contributors · ${data?.approximate_contributors_window_days ?? 30}d`,
     },
-    { value: "n ≥ 5", label: "k-anonymity floor" },
+    { value: "daily", label: "updates · 03:00 UTC" },
   ];
 
   return (
