@@ -125,19 +125,22 @@ jobs:
           echo "CF_ACCESS_CLIENT_SECRET length: ${#CF_ACCESS_CLIENT_SECRET}"
           echo "::endgroup::"
           for attempt in 1 2 3 4 5; do
-            body=$(mktemp)
-            code=$(curl -sS --max-time 10 -o "$body" -w '%{http_code}' \
+            body=$(mktemp); hdrs=$(mktemp)
+            code=$(curl -sS --max-time 10 -o "$body" -D "$hdrs" -w '%{http_code}' \
                 -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
                 -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
                 https://api-staging.bloclawd.com/challenge || echo "curl-err")
             if [ "$code" = "200" ] && jq -e '.challenge_id' "$body" >/dev/null 2>&1; then
               echo "Worker healthy on attempt $attempt"
-              rm -f "$body"
+              rm -f "$body" "$hdrs"
               exit 0
             fi
-            echo "Attempt $attempt: HTTP $code, body (first 200 bytes):"
-            head -c 200 "$body"; echo
-            rm -f "$body"
+            echo "Attempt $attempt: HTTP $code"
+            echo "--- response headers (CF + server) ---"
+            grep -iE "^(server|cf-|x-|content-type)" "$hdrs" || true
+            echo "--- body (first 400 bytes) ---"
+            head -c 400 "$body"; echo
+            rm -f "$body" "$hdrs"
             sleep 6
           done
           echo "::error::Worker failed health check after 5 attempts"
