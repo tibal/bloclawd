@@ -1,10 +1,14 @@
+import { useMemo } from "react";
 import type { TokenType } from "@web/TokenType";
 
 import {
   TOKEN_TYPE_COLOR,
   TOKEN_TYPE_LABEL,
+  TONE_GRADIENT,
+  TONE_VAR,
+  type Tone,
 } from "@/lib/model-catalog";
-import type { BucketCell, Percentiles } from "@/lib/r2";
+import { decodePercentiles, type BucketCell, type Percentiles } from "@/lib/r2";
 
 const TOKEN_TYPES: readonly TokenType[] = [
   "output",
@@ -19,25 +23,26 @@ interface TokenMixPanelProps {
 }
 
 export function TokenMixPanel({ cell, primary }: TokenMixPanelProps) {
-  const mix = cell.representative_mix ?? [];
-
-  // Aggregate share by token type across models. We surface the picked
-  // percentile as the headline number; p10–p90 spread shown as a track
-  // beneath each row.
-  const totals = TOKEN_TYPES.map((tt) => {
-    let p10 = 0, pPrimary = 0, p90 = 0;
-    for (const entry of mix) {
-      if (entry.token_type !== tt) continue;
-      const e = entry.share;
-      const pcts: Percentiles = "Mean" in e ? e.Mean : e.Bin;
-      p10 += pcts.p10;
-      pPrimary += pcts[primary];
-      p90 += pcts.p90;
-    }
-    return { tokenType: tt, p10, pPrimary, p90 };
-  });
-
-  const sumPrimary = Math.max(0.0001, totals.reduce((s, t) => s + t.pPrimary, 0));
+  const { totals, sumPrimary } = useMemo(() => {
+    const mix = cell.representative_mix ?? [];
+    const aggregated = TOKEN_TYPES.map((tt) => {
+      let p10 = 0, pPrimary = 0, p90 = 0;
+      for (const entry of mix) {
+        if (entry.token_type !== tt) continue;
+        const pcts = decodePercentiles(entry.share);
+        if (!pcts) continue;
+        p10 += pcts.p10;
+        pPrimary += pcts[primary];
+        p90 += pcts.p90;
+      }
+      return { tokenType: tt, p10, pPrimary, p90 };
+    });
+    const sum = Math.max(
+      0.0001,
+      aggregated.reduce((s, t) => s + t.pPrimary, 0),
+    );
+    return { totals: aggregated, sumPrimary: sum };
+  }, [cell, primary]);
 
   return (
     <div className="surface-card">
@@ -87,7 +92,7 @@ export function TokenMixPanel({ cell, primary }: TokenMixPanelProps) {
 function StackedBar({
   entries,
 }: {
-  entries: { color: keyof typeof TONE_GRADIENT; weight: number }[];
+  entries: { color: Tone; weight: number }[];
 }) {
   return (
     <div className="flex h-7 overflow-hidden rounded-md">
@@ -110,7 +115,7 @@ function SpreadTrack({
   lo: number;
   primary: number;
   hi: number;
-  tone: keyof typeof TONE_VAR;
+  tone: Tone;
 }) {
   const max = Math.max(hi, primary, 1);
   const pct = (n: number) => `${Math.min(100, (n / max) * 100)}%`;
@@ -132,25 +137,3 @@ function SpreadTrack({
     </div>
   );
 }
-
-const TONE_GRADIENT: Record<
-  "primary" | "teal" | "amber" | "violet" | "coral",
-  string
-> = {
-  primary: "linear-gradient(180deg, var(--brand), var(--brand-2))",
-  teal: "linear-gradient(180deg, oklch(0.78 0.14 175), oklch(0.62 0.14 175))",
-  amber: "linear-gradient(180deg, oklch(0.82 0.13 75), oklch(0.7 0.13 75))",
-  violet: "linear-gradient(180deg, oklch(0.72 0.18 295), oklch(0.6 0.18 295))",
-  coral: "linear-gradient(180deg, oklch(0.74 0.17 30), oklch(0.6 0.17 30))",
-};
-
-const TONE_VAR: Record<
-  "primary" | "teal" | "amber" | "violet" | "coral",
-  string
-> = {
-  primary: "var(--brand)",
-  teal: "var(--teal)",
-  amber: "var(--amber)",
-  violet: "var(--violet)",
-  coral: "var(--coral)",
-};

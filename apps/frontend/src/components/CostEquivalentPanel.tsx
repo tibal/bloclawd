@@ -1,30 +1,27 @@
 import type { Tier } from "@web/Tier";
 
-import { TIER_PRICE_USD } from "@/lib/model-catalog";
-import type { BucketCell, BucketEnvelope, Percentiles } from "@/lib/r2";
+import {
+  ANCHOR_USD_PER_TOKEN,
+  TIER_LABEL,
+  TIER_PRICE_USD,
+  WINDOWS_PER_MONTH,
+} from "@/lib/model-catalog";
+import {
+  decodePercentiles,
+  type BucketCell,
+  type BucketEnvelope,
+  type Percentiles,
+} from "@/lib/r2";
 
 interface CostEquivalentPanelProps {
   bucket: BucketEnvelope;
   primary: keyof Percentiles;
-  // Filters used to scope which cell variant we read from for each tier.
   filterCell: Pick<BucketCell, "harness" | "limit_type"> & {
     region?: string;
   };
 }
 
 const TIERS: readonly Tier[] = ["pro", "max5", "max20"];
-
-// Anchor model price (Opus 4.7 output). Used to convert anchor-token-equivalent
-// "unified cost" back into USD.
-const ANCHOR_USD_PER_TOKEN = 25e-6;
-
-// Each tier window count per month (5h windows = roughly 6/day x 30; weekly
-// limit = 4/month). The dollar figure shown is the per-window slice of the
-// monthly tier price.
-const WINDOWS_PER_MONTH: Record<"5h" | "weekly", number> = {
-  "5h": 30 * 24 / 5, // 144 windows/mo
-  weekly: 4,
-};
 
 export function CostEquivalentPanel({
   bucket,
@@ -43,12 +40,7 @@ export function CostEquivalentPanel({
         c.limit_type === filterCell.limit_type &&
         (filterCell.region == null || c.region === filterCell.region),
     );
-    const enc = cell?.unified_cost ?? null;
-    const pcts: Percentiles | null = enc
-      ? "Mean" in enc
-        ? enc.Mean
-        : enc.Bin
-      : null;
+    const pcts = decodePercentiles(cell?.unified_cost);
     const apiUsd = pcts ? pcts[primary] * ANCHOR_USD_PER_TOKEN : null;
     const subUsd = subscriptionPerWindow(tier);
     return {
@@ -78,7 +70,7 @@ export function CostEquivalentPanel({
         {rows.map((r) => (
           <div key={r.tier}>
             <div className="flex items-center justify-between text-[12.5px]">
-              <span className="text-foreground">{tierLabel(r.tier)}</span>
+              <span className="text-foreground">{TIER_LABEL[r.tier]}</span>
               <span className="font-mono tabular-nums text-foreground">
                 {r.apiUsd == null ? "—" : `$${r.apiUsd.toFixed(2)}`}
                 <span className="ml-2 text-muted-foreground text-[11px]">
@@ -118,10 +110,3 @@ export function CostEquivalentPanel({
   );
 }
 
-function tierLabel(tier: Tier): string {
-  return ({
-    pro: "Pro · $20/mo",
-    max5: "Max 5x · $100/mo",
-    max20: "Max 20x · $200/mo",
-  } as const)[tier];
-}

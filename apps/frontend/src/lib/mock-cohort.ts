@@ -1,11 +1,6 @@
-// Dev-only mock data generator. Produces BucketEnvelope[] shaped to the
-// real production schema (extended with representative_mix + per-token-type
-// breakdowns). Gate via `import.meta.env.DEV` at the call site.
-//
-// IMPORTANT — this file is not imported in production builds. It exists so
-// the dashboard's bottom panels (BreakdownTable, TokenMixPanel,
-// CostEquivalentPanel) have something to render before the backend ships
-// the real cohort aggregates.
+// Gate via `import.meta.env.DEV` at the call site — these aggregates do
+// not exist in production R2 yet, and the imports must tree-shake away
+// from the prod bundle.
 
 import type { Harness } from "@web/Harness";
 import type { LimitType } from "@web/LimitType";
@@ -19,6 +14,7 @@ import {
   OPENAI_MODELS,
   unifiedWeight,
 } from "@/lib/model-catalog";
+import { mulberry32 } from "@/lib/rng";
 import type {
   BucketCell,
   BucketEnvelope,
@@ -35,16 +31,6 @@ const TOKEN_TYPES: readonly TokenType[] = [
   "cached_read",
   "cached_write",
 ];
-
-function mulberry32(seed: number): () => number {
-  let s = seed >>> 0;
-  return () => {
-    s = (s + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(s ^ (s >>> 15), s | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
 
 function pcts(center: number, spread: number): Percentiles {
   return {
@@ -65,16 +51,14 @@ const TIERS: readonly Tier[] = ["pro", "max5", "max20"];
 const HARNESSES: readonly Harness[] = ["claude-code", "codex"];
 const LIMIT_TYPES: readonly LimitType[] = ["5h", "weekly"];
 
-// Tier-shape baselines (anchor tokens at limit, by tier).
 const TIER_BASELINE_TOKENS: Record<Tier, number> = {
   pro: 220_000,
   max5: 720_000,
   max20: 2_400_000,
 };
 
-// Cohort representative mix by harness — share is roughly the share of
-// total raw tokens spent on each (model, token_type). Sums to ~1.0 per
-// harness. Real backend would derive these from submissions.
+// Shares sum to ~1.0 per harness; real backend will derive these from
+// submissions but the mock intentionally matches that constraint.
 type MixSeed = { model: Model; tokenType: TokenType; share: number };
 
 const HARNESS_MIX: Record<Harness, readonly MixSeed[]> = {
@@ -219,7 +203,6 @@ function buildCells(seed: number): BucketCell[] {
   return cells;
 }
 
-// Single-bucket fixture used by panels that only need the latest snapshot.
 export function mockLatestBucket(seed = 11): BucketEnvelope {
   return {
     schema_version: "v1",
@@ -230,8 +213,6 @@ export function mockLatestBucket(seed = 11): BucketEnvelope {
   };
 }
 
-// Pick the first cell that matches the given predicate, falling back to the
-// first cell in the bucket.
 export function pickCell(
   bucket: BucketEnvelope,
   match: Partial<Pick<BucketCell, "tier" | "harness" | "region" | "limit_type">>,

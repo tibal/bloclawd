@@ -1,8 +1,8 @@
 import type { Model } from "@web/Model";
 
-import { MODEL_COLOR } from "@/lib/model-catalog";
+import { MODEL_COLOR, TONE_VAR, type Tone } from "@/lib/model-catalog";
 import { formatTokens } from "@/lib/format";
-import type { BucketCell, Percentiles } from "@/lib/r2";
+import { decodePercentiles, type BucketCell, type Percentiles } from "@/lib/r2";
 
 interface BreakdownTableProps {
   cell: BucketCell;
@@ -17,12 +17,7 @@ export function BreakdownTable({ cell, primary }: BreakdownTableProps) {
   const rows = [...cell.models]
     .sort((a, b) => b.n_with_model - a.n_with_model)
     .map((m) => {
-      const enc = m.tokens_to_limit_if_only;
-      const pcts: Percentiles | null = enc
-        ? "Mean" in enc
-          ? enc.Mean
-          : enc.Bin
-        : null;
+      const pcts = decodePercentiles(m.tokens_to_limit_if_only);
       return {
         model: m.model as Model,
         share: m.n_with_model / totalSubs,
@@ -81,19 +76,12 @@ export function BreakdownTable({ cell, primary }: BreakdownTableProps) {
   );
 }
 
-function ColorDot({ tone }: { tone: "primary" | "teal" | "amber" | "violet" | "coral" }) {
-  const map: Record<string, string> = {
-    primary: "var(--brand)",
-    teal: "var(--teal)",
-    amber: "var(--amber)",
-    violet: "var(--violet)",
-    coral: "var(--coral)",
-  };
+function ColorDot({ tone }: { tone: Tone }) {
   return (
     <span
       aria-hidden
       className="inline-block h-1.5 w-1.5 rounded-full"
-      style={{ background: map[tone] }}
+      style={{ background: TONE_VAR[tone] }}
     />
   );
 }

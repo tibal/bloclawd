@@ -9,7 +9,7 @@ import { DataTable, type DataTableRow } from "@/components/DataTable";
 import { EmptyState } from "@/components/EmptyState";
 import { EnvelopeToggle } from "@/components/EnvelopeToggle";
 import { Filters } from "@/components/Filters";
-import { PercentilePicker } from "@/components/PercentilePicker";
+import { neighborBand, PercentilePicker } from "@/components/PercentilePicker";
 import { TierToggle } from "@/components/TierToggle";
 import { BreakdownTable } from "@/components/BreakdownTable";
 import { TokenMixPanel } from "@/components/TokenMixPanel";
@@ -168,19 +168,33 @@ function DashboardPage() {
   );
 }
 
-// Bottom-row cohort panels: by-model breakdown, typical token mix, and the
-// cost-equivalent comparison. Sourced from mock cohort data in dev — the
-// real backend has not shipped representative_mix yet.
-function CohortPanels({ search }: { search: DashboardSearch }) {
-  if (!import.meta.env.DEV) return null;
+// Sourced from mock cohort data in dev — the real backend has not shipped
+// representative_mix yet. Hoisted at module level so the deterministic
+// build doesn't run per render.
+const MOCK_BUCKET = import.meta.env.DEV ? mockLatestBucket() : null;
 
-  const bucket = mockLatestBucket();
-  const cell = pickCell(bucket, {
-    tier: search.tier ?? "max20",
-    harness: search.harness,
-    region: search.region ?? "NA",
-    limit_type: search.limit_type,
-  });
+function CohortPanels({ search }: { search: DashboardSearch }) {
+  if (!MOCK_BUCKET) return null;
+
+  const cell = useMemo(
+    () =>
+      pickCell(MOCK_BUCKET, {
+        tier: search.tier ?? "max20",
+        harness: search.harness,
+        region: search.region ?? "NA",
+        limit_type: search.limit_type,
+      }),
+    [search.tier, search.harness, search.region, search.limit_type],
+  );
+  const filterCell = useMemo(
+    () => ({
+      harness: search.harness,
+      limit_type: search.limit_type,
+      region: search.region,
+    }),
+    [search.harness, search.limit_type, search.region],
+  );
+
   if (!cell) return null;
 
   return (
@@ -188,13 +202,9 @@ function CohortPanels({ search }: { search: DashboardSearch }) {
       <BreakdownTable cell={cell} primary={search.primary} />
       <TokenMixPanel cell={cell} primary={search.primary} />
       <CostEquivalentPanel
-        bucket={bucket}
+        bucket={MOCK_BUCKET}
         primary={search.primary}
-        filterCell={{
-          harness: search.harness,
-          limit_type: search.limit_type,
-          region: search.region,
-        }}
+        filterCell={filterCell}
       />
     </div>
   );
@@ -257,6 +267,11 @@ function ChartArea({
     );
   }
 
+  const brush = useMemo(
+    () => ({ start: search.brush_start, end: search.brush_end }),
+    [search.brush_start, search.brush_end],
+  );
+
   return (
     <div className="space-y-4">
       {bucketPartial ? (
@@ -277,7 +292,7 @@ function ChartArea({
         envelope={search.envelope}
         compareMode={compareMode}
         data={chartData}
-        brush={{ start: search.brush_start, end: search.brush_end }}
+        brush={brush}
       />
 
       <Brush
@@ -375,10 +390,7 @@ function ChartLegend({
     );
   }
 
-  const ORDER = ["p10", "p25", "p50", "p75", "p90"] as const;
-  const idx = ORDER.indexOf(primary);
-  const lo = ORDER[Math.max(0, idx - 1)];
-  const hi = ORDER[Math.min(ORDER.length - 1, idx + 1)];
+  const [lo, hi] = neighborBand(primary);
 
   return (
     <div className="flex flex-wrap items-center gap-4 text-[11.5px] text-muted-foreground">

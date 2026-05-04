@@ -92,15 +92,29 @@ export const TIER_PRICE_USD: Record<"pro" | "max5" | "max20", number> = {
   max20: 200,
 };
 
+export const TIER_LABEL: Record<"pro" | "max5" | "max20", string> = {
+  pro: "Pro · $20/mo",
+  max5: "Max 5x · $100/mo",
+  max20: "Max 20x · $200/mo",
+};
+
+// 5h ≈ 144 windows per 30d (24h / 5h × 30); weekly cap renews ~4×/mo.
+// Used to slice subscription monthly $ into per-window equivalents.
+export const WINDOWS_PER_MONTH: Record<"5h" | "weekly", number> = {
+  "5h": (30 * 24) / 5,
+  weekly: 4,
+};
+
 // Cross-provider unified-token bridge. We anchor at the flagship-output
 // token (Opus 4.7 output ≡ GPT-5.5 output ≡ 1 unified token). All other
 // (model, token_type) pairs are scaled by their USD price ratio against
 // the anchor. This produces a single-axis "unified cost" that compares
 // fairly across providers.
-const ANCHOR_PRICE_USD = PRICE_PER_TOKEN_USD["claude-opus-4-7"].output;
+export const ANCHOR_USD_PER_TOKEN =
+  PRICE_PER_TOKEN_USD["claude-opus-4-7"].output;
 
 export function unifiedWeight(model: Model, tokenType: TokenType): number {
-  return PRICE_PER_TOKEN_USD[model][tokenType] / ANCHOR_PRICE_USD;
+  return PRICE_PER_TOKEN_USD[model][tokenType] / ANCHOR_USD_PER_TOKEN;
 }
 
 // Display labels for the four token types.
@@ -111,20 +125,32 @@ export const TOKEN_TYPE_LABEL: Record<TokenType, string> = {
   cached_write: "Cache write",
 };
 
-// Stable color tag per token type — referenced by TokenMixPanel and the
-// breakdown table.
-export const TOKEN_TYPE_COLOR: Record<TokenType, "primary" | "teal" | "amber" | "violet" | "coral"> = {
+export type Tone = "primary" | "teal" | "amber" | "violet" | "coral";
+
+export const TONE_VAR: Record<Tone, string> = {
+  primary: "var(--brand)",
+  teal: "var(--teal)",
+  amber: "var(--amber)",
+  violet: "var(--violet)",
+  coral: "var(--coral)",
+};
+
+export const TONE_GRADIENT: Record<Tone, string> = {
+  primary: "linear-gradient(180deg, var(--brand), var(--brand-2))",
+  teal: "linear-gradient(180deg, oklch(0.78 0.14 175), oklch(0.62 0.14 175))",
+  amber: "linear-gradient(180deg, oklch(0.82 0.13 75), oklch(0.7 0.13 75))",
+  violet: "linear-gradient(180deg, oklch(0.72 0.18 295), oklch(0.6 0.18 295))",
+  coral: "linear-gradient(180deg, oklch(0.74 0.17 30), oklch(0.6 0.17 30))",
+};
+
+export const TOKEN_TYPE_COLOR: Record<TokenType, Tone> = {
   output: "amber",
   input: "teal",
   cached_read: "violet",
   cached_write: "coral",
 };
 
-// Stable color tag per model (for breakdown table dot).
-export const MODEL_COLOR: Record<
-  Model,
-  "primary" | "teal" | "amber" | "violet" | "coral"
-> = {
+export const MODEL_COLOR: Record<Model, Tone> = {
   "claude-opus-4-7": "violet",
   "claude-sonnet-4-6": "primary",
   "claude-sonnet-4-5": "primary",

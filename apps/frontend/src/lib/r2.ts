@@ -50,6 +50,13 @@ export type PercentileEncoding =
   | { Mean: Percentiles }
   | { Bin: Percentiles };
 
+export function decodePercentiles(
+  encoding: PercentileEncoding | null | undefined,
+): Percentiles | null {
+  if (!encoding) return null;
+  return "Mean" in encoding ? encoding.Mean : encoding.Bin;
+}
+
 // Re-exported from generated rust types (apps/web/src/generated/TokenType.ts).
 // SSOT: crates/event-schema/src/enums.rs.
 export type { TokenType } from "@web/TokenType";

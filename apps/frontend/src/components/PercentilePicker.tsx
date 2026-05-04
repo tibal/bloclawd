@@ -1,11 +1,13 @@
 import { useCallback } from "react";
 
+import { Segmented } from "@/components/ui/segmented";
 import type { Percentiles } from "@/lib/r2";
 import { Route } from "@/routes/dashboard";
 
 export type PercentileKey = keyof Percentiles;
 
 const ORDER: readonly PercentileKey[] = ["p10", "p25", "p50", "p75", "p90"];
+const OPTIONS = ORDER.map((p) => ({ value: p, label: p }));
 
 export function PercentilePicker() {
   const search = Route.useSearch();
@@ -13,41 +15,19 @@ export function PercentilePicker() {
 
   const onPick = useCallback(
     (next: PercentileKey) => {
-      void navigate({
-        search: (prev) => ({ ...prev, primary: next }),
-      });
+      void navigate({ search: (prev) => ({ ...prev, primary: next }) });
     },
     [navigate],
   );
 
   return (
-    <div
-      role="radiogroup"
-      aria-label="Pick the percentile to highlight"
-      className="inline-flex items-center gap-0.5 rounded-full border border-border bg-[var(--bg-1)] p-[3px]"
-    >
-      <span className="px-2 text-[11px] text-muted-foreground">Show</span>
-      {ORDER.map((p) => {
-        const active = search.primary === p;
-        return (
-          <button
-            key={p}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            onClick={() => onPick(p)}
-            className={
-              "rounded-full px-3 py-1 text-[12px] font-medium transition-colors " +
-              (active
-                ? "bg-[var(--surface)] text-foreground shadow-[0_0_0_1px_var(--line)_inset]"
-                : "text-muted-foreground hover:text-foreground")
-            }
-          >
-            {p}
-          </button>
-        );
-      })}
-    </div>
+    <Segmented
+      label="Show"
+      ariaLabel="Pick the percentile to highlight"
+      value={search.primary}
+      options={OPTIONS}
+      onChange={onPick}
+    />
   );
 }
 

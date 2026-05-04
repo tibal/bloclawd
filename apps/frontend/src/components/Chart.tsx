@@ -8,18 +8,23 @@ import {
   TIER_DASH,
   type TierName,
 } from "@/lib/chart-tokens";
+import {
+  asSeries,
+  bandPath,
+  pathFor,
+  pathFromPoints,
+  pointsFor,
+  type Point,
+  type Series,
+} from "@/lib/chart-geometry";
 import { neighborBand, type PercentileKey } from "@/components/PercentilePicker";
 
 export interface ChartProps {
   data: uPlot.AlignedData;
-  // Picked primary percentile — drawn as the headline line.
   primary?: PercentileKey;
-  // Envelope mode controls which secondary band is drawn behind the line.
   envelope?: "off" | "neighbors" | "wide";
   compareMode?: { tiers: Array<{ tier: TierName; data: uPlot.AlignedData }> };
   ariaLabel: string;
-  // Brush range, expressed as a fraction of the data length [0..1].
-  // When provided, only that slice of the timeline is visible.
   brush?: { start: number; end: number };
 }
 
@@ -29,13 +34,6 @@ const PAD_L = 56;
 const PAD_R = 24;
 const PAD_T = 18;
 const PAD_B = 36;
-
-type SeriesPoint = { x: number; y: number };
-type Series = ReadonlyArray<number | null | undefined>;
-
-function asSeries(values: uPlot.AlignedData[number] | undefined): Series {
-  return (values ?? []) as Series;
-}
 
 export function Chart({
   data,
@@ -62,8 +60,6 @@ export function Chart({
     return;
   }, []);
 
-  // Slice data by brush. `brush` is expressed as fractions of the original
-  // data length so the picker can survive resizes.
   const sliced = useMemo(() => sliceByBrush(data, brush), [data, brush]);
 
   const geometry = useMemo(
@@ -259,7 +255,7 @@ function sliceByBrush(
   const startIdx = Math.max(0, Math.floor(lo * (len - 1)));
   const endIdx = Math.min(len, Math.ceil(hi * (len - 1)) + 1);
   return data.map((row) =>
-    row ? Array.from(row).slice(startIdx, endIdx) : row,
+    row ? Array.prototype.slice.call(row, startIdx, endIdx) : row,
   ) as uPlot.AlignedData;
 }
 
@@ -323,7 +319,7 @@ interface ChartGeometry {
   neighborBandPath: string | null;
   outerBandPath: string | null;
   primaryPath: string | null;
-  primaryPoints: Array<SeriesPoint | null>;
+  primaryPoints: Array<Point | null>;
 }
 
 function buildGeometry({
@@ -418,84 +414,6 @@ function buildGeometry({
     primaryPath: pathFromPoints(primaryPoints),
     primaryPoints,
   };
-}
-
-function pointsFor(
-  xs: readonly number[],
-  ys: Series,
-  xAt: (idx: number) => number,
-  yAt: (value: number) => number,
-): Array<SeriesPoint | null> {
-  const out: Array<SeriesPoint | null> = [];
-  for (let idx = 0; idx < xs.length; idx++) {
-    const y = ys[idx];
-    if (typeof y !== "number" || !Number.isFinite(y)) {
-      out.push(null);
-    } else {
-      out.push({ x: xAt(idx), y: yAt(y) });
-    }
-  }
-  return out;
-}
-
-function pathFor(
-  xs: readonly number[],
-  ys: Series,
-  xAt: (idx: number) => number,
-  yAt: (value: number) => number,
-): string | null {
-  return pathFromPoints(pointsFor(xs, ys, xAt, yAt));
-}
-
-function pathFromPoints(points: Array<SeriesPoint | null>): string | null {
-  const segments: string[] = [];
-  let started = false;
-  for (const point of points) {
-    if (!point) {
-      started = false;
-      continue;
-    }
-    segments.push(
-      `${started ? "L" : "M"}${point.x.toFixed(2)},${point.y.toFixed(2)}`,
-    );
-    started = true;
-  }
-  return segments.length > 0 ? segments.join(" ") : null;
-}
-
-function bandPath(
-  xs: readonly number[],
-  topYs: Series,
-  bottomYs: Series,
-  xAt: (idx: number) => number,
-  yAt: (value: number) => number,
-): string | null {
-  const top = pointsFor(xs, topYs, xAt, yAt);
-  const bottom = pointsFor(xs, bottomYs, xAt, yAt);
-  const segments: string[] = [];
-  let runStart = -1;
-
-  for (let i = 0; i <= xs.length; i++) {
-    const valid = i < xs.length && top[i] && bottom[i];
-    if (valid && runStart === -1) runStart = i;
-    if ((!valid || i === xs.length) && runStart !== -1) {
-      const parts: string[] = [];
-      for (let j = runStart; j < i; j++) {
-        const p = top[j]!;
-        parts.push(
-          `${j === runStart ? "M" : "L"}${p.x.toFixed(2)},${p.y.toFixed(2)}`,
-        );
-      }
-      for (let j = i - 1; j >= runStart; j--) {
-        const p = bottom[j]!;
-        parts.push(`L${p.x.toFixed(2)},${p.y.toFixed(2)}`);
-      }
-      parts.push("Z");
-      segments.push(parts.join(" "));
-      runStart = -1;
-    }
-  }
-  return segments.length > 0 ? segments.join(" ") : null;
 }
 
 function numericAt(series: Series, index: number): number | null {

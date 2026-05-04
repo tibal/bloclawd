@@ -3,11 +3,11 @@ import type uPlot from "uplot";
 
 import type { DashboardSearch } from "@/routes/dashboard";
 import {
+  decodePercentiles,
   useBuckets,
   useManifest,
   type BucketCell,
   type BucketEnvelope,
-  type PercentileEncoding,
   type Percentiles,
 } from "@/lib/r2";
 import { pickTier, type Tier as BucketTier } from "@/lib/tier-picker";
@@ -237,20 +237,6 @@ function weightedAverage(
     p75: weighted("p75"),
     p90: weighted("p90"),
   };
-}
-
-function decodePercentiles(
-  encoding: PercentileEncoding | null | undefined,
-): Percentiles | null {
-  if (!encoding) {
-    return null;
-  }
-
-  if ("Mean" in encoding) {
-    return encoding.Mean;
-  }
-
-  return encoding.Bin;
 }
 
 function pathsForWindow(

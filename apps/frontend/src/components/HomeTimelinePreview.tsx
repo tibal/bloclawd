@@ -2,8 +2,8 @@ import { useMemo } from "react";
 import type uPlot from "uplot";
 
 import { Chart } from "@/components/Chart";
+import { mulberry32 } from "@/lib/rng";
 
-// 24h synthetic envelope used as a marketing preview on the home page.
 // Falls back to a procedural shape when the real status feed has nothing
 // to show — the home page does not block on R2 the way the dashboard does.
 function generateEnvelope({
@@ -37,16 +37,6 @@ function generateEnvelope({
     p90.push(center + spread * 0.85 * (0.85 + r() * 0.3));
   }
   return [xs, p10, p25, p50, p75, p90];
-}
-
-function mulberry32(seed: number): () => number {
-  let s = seed >>> 0;
-  return () => {
-    s = (s + 0x6d2b79f5) >>> 0;
-    let t = Math.imul(s ^ (s >>> 15), s | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 export function HomeTimelinePreview() {
