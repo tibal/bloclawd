@@ -82,7 +82,9 @@ jobs:
           workingDirectory: apps/worker
           command: deploy --env production
           wranglerVersion: '4.34.0'
-          packageManager: pnpm
+          # apps/worker has no package.json; default 'npm' is harmless and
+          # avoids requiring pnpm on PATH (which is set up only in the
+          # frontend job).
 
       - name: Health check (challenge endpoint)
         run: |
@@ -123,7 +125,13 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      - run: pnpm --filter ./apps/frontend build
+      # @cloudflare/vite-plugin owns env selection: must be set at build
+      # time via CLOUDFLARE_ENV; passing --env to wrangler deploy is now
+      # rejected when a vite-redirected wrangler.json exists.
+      - name: Build frontend (CLOUDFLARE_ENV=production)
+        env:
+          CLOUDFLARE_ENV: production
+        run: pnpm --filter ./apps/frontend build
 
       - name: Verify build artifacts exist
         # install.sh is not asserted here: release.yml's update-install-sh
@@ -141,7 +149,9 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/frontend
-          command: deploy --env production
+          # No --env: vite plugin baked the env into the redirected
+          # wrangler.json at build time (CLOUDFLARE_ENV above).
+          command: deploy
           wranglerVersion: '4.34.0'
           packageManager: pnpm
 
