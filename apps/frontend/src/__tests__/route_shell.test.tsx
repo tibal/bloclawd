@@ -1,17 +1,36 @@
+import {
+  RouterProvider,
+  createMemoryHistory,
+  createRootRoute,
+  createRoute,
+  createRouter,
+} from "@tanstack/react-router";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it } from "vitest";
 
 import { RouteShell } from "@/components/RouteShell";
 
-function render(element: React.ReactNode) {
+async function renderInRouter(child: React.ReactNode) {
+  const rootRoute = createRootRoute({
+    component: () => <RouteShell>{child}</RouteShell>,
+  });
+  const indexRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/",
+    component: () => null,
+  });
+  const router = createRouter({
+    history: createMemoryHistory({ initialEntries: ["/"] }),
+    routeTree: rootRoute.addChildren([indexRoute]),
+  });
+
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
-
-  flushSync(() => {
-    root.render(element);
-  });
+  flushSync(() => root.render(<RouterProvider router={router} />));
+  await router.load();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
   return {
     container,
@@ -23,12 +42,8 @@ function render(element: React.ReactNode) {
 }
 
 describe("RouteShell", () => {
-  it("renders the wordmark, children, and public-data footer", () => {
-    const { container, cleanup } = render(
-      <RouteShell>
-        <p>route child</p>
-      </RouteShell>,
-    );
+  it("renders the wordmark, children, and public-data footer", async () => {
+    const { container, cleanup } = await renderInRouter(<p>route child</p>);
 
     try {
       const wordmark = container.querySelector<HTMLAnchorElement>(

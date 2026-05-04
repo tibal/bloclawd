@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatInteger } from "@/lib/format";
 import { useStatus, type IngestHealth, type StatusJson } from "@/lib/r2";
 import { cn } from "@/lib/utils";
 
@@ -77,8 +78,3 @@ function relativeTime(timestamp: string): string {
   return `${Math.floor(minutes / 60)}h ago`;
 }
 
-function formatInteger(value: number): string {
-  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(
-    value,
-  );
-}

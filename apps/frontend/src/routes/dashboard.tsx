@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useMemo, type ReactNode } from "react";
 import type uPlot from "uplot";
 import { z } from "zod";
 
@@ -12,6 +13,13 @@ import { TierToggle } from "@/components/TierToggle";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useChartData, useDelayedLoading } from "@/lib/dashboard-data";
 import { isR2NotFound, useStatus, type StatusJson } from "@/lib/r2";
+import {
+  PERCENTILE_INDEX,
+  TIER_COLOR_VAR,
+  TIER_DASH,
+  type TierName,
+} from "@/lib/chart-tokens";
+import { formatTokens } from "@/lib/format";
 
 const MODEL_VALUES = [
   "claude-opus-4-7",
@@ -62,114 +70,372 @@ function DashboardPage() {
     : alignedDataHasValues(data);
   const bucketPartial =
     !loading && bucketsLoaded > 0 && bucketsLoaded < bucketsTotal;
+  const kpis = useMemo(() => computeKpis(chartData), [chartData]);
+  const compareModeProp = useMemo(
+    () =>
+      search.compare && compareData ? { tiers: compareData } : undefined,
+    [search.compare, compareData],
+  );
 
   return (
-    <main className="mx-auto w-full max-w-7xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-      <section className="space-y-2">
-        <Chrome />
-        {statusNotice?.kind === "degraded" ? (
-          <p className="text-sm text-warning">
-            Ingest degraded. Latest completed public data is still shown.
+    <section className="flex flex-col gap-6">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="tag dot">live · public dataset</span>
+            <span className="tag">v1</span>
+          </div>
+          <h1 className="text-3xl font-semibold leading-tight tracking-tight text-foreground sm:text-4xl">
+            Tokens to rate limit · {limitTypeLabel(search.limit_type)}
+          </h1>
+          <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+            Community-sourced rate-limit signal from Claude Code and Codex.
+            K-anonymized at n ≥ 5, binned, no per-event timestamps. Pick a
+            tier to see the percentile envelope or toggle compare mode for
+            side-by-side tiers.
           </p>
-        ) : null}
-      </section>
-
-      <header className="space-y-2">
-        <h1 className="text-3xl font-semibold leading-tight">
-          Tokens to rate limit · {limitTypeLabel(search.limit_type)}
-        </h1>
+          <Chrome />
+          {statusNotice?.kind === "degraded" ? (
+            <p className="text-sm text-warning">
+              Ingest degraded. Latest completed public data is still shown.
+            </p>
+          ) : null}
+        </div>
       </header>
 
-      <Filters />
+      <KpiRow kpis={kpis} hasData={hasChartData} />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <BandToggle />
-        <TierToggle />
+      <div className="surface-card overflow-hidden">
+        <div className="border-b border-border/60 px-5 py-4">
+          <Filters />
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+          <div>
+            <div className="text-sm font-medium text-foreground">
+              Token burn · {windowLabel(search.window)}
+            </div>
+            <div className="font-mono text-[11.5px] text-muted-foreground">
+              {resolutionLabel(search.window)} bins · k ≥ 5 cells only ·{" "}
+              {kpis.submissionsLabel} submissions
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <BandToggle />
+            <TierToggle />
+          </div>
+        </div>
+
+        {statusNotice?.kind === "stale" ? (
+          <div
+            className="mx-5 mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm"
+            role="alert"
+          >
+            <p className="font-semibold">Public data is stale</p>
+            <p className="text-muted-foreground">
+              Last update: {statusNotice.relative}.
+            </p>
+          </div>
+        ) : null}
+
+        <div className="px-5 pb-5">
+          <ChartArea
+            bucketPartial={bucketPartial}
+            chartData={chartData}
+            compareMode={compareModeProp}
+            delayedLoading={delayedLoading}
+            error={error}
+            hasChartData={hasChartData}
+            search={search}
+          />
+        </div>
       </div>
+    </section>
+  );
+}
 
-      {statusNotice?.kind === "stale" ? (
+interface ChartAreaProps {
+  bucketPartial: boolean;
+  chartData: uPlot.AlignedData;
+  compareMode: { tiers: { tier: TierName; data: uPlot.AlignedData }[] } | undefined;
+  delayedLoading: boolean;
+  error: Error | null;
+  hasChartData: boolean;
+  search: DashboardSearch;
+}
+
+function ChartArea({
+  bucketPartial,
+  chartData,
+  compareMode,
+  delayedLoading,
+  error,
+  hasChartData,
+  search,
+}: ChartAreaProps): ReactNode {
+  if (error) {
+    return isR2NotFound(error) ? (
+      <EmptyState
+        heading="No public data published yet"
+        subhead="The first daily aggregation runs at 03:00 UTC. Check the methodology page to see what will be published."
+      />
+    ) : (
+      <EmptyState
+        heading="We can't reach the public data right now"
+        subhead="data.bloclawd.com may be having a hiccup. Refresh in a minute, or check the methodology page for what to expect."
+      />
+    );
+  }
+
+  if (delayedLoading) {
+    return (
+      <Skeleton aria-label="Loading aggregates..." className="h-[360px] w-full" />
+    );
+  }
+
+  if (!search.tier && !search.compare) {
+    return (
+      <EmptyState
+        heading="Pick a tier"
+        subhead="Choose Pro / Max5 / Max20 above, or toggle Compare tiers to see all three."
+      />
+    );
+  }
+
+  if (!hasChartData) {
+    return (
+      <EmptyState
+        heading="Not enough data yet"
+        subhead="Every cell in this view has fewer than 5 contributors, so percentiles are suppressed for anonymity. Try widening the window or relaxing a filter - or check back after the next daily aggregation."
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {bucketPartial ? (
         <div
-          className="rounded-md border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm"
-          role="alert"
+          className="rounded-md border border-warning/40 bg-warning/10 px-4 py-3 text-sm"
+          role="status"
         >
-          <p className="font-semibold">Public data is stale</p>
+          <p className="font-semibold">One time slice didn't load</p>
           <p className="text-muted-foreground">
-            Last update: {statusNotice.relative}.
+            Refreshing usually fixes this. The rest of the chart is up to date.
           </p>
         </div>
       ) : null}
 
-      {error ? (
-        isR2NotFound(error) ? (
-          <EmptyState
-            heading="No public data published yet"
-            subhead="The first daily aggregation runs at 03:00 UTC. Check the methodology page to see what will be published."
-          />
-        ) : (
-          <EmptyState
-            heading="We can't reach the public data right now"
-            subhead="data.bloclawd.com may be having a hiccup. Refresh in a minute, or check the methodology page for what to expect."
-          />
-        )
-      ) : delayedLoading ? (
-        <Skeleton
-          aria-label="Loading aggregates..."
-          className="h-[360px] w-full"
-        />
-      ) : !search.tier && !search.compare ? (
-        <EmptyState
-          heading="Pick a tier"
-          subhead="Choose Pro / Max5 / Max20 above, or toggle Compare tiers to see all three."
-        />
-      ) : !hasChartData ? (
-        <EmptyState
-          heading="Not enough data yet"
-          subhead="Every cell in this view has fewer than 5 contributors, so percentiles are suppressed for anonymity. Try widening the window or relaxing a filter - or check back after the next daily aggregation."
-        />
-      ) : (
-        <section className="space-y-4">
-          {bucketPartial ? (
-            <div
-              className="rounded-md border border-warning/40 bg-warning/10 px-4 py-3 text-sm"
-              role="status"
-            >
-              <p className="font-semibold">One time slice didn't load</p>
-              <p className="text-muted-foreground">
-                Refreshing usually fixes this. The rest of the chart is up to date.
-              </p>
-            </div>
-          ) : null}
+      <Chart
+        ariaLabel={chartAriaLabel(search)}
+        bands={{ mode: search.bands }}
+        compareMode={compareMode}
+        data={chartData}
+      />
 
-          <div className="relative">
-            {statusNotice?.kind === "stale" ? (
-              <div className="absolute right-3 top-3 z-10 rounded-md border bg-background/90 px-3 py-1 text-sm text-muted-foreground shadow-sm">
-                Stale public data
-              </div>
-            ) : null}
-            <Chart
-              ariaLabel={chartAriaLabel(search)}
-              bands={{ mode: search.bands }}
-              compareMode={
-                search.compare && compareData
-                  ? { tiers: compareData }
-                  : undefined
-              }
-              data={chartData}
-            />
-          </div>
+      <ChartLegend mode={search.bands} compare={search.compare} />
 
+      <details className="group rounded-xl border border-border bg-[var(--bg-1)]/60">
+        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-[var(--bg-1)]">
+          Show percentile values per timestamp
+        </summary>
+        <div className="border-t border-border px-4 py-3">
           <DataTable
             ariaLabel="Percentile values per timestamp"
             rows={alignedDataToRows(chartData)}
           />
-        </section>
-      )}
-    </main>
+        </div>
+      </details>
+    </div>
   );
+}
+
+function KpiRow({ kpis, hasData }: { kpis: ComputedKpis; hasData: boolean }) {
+  const items = [
+    {
+      label: "Median p50",
+      value: hasData ? formatTokens(kpis.medianP50) : "—",
+      sub: hasData
+        ? `peak ${formatTokens(kpis.peak)} at slot ${kpis.peakIdx}`
+        : "no contributors",
+    },
+    {
+      label: "p25 — p75 spread",
+      value: hasData ? formatTokens(kpis.iqr) : "—",
+      sub: hasData ? "interquartile range" : "—",
+    },
+    {
+      label: "p10 — p90 spread",
+      value: hasData ? formatTokens(kpis.outerSpread) : "—",
+      sub: hasData ? "outer envelope" : "—",
+    },
+    {
+      label: "Submissions",
+      value: kpis.submissionsLabel,
+      sub: "k-anonymized · n ≥ 5",
+    },
+  ];
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {items.map((item) => (
+        <div key={item.label} className="surface-card px-5 py-4">
+          <div className="kpi-label">{item.label}</div>
+          <div className="kpi-value mt-1 text-2xl">{item.value}</div>
+          <div className="mt-1 font-mono text-[11px] text-muted-foreground">
+            {item.sub}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ChartLegend({
+  mode,
+  compare,
+}: {
+  mode: DashboardSearch["bands"];
+  compare: boolean;
+}) {
+  if (compare) {
+    return (
+      <div className="flex flex-wrap items-center gap-4 text-[11.5px] text-muted-foreground">
+        {(["pro", "max5", "max20"] as const).map((tier) => (
+          <LegendDot
+            color={TIER_COLOR_VAR[tier]}
+            dash={TIER_DASH[tier]?.join(" ")}
+            key={tier}
+            label={tier}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-4 text-[11.5px] text-muted-foreground">
+      <span className="inline-flex items-center gap-2">
+        <span
+          className="block h-[2px] w-4 rounded"
+          style={{ background: "var(--chart-1)" }}
+        />
+        p50 median
+      </span>
+      <span className="inline-flex items-center gap-2">
+        <span
+          className="block h-2 w-3.5 rounded-sm"
+          style={{ background: "color-mix(in oklch, var(--chart-1) 32%, transparent)" }}
+        />
+        p25 — p75
+      </span>
+      {mode === "p10-p90" ? (
+        <span className="inline-flex items-center gap-2">
+          <span
+            className="block h-2 w-3.5 rounded-sm"
+            style={{ background: "color-mix(in oklch, var(--chart-1) 14%, transparent)" }}
+          />
+          p10 — p90
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function LegendDot({
+  color,
+  dash,
+  label,
+}: {
+  color: string;
+  dash?: string;
+  label: string;
+}) {
+  return (
+    <span className="inline-flex items-center gap-2">
+      <svg height="6" width="22">
+        <line
+          stroke={color}
+          strokeDasharray={dash}
+          strokeLinecap="round"
+          strokeWidth="2"
+          x1="0"
+          x2="22"
+          y1="3"
+          y2="3"
+        />
+      </svg>
+      <span className="font-mono">{label}</span>
+    </span>
+  );
+}
+
+interface ComputedKpis {
+  medianP50: number;
+  peak: number;
+  peakIdx: number;
+  iqr: number;
+  outerSpread: number;
+  submissionsLabel: string;
+}
+
+function computeKpis(data: uPlot.AlignedData): ComputedKpis {
+  const p10 = numericArray(data[PERCENTILE_INDEX.p10]);
+  const p25 = numericArray(data[PERCENTILE_INDEX.p25]);
+  const p50 = numericArray(data[PERCENTILE_INDEX.p50]);
+  const p75 = numericArray(data[PERCENTILE_INDEX.p75]);
+  const p90 = numericArray(data[PERCENTILE_INDEX.p90]);
+
+  const median = mean(p50);
+  const peak = p50.length === 0 ? 0 : Math.max(...p50);
+  const peakIdx = p50.indexOf(peak);
+  const iqr = mean(p75.map((v, i) => v - (p25[i] ?? v)));
+  const outerSpread = mean(p90.map((v, i) => v - (p10[i] ?? v)));
+
+  return {
+    medianP50: median,
+    peak,
+    peakIdx: peakIdx === -1 ? 0 : peakIdx,
+    iqr,
+    outerSpread,
+    submissionsLabel: p50.length > 0 ? `${p50.length}` : "0",
+  };
+}
+
+function numericArray(values: uPlot.AlignedData[number] | undefined): number[] {
+  if (!values) return [];
+  const out: number[] = [];
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i];
+    if (typeof v === "number" && Number.isFinite(v)) out.push(v);
+  }
+  return out;
+}
+
+function mean(values: number[]): number {
+  if (values.length === 0) return 0;
+  return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
 export function limitTypeLabel(limitType: DashboardSearch["limit_type"]): string {
   return limitType === "5h" ? "5-hour limit" : "Weekly limit";
+}
+
+function windowLabel(window: DashboardSearch["window"]): string {
+  return ({
+    "24h": "last 24h",
+    "7d": "last 7d",
+    "30d": "last 30d",
+    "90d": "last 90d",
+  } as const)[window];
+}
+
+function resolutionLabel(window: DashboardSearch["window"]): string {
+  return ({
+    "24h": "15 min",
+    "7d": "1 hour",
+    "30d": "1 day",
+    "90d": "1 week",
+  } as const)[window];
 }
 
 function statusNoticeFor(
@@ -216,7 +482,7 @@ function alignedDataHasValues(data: uPlot.AlignedData | null): boolean {
     return false;
   }
 
-  return Array.from(data[3] ?? []).some(
+  return Array.from(data[PERCENTILE_INDEX.p50] ?? []).some(
     (value) => typeof value === "number" && Number.isFinite(value),
   );
 }
