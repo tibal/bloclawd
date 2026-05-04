@@ -8,12 +8,24 @@ import {
   TIER_DASH,
   type TierName,
 } from "@/lib/chart-tokens";
+import {
+  asSeries,
+  bandPath,
+  pathFor,
+  pathFromPoints,
+  pointsFor,
+  type Point,
+  type Series,
+} from "@/lib/chart-geometry";
+import { neighborBand, type PercentileKey } from "@/components/PercentilePicker";
 
 export interface ChartProps {
   data: uPlot.AlignedData;
-  bands: { mode: "p25-p75" | "p10-p90" };
+  primary?: PercentileKey;
+  envelope?: "off" | "neighbors" | "wide";
   compareMode?: { tiers: Array<{ tier: TierName; data: uPlot.AlignedData }> };
   ariaLabel: string;
+  brush?: { start: number; end: number };
 }
 
 const HEIGHT = 360;
@@ -23,14 +35,14 @@ const PAD_R = 24;
 const PAD_T = 18;
 const PAD_B = 36;
 
-type SeriesPoint = { x: number; y: number };
-type Series = ReadonlyArray<number | null | undefined>;
-
-function asSeries(values: uPlot.AlignedData[number] | undefined): Series {
-  return (values ?? []) as Series;
-}
-
-export function Chart({ data, bands, compareMode, ariaLabel }: ChartProps) {
+export function Chart({
+  data,
+  primary = "p50",
+  envelope = "neighbors",
+  compareMode,
+  ariaLabel,
+  brush,
+}: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(WIDTH_FALLBACK);
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
@@ -48,14 +60,16 @@ export function Chart({ data, bands, compareMode, ariaLabel }: ChartProps) {
     return;
   }, []);
 
+  const sliced = useMemo(() => sliceByBrush(data, brush), [data, brush]);
+
   const geometry = useMemo(
-    () => buildGeometry({ data, compareMode, width }),
-    [data, compareMode, width],
+    () => buildGeometry({ data: sliced, compareMode, width, primary }),
+    [sliced, compareMode, width, primary],
   );
 
   const innerWidth = Math.max(0, width - PAD_L - PAD_R);
   const innerHeight = Math.max(0, HEIGHT - PAD_T - PAD_B);
-  const xs = asSeries(data[0]);
+  const xs = asSeries(sliced[0]);
 
   const onPointerMove = (event: React.PointerEvent<SVGRectElement>) => {
     if (!xs.length) return;
@@ -67,6 +81,8 @@ export function Chart({ data, bands, compareMode, ariaLabel }: ChartProps) {
     const next = Math.round(fraction * (xs.length - 1));
     setHoverIndex((prev) => (prev === next ? prev : next));
   };
+
+  const [bandLo, bandHi] = neighborBand(primary);
 
   return (
     <div
@@ -160,24 +176,24 @@ export function Chart({ data, bands, compareMode, ariaLabel }: ChartProps) {
           })
         ) : (
           <>
-            {bands.mode === "p10-p90" && geometry.outerBandPath ? (
+            {envelope === "wide" && geometry.outerBandPath ? (
               <path
                 d={geometry.outerBandPath}
                 data-band="p10-p90"
                 fill="url(#bloclawd-band-outer)"
               />
             ) : null}
-            {geometry.innerBandPath ? (
+            {envelope === "neighbors" && geometry.neighborBandPath ? (
               <path
-                d={geometry.innerBandPath}
-                data-band="p25-p75"
+                d={geometry.neighborBandPath}
+                data-band={`${bandLo}-${bandHi}`}
                 fill="url(#bloclawd-band-inner)"
               />
             ) : null}
-            {geometry.medianPath ? (
+            {geometry.primaryPath ? (
               <path
-                d={geometry.medianPath}
-                data-series="p50"
+                d={geometry.primaryPath}
+                data-series={primary}
                 fill="none"
                 filter="url(#bloclawd-line-glow)"
                 stroke="var(--chart-1)"
@@ -188,7 +204,7 @@ export function Chart({ data, bands, compareMode, ariaLabel }: ChartProps) {
           </>
         )}
 
-        {hoverIndex != null && geometry.medianPoints[hoverIndex] ? (
+        {hoverIndex != null && geometry.primaryPoints[hoverIndex] ? (
           <g>
             <line
               stroke="var(--chart-crosshair)"
@@ -201,7 +217,7 @@ export function Chart({ data, bands, compareMode, ariaLabel }: ChartProps) {
             />
             <circle
               cx={geometry.xAt(hoverIndex)}
-              cy={geometry.medianPoints[hoverIndex]!.y}
+              cy={geometry.primaryPoints[hoverIndex]!.y}
               fill="var(--bg)"
               r="4"
               stroke="var(--chart-1)"
@@ -221,17 +237,36 @@ export function Chart({ data, bands, compareMode, ariaLabel }: ChartProps) {
         />
       </svg>
 
-      <HoverTooltip data={data} hoverIndex={hoverIndex} />
+      <HoverTooltip data={sliced} hoverIndex={hoverIndex} primary={primary} />
     </div>
   );
+}
+
+function sliceByBrush(
+  data: uPlot.AlignedData,
+  brush?: { start: number; end: number },
+): uPlot.AlignedData {
+  const xs = data[0] as readonly number[] | undefined;
+  if (!brush || !xs || xs.length === 0) return data;
+  const len = xs.length;
+  const lo = Math.max(0, Math.min(1, brush.start));
+  const hi = Math.max(0, Math.min(1, brush.end));
+  if (hi - lo > 0.999) return data;
+  const startIdx = Math.max(0, Math.floor(lo * (len - 1)));
+  const endIdx = Math.min(len, Math.ceil(hi * (len - 1)) + 1);
+  return data.map((row) =>
+    row ? Array.prototype.slice.call(row, startIdx, endIdx) : row,
+  ) as uPlot.AlignedData;
 }
 
 function HoverTooltip({
   data,
   hoverIndex,
+  primary,
 }: {
   data: uPlot.AlignedData;
   hoverIndex: number | null;
+  primary: PercentileKey;
 }) {
   if (hoverIndex == null) return null;
   const ts = asSeries(data[0])[hoverIndex];
@@ -253,7 +288,7 @@ function HoverTooltip({
           <div key={key} className="contents">
             <span
               className={
-                key === "p50"
+                key === primary
                   ? "font-semibold text-primary"
                   : "text-muted-foreground"
               }
@@ -262,7 +297,7 @@ function HoverTooltip({
             </span>
             <span
               className={
-                key === "p50"
+                key === primary
                   ? "text-right font-mono font-semibold text-foreground tabular-nums"
                   : "text-right font-mono text-foreground/80 tabular-nums"
               }
@@ -281,20 +316,22 @@ interface ChartGeometry {
   yAt: (value: number) => number;
   yTicks: Array<{ value: number; y: number }>;
   xTicks: Array<{ x: number; label: string }>;
-  innerBandPath: string | null;
+  neighborBandPath: string | null;
   outerBandPath: string | null;
-  medianPath: string | null;
-  medianPoints: Array<SeriesPoint | null>;
+  primaryPath: string | null;
+  primaryPoints: Array<Point | null>;
 }
 
 function buildGeometry({
   data,
   compareMode,
   width,
+  primary,
 }: {
   data: uPlot.AlignedData;
   compareMode: ChartProps["compareMode"];
   width: number;
+  primary: PercentileKey;
 }): ChartGeometry {
   const xs = asSeries(data[0]) as readonly number[];
   const innerWidth = Math.max(0, width - PAD_L - PAD_R);
@@ -345,16 +382,17 @@ function buildGeometry({
     };
   });
 
-  const medianPoints = pointsFor(
+  const primaryPoints = pointsFor(
     xs,
-    asSeries(data[PERCENTILE_INDEX.p50]),
+    asSeries(data[PERCENTILE_INDEX[primary]]),
     xAt,
     yAt,
   );
-  const innerBandPath = bandPath(
+  const [neighborLo, neighborHi] = neighborBand(primary);
+  const neighborBandPath = bandPath(
     xs,
-    asSeries(data[PERCENTILE_INDEX.p25]),
-    asSeries(data[PERCENTILE_INDEX.p75]),
+    asSeries(data[PERCENTILE_INDEX[neighborLo]]),
+    asSeries(data[PERCENTILE_INDEX[neighborHi]]),
     xAt,
     yAt,
   );
@@ -371,89 +409,11 @@ function buildGeometry({
     yAt,
     yTicks,
     xTicks,
-    innerBandPath,
+    neighborBandPath,
     outerBandPath,
-    medianPath: pathFromPoints(medianPoints),
-    medianPoints,
+    primaryPath: pathFromPoints(primaryPoints),
+    primaryPoints,
   };
-}
-
-function pointsFor(
-  xs: readonly number[],
-  ys: Series,
-  xAt: (idx: number) => number,
-  yAt: (value: number) => number,
-): Array<SeriesPoint | null> {
-  const out: Array<SeriesPoint | null> = [];
-  for (let idx = 0; idx < xs.length; idx++) {
-    const y = ys[idx];
-    if (typeof y !== "number" || !Number.isFinite(y)) {
-      out.push(null);
-    } else {
-      out.push({ x: xAt(idx), y: yAt(y) });
-    }
-  }
-  return out;
-}
-
-function pathFor(
-  xs: readonly number[],
-  ys: Series,
-  xAt: (idx: number) => number,
-  yAt: (value: number) => number,
-): string | null {
-  return pathFromPoints(pointsFor(xs, ys, xAt, yAt));
-}
-
-function pathFromPoints(points: Array<SeriesPoint | null>): string | null {
-  const segments: string[] = [];
-  let started = false;
-  for (const point of points) {
-    if (!point) {
-      started = false;
-      continue;
-    }
-    segments.push(
-      `${started ? "L" : "M"}${point.x.toFixed(2)},${point.y.toFixed(2)}`,
-    );
-    started = true;
-  }
-  return segments.length > 0 ? segments.join(" ") : null;
-}
-
-function bandPath(
-  xs: readonly number[],
-  topYs: Series,
-  bottomYs: Series,
-  xAt: (idx: number) => number,
-  yAt: (value: number) => number,
-): string | null {
-  const top = pointsFor(xs, topYs, xAt, yAt);
-  const bottom = pointsFor(xs, bottomYs, xAt, yAt);
-  const segments: string[] = [];
-  let runStart = -1;
-
-  for (let i = 0; i <= xs.length; i++) {
-    const valid = i < xs.length && top[i] && bottom[i];
-    if (valid && runStart === -1) runStart = i;
-    if ((!valid || i === xs.length) && runStart !== -1) {
-      const parts: string[] = [];
-      for (let j = runStart; j < i; j++) {
-        const p = top[j]!;
-        parts.push(
-          `${j === runStart ? "M" : "L"}${p.x.toFixed(2)},${p.y.toFixed(2)}`,
-        );
-      }
-      for (let j = i - 1; j >= runStart; j--) {
-        const p = bottom[j]!;
-        parts.push(`L${p.x.toFixed(2)},${p.y.toFixed(2)}`);
-      }
-      parts.push("Z");
-      segments.push(parts.join(" "));
-      runStart = -1;
-    }
-  }
-  return segments.length > 0 ? segments.join(" ") : null;
 }
 
 function numericAt(series: Series, index: number): number | null {

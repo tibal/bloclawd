@@ -41,7 +41,7 @@ describe("dashboard end-to-end with mocked R2 cache", () => {
     vi.spyOn(Date, "now").mockReturnValue(NOW);
     const queryClient = queryClientWithR2Data();
     const { container, cleanup } = await renderDashboard(
-      "/dashboard?tier=max20&harness=cc&region=EU&limit_type=5h&window=7d&bands=p25-p75&compare=false",
+      "/dashboard?tier=max20&harness=cc&region=EU&limit_type=5h&window=7d&primary=p50&envelope=neighbors&brush_start=0&brush_end=1&compare=false",
       queryClient,
     );
 

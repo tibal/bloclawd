@@ -79,7 +79,10 @@ function ComparePage() {
       harness: "claude-code",
       limit_type: search.limit_type,
       window: search.window,
-      bands: "p25-p75",
+      primary: "p50",
+      envelope: "neighbors",
+      brush_start: 0,
+      brush_end: 1,
       compare: true,
     }),
     [search.limit_type, search.window],
@@ -190,7 +193,7 @@ function ComparePage() {
           ) : (
             <Chart
               ariaLabel="Compare Pro, Max5, and Max20 percentile envelopes"
-              bands={{ mode: "p25-p75" }}
+              envelope="neighbors"
               compareMode={compareModeProp}
               data={fallbackChartData}
             />

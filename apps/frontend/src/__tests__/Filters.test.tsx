@@ -10,7 +10,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
-import { BandToggle } from "@/components/BandToggle";
+import { EnvelopeToggle } from "@/components/EnvelopeToggle";
+import { PercentilePicker } from "@/components/PercentilePicker";
 import { Filters } from "@/components/Filters";
 import { TierToggle } from "@/components/TierToggle";
 import { Route as DashboardRouteImport } from "@/routes/dashboard";
@@ -126,34 +127,40 @@ describe("Filters", () => {
     }
   });
 
-  it("round-trips band and tier compare toggles through URL search", async () => {
+  it("round-trips percentile picker, envelope toggle, and tier compare through URL search", async () => {
     const { container, router, cleanup } = await renderDashboard(
       <>
-        <BandToggle />
+        <PercentilePicker />
+        <EnvelopeToggle />
         <TierToggle />
       </>,
-      "/dashboard?bands=p25-p75&compare=false",
+      "/dashboard?primary=p50&envelope=neighbors&compare=false",
     );
 
     try {
-      expect(container.textContent).toContain("Show p25 / p75");
-      expect(container.textContent).toContain("Compare tiers");
-
-      const bandButton = Array.from(container.querySelectorAll("button")).find(
-        (button) => button.textContent?.includes("Show p25 / p75"),
+      // pick p25 line
+      const p25Button = Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent?.trim() === "p25",
+      );
+      // switch to wide envelope
+      const wideButton = Array.from(container.querySelectorAll("button")).find(
+        (button) => button.textContent?.includes("p10–p90"),
       );
       const tierButton = Array.from(container.querySelectorAll("button")).find(
         (button) => button.textContent?.includes("Compare tiers"),
       );
 
-      expect(bandButton).not.toBeUndefined();
+      expect(p25Button).not.toBeUndefined();
+      expect(wideButton).not.toBeUndefined();
       expect(tierButton).not.toBeUndefined();
-      click(bandButton!);
+      click(p25Button!);
+      click(wideButton!);
       click(tierButton!);
       await settle();
 
       expect(router.state.location.search).toMatchObject({
-        bands: "p10-p90",
+        primary: "p25",
+        envelope: "wide",
         compare: true,
       });
     } finally {
