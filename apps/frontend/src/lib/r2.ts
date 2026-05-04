@@ -1,11 +1,16 @@
 /// <reference types="vite/client" />
 import { useQueries, useQuery } from "@tanstack/react-query";
 
-const DEFAULT_R2_BASE_URL = "https://bloclawd-reports-staging.example.r2.dev";
+// Empty default = same-origin: SPA fetches `/reports/v1/...` via the
+// frontend Worker, which proxies the R2 bucket through its BUCKET
+// binding (see apps/frontend/worker/index.ts). Set
+// VITE_R2_BASE_URL=https://data.bloclawd.com (or another absolute URL)
+// to bypass the proxy and read directly from a public R2 attach.
 const REPORTS_ROOT = "reports/v1";
-const R2_BASE_URL = (
-  import.meta.env.VITE_R2_BASE_URL || DEFAULT_R2_BASE_URL
-).replace(/\/+$/, "");
+const R2_BASE_URL = (import.meta.env.VITE_R2_BASE_URL ?? "").replace(
+  /\/+$/,
+  "",
+);
 
 class PromisePool {
   private active = 0;

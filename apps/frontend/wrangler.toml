@@ -10,6 +10,14 @@ not_found_handling = "single-page-application"
 binding = "ASSETS"
 run_worker_first = true
 
+# Top-level R2 binding is consumed by `wrangler dev` / @cloudflare/vite-plugin
+# (miniflare-backed local R2). Each env below redeclares its own bucket so
+# real deploys never share state across staging/production.
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "bloclawd-reports-staging"
+preview_bucket_name = "bloclawd-reports-staging"
+
 [placement]
 mode = "smart"
 
@@ -26,6 +34,14 @@ directory = "./dist/client"
 not_found_handling = "single-page-application"
 binding = "ASSETS"
 run_worker_first = true
+
+# R2 reports proxy: SPA fetches /reports/v1/* same-origin so the bucket
+# can stay private (no public r2.dev attach, no public custom domain).
+# Reads are gated by the Cloudflare Access policy on staging.bloclawd.com.
+[[env.staging.r2_buckets]]
+binding = "BUCKET"
+bucket_name = "bloclawd-reports-staging"
+preview_bucket_name = "bloclawd-reports-staging"
 
 # Custom-domain attach for staging. Pre-existing CNAME for
 # staging.bloclawd.com MUST be deleted before first deploy or the
