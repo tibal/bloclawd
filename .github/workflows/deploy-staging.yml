@@ -120,28 +120,17 @@ jobs:
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: |
           set -euo pipefail
-          echo "::group::Secret length sanity (no values printed)"
-          echo "CF_ACCESS_CLIENT_ID length: ${#CF_ACCESS_CLIENT_ID}"
-          echo "CF_ACCESS_CLIENT_SECRET length: ${#CF_ACCESS_CLIENT_SECRET}"
-          echo "::endgroup::"
           for attempt in 1 2 3 4 5; do
-            body=$(mktemp); hdrs=$(mktemp)
-            code=$(curl -sS --max-time 10 -o "$body" -D "$hdrs" -w '%{http_code}' \
+            if curl -fsS --max-time 10 \
                 -A "Mozilla/5.0 (X11; Linux x86_64) bloclawd-deploy-smoke/1.0" \
                 -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
                 -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-                https://api-staging.bloclawd.com/challenge || echo "curl-err")
-            if [ "$code" = "200" ] && jq -e '.challenge_id' "$body" >/dev/null 2>&1; then
+                https://api-staging.bloclawd.com/challenge \
+                | jq -e '.challenge_id' >/dev/null; then
               echo "Worker healthy on attempt $attempt"
-              rm -f "$body" "$hdrs"
               exit 0
             fi
-            echo "Attempt $attempt: HTTP $code"
-            echo "--- response headers (CF + server) ---"
-            grep -iE "^(server|cf-|x-|content-type)" "$hdrs" || true
-            echo "--- body (first 400 bytes) ---"
-            head -c 400 "$body"; echo
-            rm -f "$body" "$hdrs"
+            echo "Attempt $attempt failed; retrying in 6s"
             sleep 6
           done
           echo "::error::Worker failed health check after 5 attempts"
