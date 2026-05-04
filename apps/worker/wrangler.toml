@@ -4,7 +4,11 @@ compatibility_date = "2026-04-01"
 main = "build/worker/shim.mjs"
 
 [build]
-command = "cargo install -q worker-build@0.8.1 && worker-build --release"
+# --locked: respect worker-build's published Cargo.lock so cargo doesn't
+# resolve transitive deps (e.g. `time`) to versions requiring a newer
+# rustc than the one pinned in rust-toolchain.toml. Without --locked the
+# CI install fails on bumped MSRV from time@0.3.47.
+command = "cargo install -q worker-build@0.8.1 --locked && worker-build --release"
 
 [placement]
 mode = "smart"
