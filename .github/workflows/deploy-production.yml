@@ -90,7 +90,7 @@ jobs:
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: apps/worker
           command: deploy --env production
-          wranglerVersion: '4.34.0'
+          wranglerVersion: '4.87.0'
           # apps/worker has no package.json; default 'npm' is harmless and
           # avoids requiring pnpm on PATH (which is set up only in the
           # frontend job).
@@ -161,7 +161,7 @@ jobs:
           # No --env: vite plugin baked the env into the redirected
           # wrangler.json at build time (CLOUDFLARE_ENV above).
           command: deploy
-          wranglerVersion: '4.34.0'
+          wranglerVersion: '4.87.0'
           packageManager: pnpm
 
       - name: Health check (root + install.sh content-type)
