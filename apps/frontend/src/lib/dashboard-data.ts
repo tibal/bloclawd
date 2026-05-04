@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import type uPlot from "uplot";
 
 import type { DashboardSearch } from "@/routes/dashboard";
 import {
@@ -11,13 +10,19 @@ import {
   type Percentiles,
 } from "@/lib/r2";
 import { pickTier, type Tier as BucketTier } from "@/lib/tier-picker";
+import {
+  EMPTY_ALIGNED_DATA,
+  type AlignedData,
+  type ChartMeta,
+} from "@/lib/chart-data";
 
 type SubscriptionTier = "pro" | "max5" | "max20";
 type WindowParam = DashboardSearch["window"];
 
 export type ChartDataResult = {
-  data: uPlot.AlignedData | null;
-  compareData: { tier: SubscriptionTier; data: uPlot.AlignedData }[] | null;
+  data: AlignedData | null;
+  compareData: { tier: SubscriptionTier; data: AlignedData }[] | null;
+  meta: ChartMeta | null;
   loading: boolean;
   error: Error | null;
   bucketsLoaded: number;
@@ -26,7 +31,6 @@ export type ChartDataResult = {
 
 const COMPARE_TIERS = ["pro", "max5", "max20"] as const;
 const EMPTY_PATHS: string[] = [];
-const EMPTY_ALIGNED_DATA: uPlot.AlignedData = [[], [], [], [], [], []];
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const WINDOW_DAYS: Record<WindowParam, number> = {
   "24h": 1,
@@ -57,6 +61,7 @@ export function useChartData(filters: DashboardSearch): ChartDataResult {
     return {
       data: null,
       compareData: null,
+      meta: null,
       loading: false,
       error,
       bucketsLoaded: 0,
@@ -64,10 +69,13 @@ export function useChartData(filters: DashboardSearch): ChartDataResult {
     };
   }
 
+  const meta = buildMeta(buckets, filters, bucketTier);
+
   if (filters.compare) {
     return {
       data: null,
       compareData: buildCompareData(buckets, filters),
+      meta,
       loading,
       error: null,
       bucketsLoaded: buckets.length,
@@ -80,6 +88,7 @@ export function useChartData(filters: DashboardSearch): ChartDataResult {
       ? buildAlignedData(buckets, filters, filters.tier) ?? null
       : null,
     compareData: null,
+    meta,
     loading,
     error: null,
     bucketsLoaded: buckets.length,
@@ -107,10 +116,34 @@ export function windowDaysFor(window: WindowParam): number {
   return WINDOW_DAYS[window];
 }
 
+function buildMeta(
+  buckets: BucketEnvelope[],
+  filters: DashboardSearch,
+  resolution: BucketTier,
+): ChartMeta {
+  const timestamps = sortedUniqueTimestamps(buckets);
+  const counts = new Map<number, number>();
+  for (const bucket of buckets) {
+    let total = 0;
+    for (const cell of bucket.cells) {
+      if (cell.insufficient_data) continue;
+      if (cell.harness !== filters.harness) continue;
+      if (cell.limit_type !== filters.limit_type) continue;
+      if (filters.region && cell.region !== filters.region) continue;
+      total += cell.n_submissions;
+    }
+    counts.set(bucketTimestampSeconds(bucket), total);
+  }
+  return {
+    resolution,
+    submissions: timestamps.map((ts) => counts.get(ts) ?? null),
+  };
+}
+
 function buildCompareData(
   buckets: BucketEnvelope[],
   filters: DashboardSearch,
-): { tier: SubscriptionTier; data: uPlot.AlignedData }[] {
+): { tier: SubscriptionTier; data: AlignedData }[] {
   const timestamps = sortedUniqueTimestamps(buckets);
 
   return COMPARE_TIERS.map((tier) => ({
@@ -131,7 +164,7 @@ function buildAlignedData(
   filters: DashboardSearch,
   tier: SubscriptionTier,
   timestamps?: number[],
-): uPlot.AlignedData | null {
+): AlignedData | null {
   const points = new Map<number, Percentiles>();
 
   for (const bucket of buckets) {

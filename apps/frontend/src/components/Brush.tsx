@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type uPlot from "uplot";
 
 import { PERCENTILE_INDEX } from "@/lib/chart-tokens";
 import { asSeries, pathFor } from "@/lib/chart-geometry";
+import type { AlignedData } from "@/lib/chart-data";
 import { Route } from "@/routes/dashboard";
 
 const HEIGHT = 64;
@@ -15,7 +15,7 @@ const INNER_WIDTH = VBOX_WIDTH - PAD_L - PAD_R;
 const MIN_SPAN = 0.02;
 
 interface BrushProps {
-  data: uPlot.AlignedData;
+  data: AlignedData;
   start: number;
   end: number;
 }
@@ -199,7 +199,7 @@ function buildPath(
     xs.length <= 1 ? PAD_L : PAD_L + (idx / (xs.length - 1)) * INNER_WIDTH;
   const yAt = (v: number) => 6 + INNER_HEIGHT - (v / yMax) * INNER_HEIGHT;
   return {
-    path: pathFor(xs, asSeries(p50 as uPlot.AlignedData[number]), xAt, yAt),
+    path: pathFor(xs, asSeries(p50), xAt, yAt),
     yMaxFloor: yAt(0),
   };
 }

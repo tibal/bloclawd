@@ -1,16 +1,17 @@
 import { useMemo } from "react";
-import type uPlot from "uplot";
 
 import { Chart } from "@/components/Chart";
+import type { AlignedData } from "@/lib/chart-data";
+import { decodePercentiles, useBuckets, useManifest } from "@/lib/r2";
 import { mulberry32 } from "@/lib/rng";
 
-// Falls back to a procedural shape when the real status feed has nothing
-// to show — the home page does not block on R2 the way the dashboard does.
+// Procedural shape used as a last-resort fallback when the public dataset
+// has no h1 buckets yet. The home page should never block on R2.
 function generateEnvelope({
   points = 96,
   base = 540,
   seed = 11,
-}: { points?: number; base?: number; seed?: number } = {}): uPlot.AlignedData {
+}: { points?: number; base?: number; seed?: number } = {}): AlignedData {
   const r = mulberry32(seed);
   const xs: number[] = [];
   const p10: number[] = [];
@@ -40,7 +41,12 @@ function generateEnvelope({
 }
 
 export function HomeTimelinePreview() {
-  const data = useMemo(() => generateEnvelope({ seed: 11, base: 480 }), []);
+  const manifest = useManifest();
+  const h1Paths = manifest.data?.tiers.h1 ?? [];
+  const buckets = useBuckets("h1", h1Paths);
+  const realData = useMemo(() => buildAlignedFromBuckets(buckets), [buckets]);
+  const fallback = useMemo(() => generateEnvelope({ seed: 11, base: 480 }), []);
+  const data = realData ?? fallback;
 
   return (
     <section
@@ -68,7 +74,44 @@ export function HomeTimelinePreview() {
         data={data}
         primary="p50"
         envelope="neighbors"
+        meta={realData ? { resolution: "h1" } : undefined}
       />
     </section>
   );
+}
+
+function buildAlignedFromBuckets(
+  buckets: ReturnType<typeof useBuckets>,
+): AlignedData | null {
+  type Row = { ts: number; p10: number; p25: number; p50: number; p75: number; p90: number };
+  const rows: Row[] = [];
+
+  for (const result of buckets) {
+    const env = result.data;
+    if (!env) continue;
+    const cell = env.cells.find(
+      (c) =>
+        c.tier === "max20" &&
+        c.harness === "claude-code" &&
+        c.limit_type === "5h" &&
+        !c.insufficient_data,
+    );
+    const pcts = decodePercentiles(cell?.unified_cost);
+    if (!pcts) continue;
+    rows.push({
+      ts: Math.floor(new Date(env.bucket_ts).getTime() / 1000),
+      ...pcts,
+    });
+  }
+
+  if (rows.length === 0) return null;
+  rows.sort((a, b) => a.ts - b.ts);
+  return [
+    rows.map((r) => r.ts),
+    rows.map((r) => r.p10),
+    rows.map((r) => r.p25),
+    rows.map((r) => r.p50),
+    rows.map((r) => r.p75),
+    rows.map((r) => r.p90),
+  ];
 }

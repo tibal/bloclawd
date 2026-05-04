@@ -1,4 +1,3 @@
-import type uPlot from "uplot";
 import {
   RouterProvider,
   createMemoryHistory,
@@ -10,7 +9,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { routeTree } from "@/routeTree.gen";
 import { useChartData } from "@/lib/dashboard-data";
-import { useStatus, type StatusJson } from "@/lib/r2";
+import {
+  useBucket,
+  useManifest,
+  useStatus,
+  type Manifest,
+  type StatusJson,
+} from "@/lib/r2";
+import type { AlignedData } from "@/lib/chart-data";
 
 vi.mock("@/lib/dashboard-data", () => ({
   useChartData: vi.fn(),
@@ -22,6 +28,8 @@ vi.mock("@/lib/r2", async (importOriginal) => {
   return {
     ...actual,
     useStatus: vi.fn(),
+    useManifest: vi.fn(),
+    useBucket: vi.fn(),
   };
 });
 
@@ -46,7 +54,7 @@ vi.mock("@/components/Chart", () => ({
 }));
 
 const NOW = Date.UTC(2026, 4, 2, 21, 15, 0);
-const SAMPLE_DATA: uPlot.AlignedData = [
+const SAMPLE_DATA: AlignedData = [
   [Date.UTC(2026, 4, 2, 21, 0, 0) / 1000],
   [10],
   [20],
@@ -63,7 +71,7 @@ const COMPARE_DATA = (["pro", "max5", "max20"] as const).map((tier, idx) => ({
     [30 + idx],
     [40 + idx],
     [50 + idx],
-  ] satisfies uPlot.AlignedData,
+  ] satisfies AlignedData,
 }));
 
 afterEach(() => {
@@ -197,15 +205,33 @@ function mockChartData({
   data = null,
   error = null,
   loading = false,
+  meta = null,
 }: Partial<ReturnType<typeof useChartData>> = {}) {
   vi.mocked(useChartData).mockReturnValue({
     data,
     compareData,
+    meta,
     loading,
     error,
     bucketsLoaded: data || compareData ? 1 : 0,
     bucketsTotal: 1,
   });
+  // Cohort panels read manifest+bucket; default them to empty so /dashboard
+  // tests don't have to care unless they explicitly check cohort UI.
+  vi.mocked(useManifest).mockReturnValue({
+    data: {
+      schema_version: "v1",
+      last_updated_ts: new Date(NOW).toISOString(),
+      tiers: { q15: [], h1: [], d1: [] },
+    } satisfies Manifest,
+    isLoading: false,
+    error: null,
+  } as unknown as ReturnType<typeof useManifest>);
+  vi.mocked(useBucket).mockReturnValue({
+    data: undefined,
+    isLoading: false,
+    error: null,
+  } as unknown as ReturnType<typeof useBucket>);
 }
 
 function mockStatus(overrides: Partial<StatusJson> = {}) {

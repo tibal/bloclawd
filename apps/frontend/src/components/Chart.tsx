@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type uPlot from "uplot";
 
 import { formatTokens } from "@/lib/format";
 import {
@@ -17,23 +16,37 @@ import {
   type Point,
   type Series,
 } from "@/lib/chart-geometry";
+import {
+  sliceByBrush,
+  sliceMetaByBrush,
+  type AlignedData,
+  type ChartMeta,
+} from "@/lib/chart-data";
 import { neighborBand, type PercentileKey } from "@/components/PercentilePicker";
 
 export interface ChartProps {
-  data: uPlot.AlignedData;
+  data: AlignedData;
   primary?: PercentileKey;
   envelope?: "off" | "neighbors" | "wide";
-  compareMode?: { tiers: Array<{ tier: TierName; data: uPlot.AlignedData }> };
+  compareMode?: { tiers: Array<{ tier: TierName; data: AlignedData }> };
   ariaLabel: string;
   brush?: { start: number; end: number };
+  meta?: ChartMeta;
+  yLabel?: string;
 }
 
 const HEIGHT = 360;
 const WIDTH_FALLBACK = 720;
 const PAD_L = 56;
 const PAD_R = 24;
-const PAD_T = 18;
+const PAD_T = 24;
 const PAD_B = 36;
+
+const RESOLUTION_LABEL: Record<NonNullable<ChartMeta["resolution"]>, string> = {
+  q15: "15 min",
+  h1: "1 hour",
+  d1: "1 day",
+};
 
 export function Chart({
   data,
@@ -42,6 +55,8 @@ export function Chart({
   compareMode,
   ariaLabel,
   brush,
+  meta,
+  yLabel,
 }: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(WIDTH_FALLBACK);
@@ -61,6 +76,10 @@ export function Chart({
   }, []);
 
   const sliced = useMemo(() => sliceByBrush(data, brush), [data, brush]);
+  const slicedMeta = useMemo(
+    () => sliceMetaByBrush(meta, data[0]?.length ?? 0, brush),
+    [meta, data, brush],
+  );
 
   const geometry = useMemo(
     () => buildGeometry({ data: sliced, compareMode, width, primary }),
@@ -83,6 +102,11 @@ export function Chart({
   };
 
   const [bandLo, bandHi] = neighborBand(primary);
+  const yLabelText =
+    yLabel ??
+    (meta?.resolution
+      ? `tokens / ${RESOLUTION_LABEL[meta.resolution]}`
+      : "tokens / window");
 
   return (
     <div
@@ -95,7 +119,7 @@ export function Chart({
         height={HEIGHT}
         viewBox={`0 0 ${width} ${HEIGHT}`}
         width={width}
-        style={{ display: "block" }}
+        style={{ display: "block", overflow: "visible" }}
       >
         <defs>
           <linearGradient id="bloclawd-band-outer" x1="0" x2="0" y1="0" y2="1">
@@ -114,6 +138,16 @@ export function Chart({
             </feMerge>
           </filter>
         </defs>
+
+        <text
+          fill="var(--muted-foreground)"
+          fontFamily="var(--font-mono)"
+          fontSize="10.5"
+          x={PAD_L}
+          y={PAD_T - 8}
+        >
+          {yLabelText}
+        </text>
 
         {geometry.yTicks.map((tick, idx) => (
           <g key={`y-${tick.value}`}>
@@ -237,51 +271,41 @@ export function Chart({
         />
       </svg>
 
-      <HoverTooltip data={sliced} hoverIndex={hoverIndex} primary={primary} />
+      <HoverTooltip
+        data={sliced}
+        hoverIndex={hoverIndex}
+        primary={primary}
+        meta={slicedMeta}
+      />
     </div>
   );
-}
-
-function sliceByBrush(
-  data: uPlot.AlignedData,
-  brush?: { start: number; end: number },
-): uPlot.AlignedData {
-  const xs = data[0] as readonly number[] | undefined;
-  if (!brush || !xs || xs.length === 0) return data;
-  const len = xs.length;
-  const lo = Math.max(0, Math.min(1, brush.start));
-  const hi = Math.max(0, Math.min(1, brush.end));
-  if (hi - lo > 0.999) return data;
-  const startIdx = Math.max(0, Math.floor(lo * (len - 1)));
-  const endIdx = Math.min(len, Math.ceil(hi * (len - 1)) + 1);
-  return data.map((row) =>
-    row ? Array.prototype.slice.call(row, startIdx, endIdx) : row,
-  ) as uPlot.AlignedData;
 }
 
 function HoverTooltip({
   data,
   hoverIndex,
   primary,
+  meta,
 }: {
-  data: uPlot.AlignedData;
+  data: AlignedData;
   hoverIndex: number | null;
   primary: PercentileKey;
+  meta: ChartMeta | undefined;
 }) {
   if (hoverIndex == null) return null;
   const ts = asSeries(data[0])[hoverIndex];
   if (typeof ts !== "number") return null;
-  const values = (Object.keys(PERCENTILE_INDEX) as Array<
-    keyof typeof PERCENTILE_INDEX
-  >).map((key) => ({
+  const orderedKeys: PercentileKey[] = ["p90", "p75", "p50", "p25", "p10"];
+  const values = orderedKeys.map((key) => ({
     key,
     value: numericAt(asSeries(data[PERCENTILE_INDEX[key]]), hoverIndex),
   }));
+  const submissions = meta?.submissions?.[hoverIndex] ?? null;
 
   return (
     <div className="pointer-events-none absolute left-20 top-5 min-w-[220px] rounded-xl border border-border bg-[var(--bg-2)]/95 p-3 shadow-[var(--shadow-card)] backdrop-blur-md">
       <div className="mb-2 font-mono text-[11px] text-muted-foreground">
-        {formatTooltipTimestamp(ts)}
+        {formatTooltipTimestamp(ts, meta?.resolution)}
       </div>
       <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
         {values.map(({ key, value }) => (
@@ -307,6 +331,14 @@ function HoverTooltip({
           </div>
         ))}
       </div>
+      {submissions != null ? (
+        <div className="mt-2.5 border-t border-border/60 pt-2 font-mono text-[11px] text-muted-foreground">
+          <span className="text-foreground">
+            {submissions.toLocaleString()}
+          </span>{" "}
+          submissions · k≥5
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -328,7 +360,7 @@ function buildGeometry({
   width,
   primary,
 }: {
-  data: uPlot.AlignedData;
+  data: AlignedData;
   compareMode: ChartProps["compareMode"];
   width: number;
   primary: PercentileKey;
@@ -433,9 +465,18 @@ function formatXTick(ts: number): string {
   return date.toISOString().slice(5, 16).replace("T", " ");
 }
 
-function formatTooltipTimestamp(ts: number): string {
+function formatTooltipTimestamp(
+  ts: number,
+  resolution: ChartMeta["resolution"] | undefined,
+): string {
   const date = new Date(ts * 1000);
   if (Number.isNaN(date.getTime())) return "";
   const iso = date.toISOString();
-  return `${iso.slice(0, 10)} · ${iso.slice(11, 16)} UTC`;
+  if (resolution === "d1") return `${iso.slice(0, 10)} UTC`;
+  const startMin = iso.slice(11, 16);
+  const stepMin = resolution === "q15" ? 15 : 60;
+  const end = new Date(date.getTime() + stepMin * 60_000)
+    .toISOString()
+    .slice(11, 16);
+  return `${iso.slice(0, 10)} · ${startMin} – ${end} UTC`;
 }

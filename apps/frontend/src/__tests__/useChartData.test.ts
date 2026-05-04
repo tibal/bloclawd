@@ -1,4 +1,3 @@
-import type uPlot from "uplot";
 import React from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
@@ -13,6 +12,7 @@ import {
   type Manifest,
 } from "@/lib/r2";
 import { useChartData } from "@/lib/dashboard-data";
+import type { AlignedData } from "@/lib/chart-data";
 
 vi.mock("@/lib/r2", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/r2")>();
@@ -74,7 +74,7 @@ describe("useChartData", () => {
       [30],
       [40],
       [50],
-    ] satisfies uPlot.AlignedData);
+    ] satisfies AlignedData);
   });
 
   it("uses model drill-down percentiles when the model filter is set", () => {
