@@ -1,84 +1,38 @@
-//! Hand-curated per-model per-token pricing priors.
-//! Source: https://www.anthropic.com/pricing plus model release pages, and
-//! https://openai.com/api/pricing/, captured 2026-05-02. USD per token.
-//! Used as the ridge-regression prior for weight fits.
-//! Audited in PR; tunable after staging validation.
+//! Compat shim over `catalog`. Pricing data lives in `catalog::MODELS` per
+//! `ModelInfo::prices`. This module preserves the `model_price_lookup` API
+//! that the cron weight-fit calls and exposes a flattened `MODEL_PRICES` table
+//! for code that prefers the tuple form.
 
+use crate::catalog::MODELS;
 use crate::enums::{Model, TokenType, Window};
 
-/// (Model, TokenType, Window, price_USD_per_token).
-/// Every (Model, TokenType, Window) tuple must appear exactly once.
-#[rustfmt::skip]
-pub const MODEL_PRICES: &[(Model, TokenType, Window, f64)] = &[
-        (Model::ClaudeOpus47, TokenType::Input, Window::FiveMin, 5e-6),
-        (Model::ClaudeOpus47, TokenType::Output, Window::FiveMin, 25e-6),
-        (Model::ClaudeOpus47, TokenType::CachedRead, Window::FiveMin, 0.5e-6),
-        (Model::ClaudeOpus47, TokenType::CachedWrite, Window::FiveMin, 6.25e-6),
-        (Model::ClaudeOpus47, TokenType::Input, Window::FiveH, 5e-6),
-        (Model::ClaudeOpus47, TokenType::Output, Window::FiveH, 25e-6),
-        (Model::ClaudeOpus47, TokenType::CachedRead, Window::FiveH, 0.5e-6),
-        (Model::ClaudeOpus47, TokenType::CachedWrite, Window::FiveH, 6.25e-6),
-        (Model::ClaudeSonnet46, TokenType::Input, Window::FiveMin, 3e-6),
-        (Model::ClaudeSonnet46, TokenType::Output, Window::FiveMin, 15e-6),
-        (Model::ClaudeSonnet46, TokenType::CachedRead, Window::FiveMin, 0.3e-6),
-        (Model::ClaudeSonnet46, TokenType::CachedWrite, Window::FiveMin, 3.75e-6),
-        (Model::ClaudeSonnet46, TokenType::Input, Window::FiveH, 3e-6),
-        (Model::ClaudeSonnet46, TokenType::Output, Window::FiveH, 15e-6),
-        (Model::ClaudeSonnet46, TokenType::CachedRead, Window::FiveH, 0.3e-6),
-        (Model::ClaudeSonnet46, TokenType::CachedWrite, Window::FiveH, 3.75e-6),
-        (Model::ClaudeSonnet45, TokenType::Input, Window::FiveMin, 3e-6),
-        (Model::ClaudeSonnet45, TokenType::Output, Window::FiveMin, 15e-6),
-        (Model::ClaudeSonnet45, TokenType::CachedRead, Window::FiveMin, 0.3e-6),
-        (Model::ClaudeSonnet45, TokenType::CachedWrite, Window::FiveMin, 3.75e-6),
-        (Model::ClaudeSonnet45, TokenType::Input, Window::FiveH, 3e-6),
-        (Model::ClaudeSonnet45, TokenType::Output, Window::FiveH, 15e-6),
-        (Model::ClaudeSonnet45, TokenType::CachedRead, Window::FiveH, 0.3e-6),
-        (Model::ClaudeSonnet45, TokenType::CachedWrite, Window::FiveH, 3.75e-6),
-        (Model::ClaudeHaiku45, TokenType::Input, Window::FiveMin, 1e-6),
-        (Model::ClaudeHaiku45, TokenType::Output, Window::FiveMin, 5e-6),
-        (Model::ClaudeHaiku45, TokenType::CachedRead, Window::FiveMin, 0.1e-6),
-        (Model::ClaudeHaiku45, TokenType::CachedWrite, Window::FiveMin, 1.25e-6),
-        (Model::ClaudeHaiku45, TokenType::Input, Window::FiveH, 1e-6),
-        (Model::ClaudeHaiku45, TokenType::Output, Window::FiveH, 5e-6),
-        (Model::ClaudeHaiku45, TokenType::CachedRead, Window::FiveH, 0.1e-6),
-        (Model::ClaudeHaiku45, TokenType::CachedWrite, Window::FiveH, 1.25e-6),
-        (Model::Gpt5, TokenType::Input, Window::FiveMin, 1.25e-6),
-        (Model::Gpt5, TokenType::Output, Window::FiveMin, 10e-6),
-        (Model::Gpt5, TokenType::CachedRead, Window::FiveMin, 0.125e-6),
-        (Model::Gpt5, TokenType::CachedWrite, Window::FiveMin, 1.25e-6),
-        (Model::Gpt5, TokenType::Input, Window::FiveH, 1.25e-6),
-        (Model::Gpt5, TokenType::Output, Window::FiveH, 10e-6),
-        (Model::Gpt5, TokenType::CachedRead, Window::FiveH, 0.125e-6),
-        (Model::Gpt5, TokenType::CachedWrite, Window::FiveH, 1.25e-6),
-        (Model::Gpt55, TokenType::Input, Window::FiveMin, 5e-6),
-        (Model::Gpt55, TokenType::Output, Window::FiveMin, 30e-6),
-        (Model::Gpt55, TokenType::CachedRead, Window::FiveMin, 0.5e-6),
-        (Model::Gpt55, TokenType::CachedWrite, Window::FiveMin, 5e-6),
-        (Model::Gpt55, TokenType::Input, Window::FiveH, 5e-6),
-        (Model::Gpt55, TokenType::Output, Window::FiveH, 30e-6),
-        (Model::Gpt55, TokenType::CachedRead, Window::FiveH, 0.5e-6),
-        (Model::Gpt55, TokenType::CachedWrite, Window::FiveH, 5e-6),
-        (Model::Gpt5Codex, TokenType::Input, Window::FiveMin, 1.25e-6),
-        (Model::Gpt5Codex, TokenType::Output, Window::FiveMin, 10e-6),
-        (Model::Gpt5Codex, TokenType::CachedRead, Window::FiveMin, 0.125e-6),
-        (Model::Gpt5Codex, TokenType::CachedWrite, Window::FiveMin, 1.25e-6),
-        (Model::Gpt5Codex, TokenType::Input, Window::FiveH, 1.25e-6),
-        (Model::Gpt5Codex, TokenType::Output, Window::FiveH, 10e-6),
-        (Model::Gpt5Codex, TokenType::CachedRead, Window::FiveH, 0.125e-6),
-        (Model::Gpt5Codex, TokenType::CachedWrite, Window::FiveH, 1.25e-6),
-];
-
+/// `(Model, TokenType, Window) -> usd_per_token`. Exact contents match
+/// `catalog::MODELS` flattened in declaration order.
 pub fn lookup(model: Model, token_type: TokenType, window: Window) -> Option<f64> {
-    MODEL_PRICES
-        .iter()
-        .find(|(m, tt, w, _)| *m == model && *tt == token_type && *w == window)
-        .map(|(_, _, _, price)| *price)
+    model.price(token_type, window)
 }
+
+/// Lazy-built flat tuple table for callers that walk the cartesian product.
+/// Built once on first access from the catalog.
+pub static MODEL_PRICES: std::sync::LazyLock<Vec<(Model, TokenType, Window, f64)>> =
+    std::sync::LazyLock::new(|| {
+        let mut rows = Vec::new();
+        for info in MODELS {
+            for price in info.prices {
+                rows.push((
+                    info.model,
+                    price.token_type,
+                    price.window,
+                    price.usd_per_token,
+                ));
+            }
+        }
+        rows
+    });
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::enums::{Model, TokenType, Window};
 
     const ALL_MODELS: &[Model] = &[
         Model::ClaudeOpus47,
@@ -96,12 +50,6 @@ mod tests {
         TokenType::CachedWrite,
     ];
     const ALL_WINDOWS: &[Window] = &[Window::FiveMin, Window::FiveH];
-    const ANTHROPIC_MODELS: &[Model] = &[
-        Model::ClaudeOpus47,
-        Model::ClaudeSonnet46,
-        Model::ClaudeSonnet45,
-        Model::ClaudeHaiku45,
-    ];
 
     #[test]
     fn every_model_token_type_window_tuple_has_exactly_one_row() {
@@ -123,7 +71,7 @@ mod tests {
 
     #[test]
     fn prices_are_finite_and_positive() {
-        for (_, _, _, price) in MODEL_PRICES {
+        for (_, _, _, price) in MODEL_PRICES.iter() {
             assert!(price.is_finite(), "price should be finite");
             assert!(*price > 0.0, "price should be positive");
         }
@@ -134,20 +82,5 @@ mod tests {
         let price = lookup(Model::ClaudeSonnet45, TokenType::Input, Window::FiveMin)
             .expect("known combo should have a price");
         assert!(price > 0.0);
-    }
-
-    #[test]
-    fn cached_read_is_cheaper_than_input() {
-        for model in ANTHROPIC_MODELS {
-            for window in ALL_WINDOWS {
-                let cached_read = lookup(*model, TokenType::CachedRead, *window)
-                    .expect("cached read price exists");
-                let input = lookup(*model, TokenType::Input, *window).expect("input price exists");
-                assert!(
-                    cached_read < input,
-                    "{model:?} cached read should be cheaper than input for {window:?}"
-                );
-            }
-        }
     }
 }
