@@ -159,6 +159,62 @@ export const ROUTES: RouteSeo[] = [
     noscript:
       "Data contract: the exact wire payload your CLI submits, the canonical ordering applied before signing, redacted fields, and the diff a dry-run shows you before any network call.",
   },
+  {
+    path: "/compare",
+    title: "Pro vs Max5 vs Max20 · live tier comparison",
+    description:
+      "Side-by-side percentile envelope of tokens consumed before Claude Code and Codex rate limits trigger, broken down by Pro, Max5, and Max20. Real bonks from real users, anonymized.",
+    jsonLd: [
+      {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        name: "Pro vs Max5 vs Max20 · live tier comparison",
+        url: `${SITE_URL}/compare`,
+        description:
+          "Side-by-side percentile envelope of tokens consumed before Claude Code and Codex rate limits trigger, broken down by Pro, Max5, and Max20.",
+      },
+      {
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: [
+          {
+            "@type": "Question",
+            name: "Does $200/mo Max20 really give you 20× the headroom of Pro?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Compare the p50 envelope side-by-side over a 30-day window. The relationship between sticker-price ratio and observed headroom is rarely linear and shifts week to week.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "Why does my tier look tighter than the cohort?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Either you've hit a heavier model mix, or you may be in a cohort the provider is silently A/B testing. The drift chart shows shifts before any official changelog mentions them.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "How is 'tokens to limit' defined across tiers?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "It is the unified token cost summed over the 5-hour or weekly window leading into a rate-limit hit. Per-model token weights are fit with ridge regression toward published per-token prices.",
+            },
+          },
+          {
+            "@type": "Question",
+            name: "Why are some cells suppressed?",
+            acceptedAnswer: {
+              "@type": "Answer",
+              text: "Any cell with fewer than 5 distinct contributors is suppressed for anonymity. Widen the window or relax a filter if you see gaps.",
+            },
+          },
+        ],
+      },
+    ],
+    noscript:
+      "Pro vs Max5 vs Max20: live percentile envelope of tokens consumed before Claude Code and Codex rate limits trigger, broken down by subscription tier. Real bonks from real users, anonymized at k ≥ 5.",
+  },
 ];
 
 export function buildPageTitle(routeTitle: string): string {
