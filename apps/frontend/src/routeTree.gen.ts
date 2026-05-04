@@ -13,6 +13,7 @@ import { Route as MethodologyRouteImport } from './routes/methodology'
 import { Route as InstallRouteImport } from './routes/install'
 import { Route as DataRouteImport } from './routes/data'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as CompareRouteImport } from './routes/compare'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MethodologyChangelogRouteImport } from './routes/methodology.changelog'
 
@@ -36,6 +37,11 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CompareRoute = CompareRouteImport.update({
+  id: '/compare',
+  path: '/compare',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -49,6 +55,7 @@ const MethodologyChangelogRoute = MethodologyChangelogRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/compare': typeof CompareRoute
   '/dashboard': typeof DashboardRoute
   '/data': typeof DataRoute
   '/install': typeof InstallRoute
@@ -57,6 +64,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/compare': typeof CompareRoute
   '/dashboard': typeof DashboardRoute
   '/data': typeof DataRoute
   '/install': typeof InstallRoute
@@ -66,6 +74,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/compare': typeof CompareRoute
   '/dashboard': typeof DashboardRoute
   '/data': typeof DataRoute
   '/install': typeof InstallRoute
@@ -76,6 +85,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/compare'
     | '/dashboard'
     | '/data'
     | '/install'
@@ -84,6 +94,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/compare'
     | '/dashboard'
     | '/data'
     | '/install'
@@ -92,6 +103,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/compare'
     | '/dashboard'
     | '/data'
     | '/install'
@@ -101,6 +113,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CompareRoute: typeof CompareRoute
   DashboardRoute: typeof DashboardRoute
   DataRoute: typeof DataRoute
   InstallRoute: typeof InstallRoute
@@ -137,6 +150,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/compare': {
+      id: '/compare'
+      path: '/compare'
+      fullPath: '/compare'
+      preLoaderRoute: typeof CompareRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -168,6 +188,7 @@ const MethodologyRouteWithChildren = MethodologyRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CompareRoute: CompareRoute,
   DashboardRoute: DashboardRoute,
   DataRoute: DataRoute,
   InstallRoute: InstallRoute,

@@ -103,10 +103,10 @@ function DashboardPage() {
             Tokens to rate limit · {limitTypeLabel(search.limit_type)}
           </h1>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-            Community-sourced rate-limit signal from Claude Code and Codex.
-            K-anonymized at n ≥ 5, binned, no per-event timestamps. Pick a
-            tier to see the percentile envelope or toggle compare mode for
-            side-by-side tiers.
+            Where your tier's limits actually fire. Pick Pro, Max5, or Max20
+            for the live percentile envelope, or toggle Compare for
+            tier-to-tier drift. Cells with fewer than 5 contributors are
+            suppressed for anonymity.
           </p>
           <Chrome />
           {statusNotice?.kind === "degraded" ? (
@@ -211,7 +211,7 @@ function ChartArea({
     return (
       <EmptyState
         heading="Pick a tier"
-        subhead="Choose Pro / Max5 / Max20 above, or toggle Compare tiers to see all three."
+        subhead="Start with your own — Pro, Max5, or Max20. Or toggle Compare to see all three side-by-side and spot tier-to-tier drift."
       />
     );
   }
@@ -220,7 +220,7 @@ function ChartArea({
     return (
       <EmptyState
         heading="Not enough data yet"
-        subhead="Every cell in this view has fewer than 5 contributors, so percentiles are suppressed for anonymity. Try widening the window or relaxing a filter - or check back after the next daily aggregation."
+        subhead="Fewer than 5 contributors in this slice, so percentiles are suppressed for anonymity. Widen the window, drop a filter, or check back tomorrow — the next aggregate runs at 03:00 UTC."
       />
     );
   }
@@ -273,6 +273,14 @@ function KpiRow({ kpis, hasData }: { kpis: ComputedKpis; hasData: boolean }) {
         : "no contributors",
     },
     {
+      label: "p50 change",
+      value: hasData ? formatDriftPct(kpis.driftPct) : "—",
+      sub:
+        hasData && kpis.driftPct !== null
+          ? "second half vs first half of window"
+          : "needs ≥ 4 buckets",
+    },
+    {
       label: "p25 — p75 spread",
       value: hasData ? formatTokens(kpis.iqr) : "—",
       sub: hasData ? "interquartile range" : "—",
@@ -281,11 +289,6 @@ function KpiRow({ kpis, hasData }: { kpis: ComputedKpis; hasData: boolean }) {
       label: "p10 — p90 spread",
       value: hasData ? formatTokens(kpis.outerSpread) : "—",
       sub: hasData ? "outer envelope" : "—",
-    },
-    {
-      label: "Submissions",
-      value: kpis.submissionsLabel,
-      sub: "k-anonymized · n ≥ 5",
     },
   ];
 
@@ -390,6 +393,7 @@ interface ComputedKpis {
   iqr: number;
   outerSpread: number;
   submissionsLabel: string;
+  driftPct: number | null;
 }
 
 function computeKpis(data: uPlot.AlignedData): ComputedKpis {
@@ -412,7 +416,27 @@ function computeKpis(data: uPlot.AlignedData): ComputedKpis {
     iqr,
     outerSpread,
     submissionsLabel: p50.length > 0 ? `${p50.length}` : "0",
+    driftPct: computeDriftPct(p50),
   };
+}
+
+function computeDriftPct(p50: number[]): number | null {
+  if (p50.length < 4) return null;
+
+  const mid = Math.floor(p50.length / 2);
+  const firstHalf = mean(p50.slice(0, mid));
+  const secondHalf = mean(p50.slice(mid));
+
+  if (firstHalf === 0) return null;
+
+  return ((secondHalf - firstHalf) / firstHalf) * 100;
+}
+
+export function formatDriftPct(value: number | null): string {
+  if (value === null) return "—";
+  if (Math.abs(value) < 0.05) return "±0%";
+  const sign = value > 0 ? "+" : "−";
+  return `${sign}${Math.abs(value).toFixed(1)}%`;
 }
 
 function numericArray(values: uPlot.AlignedData[number] | undefined): number[] {

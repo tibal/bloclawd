@@ -219,6 +219,28 @@ function MethodologyPage() {
               between the raw session log on a contributor's laptop and the
               public cell on the timeline.
             </p>
+            <p className="max-w-2xl text-sm leading-7 text-muted-foreground">
+              Read it adversarially. The math is in{" "}
+              <a
+                className="text-primary underline underline-offset-4"
+                href="https://github.com/bloclawd/bloclawd/tree/main/spec"
+                rel="noreferrer"
+                target="_blank"
+              >
+                spec/
+              </a>
+              , the code is in the{" "}
+              <a
+                className="text-primary underline underline-offset-4"
+                href="https://github.com/bloclawd/bloclawd"
+                rel="noreferrer"
+                target="_blank"
+              >
+                repo
+              </a>
+              , and the CLI prints the canonical bytes in dry-run before any
+              byte leaves your machine.
+            </p>
           </header>
 
           <div className="flex flex-col gap-5">
