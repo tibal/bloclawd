@@ -2,7 +2,7 @@
 
 This document describes the manual steps to complete after the wrangler config + CI workflow changes have landed. Goal: **staging worker + frontend are reachable only by authorized humans (Cloudflare Access SSO) and the CI service token**, while the CD pipeline (`deploy-staging.yml`) continues to ship every push to `main`.
 
-R2 staging bucket and PlanetScale staging branch are already private (no public domain attach on R2; Hyperdrive credentials gate the DB). This runbook only locks down the two worker hostnames.
+R2 staging bucket and PlanetScale staging branch are already private (Hyperdrive credentials gate the DB; the bucket has no custom-domain attach and the auto-generated `*.r2.dev` URL must be disabled — see step 4). The SPA reads R2 same-origin through the frontend Worker's `BUCKET` binding (`apps/frontend/wrangler.toml` + `apps/frontend/worker/index.ts`), so `/reports/v1/*` rides the same Cloudflare Access policy as the rest of `staging.bloclawd.com`. This runbook locks down the two worker hostnames; once that is in place R2 is implicitly private.
 
 ---
 
@@ -12,7 +12,8 @@ R2 staging bucket and PlanetScale staging branch are already private (no public 
 |---|---|---|---|
 | Worker (staging) | `api-staging.bloclawd.com` | No `*.workers.dev` URL | Cloudflare Access (SSO) + service token for CI |
 | Frontend (staging) | `staging.bloclawd.com` | No `*.workers.dev` URL | Cloudflare Access (SSO) + service token for CI |
-| R2 (staging) | n/a | No public attach | Worker reads only via `BUCKET` binding |
+| R2 reports proxy | `staging.bloclawd.com/reports/v1/*` | Same-origin via frontend Worker `BUCKET` binding | Cloudflare Access (inherited from frontend hostname) |
+| R2 (staging) | n/a | r2.dev public access disabled; no custom-domain attach | Workers read via `BUCKET` binding only |
 | PlanetScale (staging branch) | n/a | No public attach | Hyperdrive credentials |
 
 CD path unchanged: push to `main` → `deploy-staging.yml` → both workers re-deploy → health check curls each hostname with `CF-Access-Client-*` headers.
@@ -65,16 +66,21 @@ gh secret set CLOUDFLARE_API_TOKEN --env staging --repo bloclawd/bloclawd
 
 Then revoke the old token in the Cloudflare dashboard.
 
-### 4. (already applied) Staging R2 CORS rules
+### 4. Disable the staging R2 public dev URL
 
-`apps/worker/r2-cors-staging.json` was updated to allow only `https://staging.bloclawd.com` as a CORS origin, and the rule was applied to the `bloclawd-reports-staging` bucket. To re-apply (after editing the JSON):
+The SPA now reads R2 same-origin through the frontend Worker's `BUCKET` binding. The auto-generated `https://pub-<hash>.r2.dev` attach for `bloclawd-reports-staging` must be turned off so the bucket is reachable only via the binding (and therefore only behind Cloudflare Access).
 
 ```bash
-npx --yes wrangler@4.34.0 r2 bucket cors set bloclawd-reports-staging \
-  --file apps/worker/r2-cors-staging.json
+npx --yes wrangler@4.87.0 r2 bucket dev-url disable bloclawd-reports-staging
 ```
 
-Verify: `wrangler r2 bucket cors list bloclawd-reports-staging`.
+Verify (should report "disabled"):
+
+```bash
+npx --yes wrangler@4.87.0 r2 bucket dev-url get bloclawd-reports-staging
+```
+
+CORS rules on the bucket are obsolete once the public URL is off — same-origin proxy reads do not trigger CORS. `apps/worker/r2-cors-staging.json` is kept in-tree for reference / fallback if a public attach is ever re-enabled, but the rule does not need to be (re-)applied for this lockdown.
 
 ### 5. Create the Cloudflare Access application
 

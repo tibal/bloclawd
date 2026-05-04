@@ -19,7 +19,8 @@ vi.mock("@/components/Chart", () => ({
   ),
 }));
 
-const R2_BASE_URL = "https://bloclawd-reports-staging.example.r2.dev";
+// Mirrors the same-origin default in src/lib/r2.ts so query keys match.
+const R2_BASE_URL = "";
 const REPORTS_ROOT = "reports/v1";
 const NOW = Date.UTC(2026, 4, 2, 15, 0, 0);
 const H1_PATHS = [
