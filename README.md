@@ -36,6 +36,12 @@ The `install.sh` script verifies a per-target sha256 hash before extracting the 
 curl https://bloclawd.com/install.sh
 ```
 
+Release artifacts also carry GitHub artifact attestations. To verify a downloaded release asset was produced by this repository's release workflow:
+
+```sh
+gh attestation verify <downloaded-asset> --repo bloclawd/bloclawd
+```
+
 macOS binaries are signed and notarized via Apple's `notarytool` starting with the first release after Apple Developer enrollment is active. Earlier `0.1.x` releases may trigger Gatekeeper friction on first launch; if you see "cannot be opened because the developer cannot be verified", right-click the binary and choose Open to bypass. This note will be removed once enrollment-completion confirms in plan 05-13 Checkpoint 1.
 
 ## Quick start
