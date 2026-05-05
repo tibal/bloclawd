@@ -51,7 +51,7 @@ jobs:
             channel: brew
     steps:
       - name: Checkout (for fixture + dist-workspace.toml)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           # Use the tagged commit so the fixture matches the release.
           ref: ${{ github.event.release.tag_name }}
@@ -177,7 +177,7 @@ jobs:
 
       - name: Upload smoke logs
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: smoke-${{ matrix.runner }}-${{ matrix.channel }}-${{ github.event.release.tag_name }}
           path: |
