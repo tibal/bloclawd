@@ -164,6 +164,11 @@ validated, idempotent, and gates server work behind cheap checks first.
   release time (Phase 5 D-122). The script downloads the binary from
   GitHub Releases over TLS, then verifies via `shasum -a 256 -c` before
   extracting. Mismatch aborts with a clear error.
+- **GitHub artifact attestations bind release artifacts to the tagged
+  workflow run.** The release workflow emits Sigstore-backed provenance
+  attestations for the files uploaded to the GitHub Release. Users can
+  verify an artifact with `gh attestation verify <artifact> --repo
+  bloclawd/bloclawd`.
 - **Cache headers `public, max-age=300, must-revalidate`,
   `Content-Type: text/plain`** on `bloclawd.com/install.sh` (Phase 5
   D-123) — `text/plain` keeps `curl ... | sh` clean and lets users
@@ -256,10 +261,10 @@ What `bloclawd` does NOT promise. Read these as carefully as the promises.
 - **HSTS preload is NOT enabled at v1.** Preload commits us irrevocably
   to HTTPS on `bloclawd.com` + every subdomain for ~12 months. Deferred
   to v1.0.0 cut (Phase 5 research §Implementation Landmines #8).
-- **No release-pipeline cryptographic provenance attestation
-  (SLSA / sigstore) at v1.** macOS notarize + sha256 in `install.sh` +
-  `cargo publish` from a tagged main commit are the trust chain at v1.
-  SLSA-style attestations are a v1.x consideration.
+- **No reproducible-build guarantee at v1.** GitHub artifact attestations
+  prove which repository, commit, and workflow produced a release
+  artifact; they do not prove a third-party rebuild would produce
+  byte-identical output.
 - **No defense against compromised user machines.** If your laptop is
   compromised, an attacker can submit arbitrary events. bloclawd's
   anti-spam is PoW + rate-limit + idempotency; it is not endpoint-security.
@@ -280,7 +285,8 @@ Each promise above is automated-tested or grep-gated in CI:
 | `deny_unknown_fields` + closed enums | `crates/event-schema::EventPayload` serde derives; `apps/worker` ingest tests |
 | Server-assigned `bucket_ts` | `apps/worker` `POST /event` handler (`date_bin` SQL); staging-e2e integration test (Phase 2 D-46) |
 | Notarize gating cascade | `.github/workflows/release.yml` `notarize-macos` step (Phase 5 plan 05-04); Phase 5 D-119 fail-closed wiring |
-| sha256 in `install.sh` | `cargo dist generate-installer --shell` (Phase 5 plan 05-04); `release-smoke.yml` verifies hash on actual install |
+| sha256 in `install.sh` | cargo-dist `bloclawd-installer.sh` synced from the GitHub Release; `release-smoke.yml` verifies hash on actual install |
+| Release artifact provenance | `.github/workflows/release.yml` `actions/attest@v4`; users verify via `gh attestation verify <artifact> --repo bloclawd/bloclawd` |
 | No fingerprinting in shell-outs | `crates/cli/src/probe.rs` source review; user memory `feedback_no_provider_fingerprinting.md` |
 | No `event_id` / nonce / IP in CI logs | `.github/workflows/release-smoke.yml` anonymity grep step (Phase 5 plan 05-05) |
 
