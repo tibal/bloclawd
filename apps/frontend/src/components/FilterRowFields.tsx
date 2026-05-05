@@ -31,7 +31,6 @@ import type { FilterRow } from "@/lib/dashboard-search";
 
 const PROVIDER_HARNESS_OPTIONS = providerHarnessOptions();
 const REGION_SELECT_OPTIONS = regionOptions();
-const TIER_SELECT_OPTIONS = tierOptions();
 
 export interface FilterRowFieldsProps {
   row: FilterRow;
@@ -95,13 +94,15 @@ export function FilterRowFields({
         options={PROVIDER_HARNESS_OPTIONS}
         value={encodeProviderHarness(resolved.provider, resolved.harness)}
       />
-      <FilterPill
-        ariaLabel="Tier"
-        label="Tier"
-        onChange={onTier}
-        options={TIER_SELECT_OPTIONS}
-        value={resolved.tier}
-      />
+      {tierOptions(resolved).length > 0 && resolved.tier ? (
+        <FilterPill
+          ariaLabel="Tier"
+          label="Tier"
+          onChange={onTier}
+          options={tierOptions(resolved)}
+          value={resolved.tier}
+        />
+      ) : null}
       <FilterPill
         ariaLabel="Region"
         label="Region"
@@ -162,7 +163,7 @@ export function FilterPill({
     <Select onValueChange={onChange} value={value}>
       <SelectTrigger
         aria-label={ariaLabel}
-        className="h-8 min-h-0 gap-2 rounded-full border border-border bg-[var(--surface)] px-3 text-[12.5px] font-medium text-foreground hover:bg-[var(--surface-2)] data-[state=open]:bg-[var(--surface-2)]"
+        className="h-8 w-fit min-h-0 justify-start gap-2 rounded-full border border-border bg-[var(--surface)] px-3 text-[12.5px] font-medium text-foreground hover:bg-[var(--surface-2)] data-[state=open]:bg-[var(--surface-2)]"
       >
         <span className="text-muted-foreground">{label}</span>
         <SelectValue />

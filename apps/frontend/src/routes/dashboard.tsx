@@ -116,8 +116,10 @@ function DashboardPage() {
       <KpiRow kpis={kpis} hasData={hasChartData} />
 
       <div className="surface-card overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-border/60 px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
-          <Filters />
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/60 px-5 py-4">
+          <div className="min-w-0 grow">
+            <Filters />
+          </div>
           <div className="flex items-center gap-2">
             <Toggle
               aria-label="Toggle compare mode"

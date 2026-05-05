@@ -120,7 +120,9 @@ export function rowLabel(row: ResolvedRow): string {
   // Compact label suited for the chart legend / cohort row badges.
   // Aggregable fields appear only when narrowed.
   const provider = row.provider === "anthropic" ? "Anthropic" : "OpenAI";
-  const parts: string[] = [`${provider} · ${row.harness}`, row.tier, row.limit_type];
+  const parts: string[] = [`${provider} · ${row.harness}`];
+  if (row.tier) parts.push(row.tier);
+  parts.push(row.limit_type);
   if (row.region) parts.push(row.region);
   if (row.model) parts.push(row.model);
   if (row.plan) parts.push(row.plan);
@@ -186,7 +188,10 @@ function extractPercentiles(
 
 function matchesCell(cell: BucketCell, row: ResolvedRow): boolean {
   if (cell.insufficient_data) return false;
-  if (cell.subscription_tier !== row.tier) return false;
+  // Tier is optional in the resolved row when the catalog has no tier
+  // aliases for the active provider (e.g. OpenAI). When unset, all tiers
+  // emitted for that harness/limit_type pair are accepted.
+  if (row.tier && cell.subscription_tier !== row.tier) return false;
   if (cell.harness !== row.harness) return false;
   if (cell.limit_type !== row.limit_type) return false;
   if (row.region && cell.region !== row.region) return false;
