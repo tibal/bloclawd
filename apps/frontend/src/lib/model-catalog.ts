@@ -3,14 +3,39 @@
 // `lib/catalog.ts` over the Rust-emitted catalog.json.
 
 import type { Model } from "@web/Model";
+import type { TokenMixTotals } from "@web/TokenMixTotals";
 import type { TokenType } from "@web/TokenType";
 
-// Display labels for the four token types.
 export const TOKEN_TYPE_LABEL: Record<TokenType, string> = {
-  input: "Input",
-  output: "Output",
-  cached_read: "Cache read",
-  cached_write: "Cache write",
+  input_tokens: "input_tokens",
+  output_tokens: "output_tokens",
+  cache_read_input_tokens: "cache_read_input_tokens",
+  ephemeral_5m_input_tokens: "ephemeral_5m_input_tokens",
+  ephemeral_1h_input_tokens: "ephemeral_1h_input_tokens",
+  cached_input_tokens: "cached_input_tokens",
+  reasoning_output_tokens: "reasoning_output_tokens",
+};
+
+export type TokenMixField = keyof TokenMixTotals;
+
+export const TOKEN_MIX_FIELD_VALUES: readonly TokenMixField[] = [
+  "input_tokens",
+  "output_tokens",
+  "cache_read_input_tokens",
+  "ephemeral_5m_input_tokens",
+  "ephemeral_1h_input_tokens",
+  "cached_input_tokens",
+  "reasoning_output_tokens",
+];
+
+export const TOKEN_MIX_FIELD_LABEL: Record<TokenMixField, string> = {
+  input_tokens: "input_tokens",
+  output_tokens: "output_tokens",
+  cache_read_input_tokens: "cache_read_input_tokens",
+  ephemeral_5m_input_tokens: "ephemeral_5m_input_tokens",
+  ephemeral_1h_input_tokens: "ephemeral_1h_input_tokens",
+  cached_input_tokens: "cached_input_tokens",
+  reasoning_output_tokens: "reasoning_output_tokens",
 };
 
 export type Tone = "primary" | "teal" | "amber" | "violet" | "coral";
@@ -32,10 +57,23 @@ export const TONE_GRADIENT: Record<Tone, string> = {
 };
 
 export const TOKEN_TYPE_COLOR: Record<TokenType, Tone> = {
-  output: "amber",
-  input: "teal",
-  cached_read: "violet",
-  cached_write: "coral",
+  input_tokens: "teal",
+  output_tokens: "amber",
+  cache_read_input_tokens: "violet",
+  ephemeral_5m_input_tokens: "coral",
+  ephemeral_1h_input_tokens: "primary",
+  cached_input_tokens: "violet",
+  reasoning_output_tokens: "coral",
+};
+
+export const TOKEN_MIX_FIELD_COLOR: Record<TokenMixField, Tone> = {
+  input_tokens: "teal",
+  output_tokens: "amber",
+  cache_read_input_tokens: "violet",
+  ephemeral_5m_input_tokens: "coral",
+  ephemeral_1h_input_tokens: "primary",
+  cached_input_tokens: "violet",
+  reasoning_output_tokens: "coral",
 };
 
 export const MODEL_COLOR: Record<Model, Tone> = {

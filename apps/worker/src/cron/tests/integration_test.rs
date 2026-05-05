@@ -22,14 +22,13 @@ fn sample_payload(
         harness,
         region,
         tokens: TokenCounts {
-            input_5min: 100 + seed,
-            output_5min: 60 + seed,
-            cached_read_5min: 20 + seed,
-            cached_write_5min: 10 + seed,
-            input_5h: 1_000 + seed,
-            output_5h: 600 + seed,
-            cached_read_5h: 200 + seed,
-            cached_write_5h: 100 + seed,
+            input_tokens: 1_000 + seed,
+            output_tokens: 600 + seed,
+            cache_read_input_tokens: 200 + seed,
+            ephemeral_5m_input_tokens: 60 + seed,
+            ephemeral_1h_input_tokens: 40 + seed,
+            cached_input_tokens: 0,
+            reasoning_output_tokens: 0,
         },
     }
 }

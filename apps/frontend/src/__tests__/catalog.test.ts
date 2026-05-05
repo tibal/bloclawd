@@ -44,16 +44,12 @@ describe("catalog", () => {
     }
   });
 
-  it("every model has a price for every (token type, window)", () => {
+  it("every model has a price for every token type", () => {
     for (const model of CATALOG.models) {
       for (const tt of CATALOG.token_types) {
-        for (const w of CATALOG.windows) {
-          const price = model.prices.find(
-            (p) => p.token_type === tt && p.window === w,
-          );
-          expect(price).toBeDefined();
-          expect(price!.usd_per_token).toBeGreaterThan(0);
-        }
+        const price = model.prices.find((p) => p.token_type === tt);
+        expect(price).toBeDefined();
+        expect(price!.usd_per_token).toBeGreaterThan(0);
       }
     }
   });

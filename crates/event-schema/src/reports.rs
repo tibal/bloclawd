@@ -66,18 +66,21 @@ pub struct Percentiles {
 
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, TS)]
 #[ts(export)]
-pub struct TokenTypeTotals {
-    pub input: f64,
-    pub output: f64,
-    pub cached_read: f64,
-    pub cached_write: f64,
+pub struct TokenMixTotals {
+    pub input_tokens: f64,
+    pub output_tokens: f64,
+    pub cache_read_input_tokens: f64,
+    pub ephemeral_5m_input_tokens: f64,
+    pub ephemeral_1h_input_tokens: f64,
+    pub cached_input_tokens: f64,
+    pub reasoning_output_tokens: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]
 #[ts(export)]
 pub struct ModelTokenMix {
     pub model: Model,
-    pub tokens: TokenTypeTotals,
+    pub tokens: TokenMixTotals,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]

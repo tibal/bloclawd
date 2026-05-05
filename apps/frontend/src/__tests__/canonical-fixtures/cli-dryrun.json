@@ -9,14 +9,10 @@
         "region": "NA",
         "tier": "max20",
         "tokens": {
-            "cached_read_5h": 14,
-            "cached_read_5min": 14,
-            "cached_write_5h": 8,
-            "cached_write_5min": 8,
-            "input_5h": 150,
-            "input_5min": 150,
-            "output_5h": 275,
-            "output_5min": 275
+            "cache_read_input_tokens": 14,
+            "ephemeral_5m_input_tokens": 8,
+            "input_tokens": 150,
+            "output_tokens": 275
         },
         "v": 1
     },

@@ -243,8 +243,7 @@ fn cc_fixture_parses_cleanly_with_zero_failures() {
 fn cc_fixture_token_totals_match_expected() {
     let (events, failures) = cc_events_from_fixture();
     assert_eq!(failures, 0);
-    let counts =
-        bloclawd::aggregate::aggregate(&events, &[], WindowKind::FiveHour).expect("aggregate");
+    let counts = bloclawd::aggregate::aggregate(&events, &[], WindowKind::FiveHour);
     let expected_path = fixture_dir().join("cc/sample.expected.json");
     let generated = expected_fixture_json(counts, LimitType::FiveH);
     write_if_regen(&expected_path, &pretty_json(&generated));
@@ -298,8 +297,7 @@ fn codex_fixture_parses_cleanly_with_zero_failures() {
 fn codex_fixture_token_totals_match_expected() {
     let (events, failures) = codex_events_from_fixture();
     assert_eq!(failures, 0);
-    let counts =
-        bloclawd::aggregate::aggregate(&[], &events, WindowKind::FiveHour).expect("aggregate");
+    let counts = bloclawd::aggregate::aggregate(&[], &events, WindowKind::FiveHour);
     let expected_path = fixture_dir().join("codex/sample.expected.json");
     let generated = expected_fixture_json(counts, LimitType::FiveH);
     write_if_regen(&expected_path, &pretty_json(&generated));
@@ -441,7 +439,7 @@ fn codex_accepts_individual_max20_tier() {
 }
 
 #[test]
-fn week_submit_is_user_error_but_week_dry_run_is_allowed() {
+fn week_submit_is_allowed_and_week_dry_run_uses_weekly_limit_type() {
     let _env = env_lock();
     let guard = EnvGuard::new("week");
     copy_cc_fixture_to_home(&guard.home());
@@ -455,12 +453,13 @@ fn week_submit_is_user_error_but_week_dry_run_is_allowed() {
             "--end",
             "2026-01-01T06:00:00",
             "--week",
+            "--yes",
         ]),
         Uuid::parse_str("10000000-0000-4000-8000-000000000007").unwrap(),
         vec![Uuid::parse_str("20000000-0000-4000-8000-000000000007").unwrap()],
     )
-    .expect_err("week submit fails");
-    assert!(err.to_string().contains("--week submit not supported"));
+    .expect_err("week submit reaches network path in the test harness");
+    assert_eq!(err, IngestCliError::ServerUnavailable);
 
     let (code, output) = run_to_string(
         args(&[
@@ -479,6 +478,7 @@ fn week_submit_is_user_error_but_week_dry_run_is_allowed() {
     .expect("week dry-run succeeds");
     assert_eq!(code, 0);
     assert!(output.contains("bloclawd dry-run"));
+    assert!(output.contains(r#""limit_type": "weekly""#));
 }
 
 #[test]

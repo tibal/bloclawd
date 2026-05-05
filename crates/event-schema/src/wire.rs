@@ -37,14 +37,13 @@ mod tests {
             harness: Harness::Codex,
             region: Region::Na,
             tokens: TokenCounts {
-                input_5min: 10,
-                output_5min: 20,
-                cached_read_5min: 30,
-                cached_write_5min: 0,
-                input_5h: 100,
-                output_5h: 200,
-                cached_read_5h: 300,
-                cached_write_5h: 0,
+                input_tokens: 100,
+                output_tokens: 200,
+                cache_read_input_tokens: 0,
+                ephemeral_5m_input_tokens: 0,
+                ephemeral_1h_input_tokens: 0,
+                cached_input_tokens: 300,
+                reasoning_output_tokens: 20,
             },
         }
     }

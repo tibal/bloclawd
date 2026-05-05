@@ -3,48 +3,47 @@ import type { Tier } from "@web/Tier";
 import {
   TIER_VALUES,
   limitWindowsPerMonth,
-  tierLabel,
+  plansForProvider,
   tierMonthlyCostUsd,
+  tierLabel,
+  type ResolvedRow,
 } from "@/lib/catalog";
+import { percentilesForCells, cellsForRow } from "@/lib/cohort";
 import { formatUsd } from "@/lib/format";
 import type {
-  BucketCell,
   BucketEnvelope,
   Percentiles,
 } from "@/lib/r2";
 
 interface CostEquivalentPanelProps {
   bucket: BucketEnvelope;
+  filters: ResolvedRow;
   primary: keyof Percentiles;
-  filterCell: Pick<BucketCell, "harness" | "limit_type"> & {
-    region?: string;
-  };
 }
 
 const TIERS: readonly Tier[] = TIER_VALUES;
 
 export function CostEquivalentPanel({
   bucket,
+  filters,
   primary,
-  filterCell,
 }: CostEquivalentPanelProps) {
-  const limitType = filterCell.limit_type;
+  const limitType = filters.limit_type;
   const subscriptionPerWindow = (tier: Tier) =>
-    tierMonthlyCostUsd(tier) / limitWindowsPerMonth(limitType);
+    providerTierMonthlyCostUsd(filters, tier) / limitWindowsPerMonth(limitType);
 
   const rows = TIERS.map((tier) => {
-    const cell = bucket.cells.find(
-      (c) =>
-        c.subscription_tier === tier &&
-        c.harness === filterCell.harness &&
-        c.limit_type === filterCell.limit_type &&
-        (filterCell.region == null || c.region === filterCell.region),
+    const pcts = percentilesForCells(
+      cellsForRow(bucket, {
+        ...filters,
+        tier,
+      }),
     );
-    const pcts = cell?.api_cost_usd ?? null;
     const apiUsd = pcts ? pcts[primary] : null;
     const subUsd = subscriptionPerWindow(tier);
     return {
       tier,
+      label: providerTierLabel(filters, tier),
       apiUsd,
       subUsd,
       ratio: apiUsd ? apiUsd / Math.max(0.01, subUsd) : 0,
@@ -70,7 +69,7 @@ export function CostEquivalentPanel({
         {rows.map((r) => (
           <div key={r.tier}>
             <div className="flex items-center justify-between text-[12.5px]">
-              <span className="text-foreground">{tierLabel(r.tier)}</span>
+              <span className="text-foreground">{r.label}</span>
               <span className="font-mono tabular-nums text-foreground">
                 {r.apiUsd == null ? "—" : formatUsd(r.apiUsd)}
                 <span className="ml-2 text-muted-foreground text-[11px]">
@@ -107,5 +106,33 @@ export function CostEquivalentPanel({
         </div>
       </div>
     </div>
+  );
+}
+
+function providerTierLabel(filters: ResolvedRow, tier: Tier): string {
+  const plan = providerTierPlan(filters, tier);
+  return plan?.display_name ?? tierLabel(tier);
+}
+
+function providerTierMonthlyCostUsd(filters: ResolvedRow, tier: Tier): number {
+  const plan = providerTierPlan(filters, tier);
+  return plan?.monthly_cost_usd ?? tierMonthlyCostUsd(tier);
+}
+
+function providerTierPlan(filters: ResolvedRow, tier: Tier) {
+  const providerPlans = plansForProvider(filters.provider).filter(
+    (plan) =>
+      plan.harnesses.includes(filters.harness) &&
+      plan.limit_types.includes(filters.limit_type),
+  );
+  const direct = providerPlans.find((plan) => plan.tier_alias === tier);
+  if (direct) return direct;
+
+  // `Tier` is a provider-neutral price bucket on the wire. Some providers do
+  // not expose a catalog `tier_alias` yet, so pair their plans by the same
+  // monthly price bucket before falling back to the primary tier label.
+  const targetMonthlyCost = tierMonthlyCostUsd(tier);
+  return providerPlans.find(
+    (plan) => plan.monthly_cost_usd === targetMonthlyCost,
   );
 }

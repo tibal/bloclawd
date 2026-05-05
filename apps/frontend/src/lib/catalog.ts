@@ -16,7 +16,6 @@ import type { Provider } from "@web/Provider";
 import type { Region } from "@web/Region";
 import type { Tier } from "@web/Tier";
 import type { TokenType } from "@web/TokenType";
-import type { Window } from "@web/Window";
 
 export const CATALOG: Catalog = catalogJson as Catalog;
 
@@ -56,7 +55,6 @@ export const TOKEN_TYPE_VALUES = nonEmptyValues(
   CATALOG.token_types,
   "token types",
 );
-export const WINDOW_VALUES = nonEmptyValues(CATALOG.windows, "windows");
 
 export type CatalogFilters = {
   provider?: Provider;
@@ -436,10 +434,6 @@ export function tokenTypeOptions(): Options<TokenType> {
     value: tokenType,
     label: tokenType,
   }));
-}
-
-export function windowOptions(): Options<Window> {
-  return CATALOG.windows.map((window) => ({ value: window, label: window }));
 }
 
 export function limitTypeOptions(filters: CatalogFilters): Options<LimitType> {

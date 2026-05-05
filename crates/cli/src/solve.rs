@@ -62,14 +62,13 @@ mod tests {
             harness: Harness::ClaudeCode,
             region: Region::Na,
             tokens: TokenCounts {
-                input_5min: 1,
-                output_5min: 2,
-                cached_read_5min: 3,
-                cached_write_5min: 4,
-                input_5h: 5,
-                output_5h: 6,
-                cached_read_5h: 7,
-                cached_write_5h: 8,
+                input_tokens: 5,
+                output_tokens: 6,
+                cache_read_input_tokens: 7,
+                ephemeral_5m_input_tokens: 8,
+                ephemeral_1h_input_tokens: 9,
+                cached_input_tokens: 0,
+                reasoning_output_tokens: 0,
             },
         }
     }
@@ -78,7 +77,7 @@ mod tests {
     fn solve_for_payload_finds_nonce_at_k22() {
         let payload = sample_payload();
         let mut cid_bytes = [0_u8; 32];
-        cid_bytes[29..32].copy_from_slice(&[0xf2, 0xa5, 0x97]);
+        cid_bytes[29..32].copy_from_slice(&[0x03, 0x82, 0x12]);
         let cid = ChallengeId(cid_bytes);
         let (nonce, payload_hash) =
             solve_for_payload(&payload, &cid).expect("PoW solves within timeout");

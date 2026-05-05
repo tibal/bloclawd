@@ -24,6 +24,7 @@ import {
   type Series,
 } from "@/lib/chart-data";
 import { PERCENTILE_INDEX } from "@/lib/chart-tokens";
+import { aggregateCohortCell } from "@/lib/cohort";
 import {
   alignedHasValues,
   rowLabel,
@@ -43,11 +44,10 @@ import {
   useBucket,
   useManifest,
   useStatus,
-  type BucketCell,
-  type BucketEnvelope,
   type StatusJson,
 } from "@/lib/r2";
 import { routeHead } from "@/lib/route-head";
+import { pickTier } from "@/lib/tier-picker";
 
 export type { DashboardSearch };
 export { dashboardSearchSchema };
@@ -192,9 +192,15 @@ function CohortPanels({ search }: { search: DashboardSearch }) {
   // the panels alongside the chart.
   const manifest = useManifest();
   const nowMs = Date.now();
-  const { startMs, endMs } = rangeWindow(search, nowMs);
+  const { startMs, endMs, days } = rangeWindow(search, nowMs);
+  const resolution = pickTier(days);
   const tierPaths = manifest.data?.tiers ?? null;
-  const latestPath = pickLatestPathInRange(tierPaths, startMs, endMs);
+  const latestPath = pickLatestPathInRange(
+    tierPaths,
+    resolution,
+    startMs,
+    endMs,
+  );
   const bucketQuery = useBucket(latestPath?.tier ?? "h1", latestPath?.path ?? "");
   const bucket = latestPath ? bucketQuery.data : undefined;
 
@@ -203,24 +209,8 @@ function CohortPanels({ search }: { search: DashboardSearch }) {
     [search],
   );
   const cell = useMemo(
-    () =>
-      bucket
-        ? pickCellFromBucket(bucket, {
-            subscription_tier: resolved.tier,
-            harness: resolved.harness,
-            limit_type: resolved.limit_type,
-            region: resolved.region,
-          })
-        : null,
+    () => (bucket ? aggregateCohortCell(bucket, resolved) : null),
     [bucket, resolved],
-  );
-  const filterCell = useMemo(
-    () => ({
-      harness: resolved.harness,
-      limit_type: resolved.limit_type,
-      region: resolved.region,
-    }),
-    [resolved],
   );
 
   if (!bucket || !cell) return null;
@@ -231,8 +221,8 @@ function CohortPanels({ search }: { search: DashboardSearch }) {
       <TokenMixPanel cell={cell} />
       <CostEquivalentPanel
         bucket={bucket}
+        filters={resolved}
         primary={search.primary}
-        filterCell={filterCell}
       />
     </div>
   );
@@ -240,12 +230,18 @@ function CohortPanels({ search }: { search: DashboardSearch }) {
 
 function pickLatestPathInRange(
   tiers: { q15: string[]; h1: string[]; d1: string[] } | null,
+  preferredTier: "q15" | "h1" | "d1",
   startMs: number,
   endMs: number,
 ): { tier: "q15" | "h1" | "d1"; path: string } | null {
   if (!tiers) return null;
-  // Prefer the finest resolution available for the chosen range.
-  for (const tier of ["q15", "h1", "d1"] as const) {
+  // Mirror the chart resolution first, then fall back if that tier has no
+  // bucket in the selected range.
+  const orderedTiers = [
+    preferredTier,
+    ...(["q15", "h1", "d1"] as const).filter((tier) => tier !== preferredTier),
+  ];
+  for (const tier of orderedTiers) {
     const candidates = tiers[tier];
     if (!candidates.length) continue;
     let best: { ts: number; path: string } | null = null;
@@ -277,27 +273,6 @@ function parsePathTimestampMs(
   if (tier === "d1") return Date.UTC(y, m - 1, d);
   const [h = "0", mi = "0"] = (time ?? "").split("-");
   return Date.UTC(y, m - 1, d, Number(h), Number(mi));
-}
-
-function pickCellFromBucket(
-  bucket: BucketEnvelope,
-  match: Partial<
-    Pick<BucketCell, "subscription_tier" | "harness" | "region" | "limit_type">
-  >,
-): BucketCell | null {
-  return (
-    bucket.cells.find(
-      (cell) =>
-        (match.subscription_tier == null ||
-          cell.subscription_tier === match.subscription_tier) &&
-        (match.harness == null || cell.harness === match.harness) &&
-        (match.region == null || cell.region === match.region) &&
-        (match.limit_type == null || cell.limit_type === match.limit_type) &&
-        !cell.insufficient_data,
-    ) ??
-    bucket.cells.find((cell) => !cell.insufficient_data) ??
-    null
-  );
 }
 
 interface ChartAreaProps {
@@ -408,8 +383,8 @@ function KpiRow({ kpis, hasData }: { kpis: ComputedKpis; hasData: boolean }) {
       value: hasData ? formatDriftPct(kpis.driftPct) : "—",
       sub:
         hasData && kpis.driftPct !== null
-          ? "second half vs first half of window"
-          : "needs ≥ 4 buckets",
+          ? "during selected period"
+          : "needs at least 2 chart points",
     },
     {
       label: "p25 — p75 spread",
@@ -528,7 +503,7 @@ function computeKpis(
 }
 
 function computeDriftPct(p50: number[]): number | null {
-  if (p50.length < 4) return null;
+  if (p50.length < 2) return null;
   const mid = Math.floor(p50.length / 2);
   const firstHalf = mean(p50.slice(0, mid));
   const secondHalf = mean(p50.slice(mid));

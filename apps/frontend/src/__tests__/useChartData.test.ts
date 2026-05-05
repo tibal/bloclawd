@@ -211,10 +211,13 @@ function cell(
           {
             model,
             tokens: {
-              input: 100,
-              output: 50,
-              cached_read: 250,
-              cached_write: 10,
+              input_tokens: 100,
+              output_tokens: 50,
+              cache_read_input_tokens: 250,
+              ephemeral_5m_input_tokens: 10,
+              ephemeral_1h_input_tokens: 0,
+              cached_input_tokens: 0,
+              reasoning_output_tokens: 0,
             },
           },
         ]

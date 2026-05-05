@@ -10,14 +10,14 @@
 //! 4. Update tests if the new entry must be exhaustive.
 //!
 //! Wire compatibility: this module does NOT alter the canonical event schema.
-//! `Tier`, `Model`, `Harness`, `Region`, `LimitType`, `TokenType`, `Window` keep
+//! `Tier`, `Model`, `Harness`, `Region`, `LimitType`, and `TokenType` keep
 //! their existing JSON encodings. `Provider` and `Plan` are new and only travel
 //! through the generated TS catalog.
 
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::enums::{Harness, LimitType, Model, Region, Tier, TokenType, Window};
+use crate::enums::{Harness, LimitType, Model, Region, Tier, TokenType};
 
 /// Inference / hosting provider behind a model and plan.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, TS)]
@@ -55,12 +55,11 @@ pub enum Plan {
     OpenAIPro,
 }
 
-/// USD per token for a given (TokenType, Window) on a given model.
+/// USD per token for a given TokenType on a given model.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, TS)]
 #[ts(export)]
 pub struct PricePoint {
     pub token_type: TokenType,
-    pub window: Window,
     pub usd_per_token: f64,
 }
 
@@ -105,52 +104,42 @@ pub struct LimitInfo {
 
 // --- model price tables -----------------------------------------------------
 
-const fn full_window_prices(
+const fn full_prices(
     input: f64,
     output: f64,
-    cached_read: f64,
-    cached_write: f64,
-) -> [PricePoint; 8] {
+    cache_read_input: f64,
+    ephemeral_5m_input: f64,
+    ephemeral_1h_input: f64,
+    cached_input: f64,
+) -> [PricePoint; 7] {
     [
         PricePoint {
-            token_type: TokenType::Input,
-            window: Window::FiveMin,
+            token_type: TokenType::InputTokens,
             usd_per_token: input,
         },
         PricePoint {
-            token_type: TokenType::Output,
-            window: Window::FiveMin,
+            token_type: TokenType::OutputTokens,
             usd_per_token: output,
         },
         PricePoint {
-            token_type: TokenType::CachedRead,
-            window: Window::FiveMin,
-            usd_per_token: cached_read,
+            token_type: TokenType::CacheReadInputTokens,
+            usd_per_token: cache_read_input,
         },
         PricePoint {
-            token_type: TokenType::CachedWrite,
-            window: Window::FiveMin,
-            usd_per_token: cached_write,
+            token_type: TokenType::Ephemeral5mInputTokens,
+            usd_per_token: ephemeral_5m_input,
         },
         PricePoint {
-            token_type: TokenType::Input,
-            window: Window::FiveH,
-            usd_per_token: input,
+            token_type: TokenType::Ephemeral1hInputTokens,
+            usd_per_token: ephemeral_1h_input,
         },
         PricePoint {
-            token_type: TokenType::Output,
-            window: Window::FiveH,
+            token_type: TokenType::CachedInputTokens,
+            usd_per_token: cached_input,
+        },
+        PricePoint {
+            token_type: TokenType::ReasoningOutputTokens,
             usd_per_token: output,
-        },
-        PricePoint {
-            token_type: TokenType::CachedRead,
-            window: Window::FiveH,
-            usd_per_token: cached_read,
-        },
-        PricePoint {
-            token_type: TokenType::CachedWrite,
-            window: Window::FiveH,
-            usd_per_token: cached_write,
         },
     ]
 }
@@ -158,13 +147,15 @@ const fn full_window_prices(
 // Hand-curated per-model per-token prices.
 // Source: anthropic.com/pricing + openai.com/api/pricing, captured 2026-05-02.
 // USD per token. Used by cron to compute public API-equivalent costs.
-const OPUS47_PRICES: [PricePoint; 8] = full_window_prices(5e-6, 25e-6, 0.5e-6, 6.25e-6);
-const SONNET46_PRICES: [PricePoint; 8] = full_window_prices(3e-6, 15e-6, 0.3e-6, 3.75e-6);
-const SONNET45_PRICES: [PricePoint; 8] = full_window_prices(3e-6, 15e-6, 0.3e-6, 3.75e-6);
-const HAIKU45_PRICES: [PricePoint; 8] = full_window_prices(1e-6, 5e-6, 0.1e-6, 1.25e-6);
-const GPT5_PRICES: [PricePoint; 8] = full_window_prices(1.25e-6, 10e-6, 0.125e-6, 1.25e-6);
-const GPT55_PRICES: [PricePoint; 8] = full_window_prices(5e-6, 30e-6, 0.5e-6, 5e-6);
-const GPT5_CODEX_PRICES: [PricePoint; 8] = full_window_prices(1.25e-6, 10e-6, 0.125e-6, 1.25e-6);
+const OPUS47_PRICES: [PricePoint; 7] = full_prices(5e-6, 25e-6, 0.5e-6, 6.25e-6, 10e-6, 0.5e-6);
+const SONNET46_PRICES: [PricePoint; 7] = full_prices(3e-6, 15e-6, 0.3e-6, 3.75e-6, 6e-6, 0.3e-6);
+const SONNET45_PRICES: [PricePoint; 7] = full_prices(3e-6, 15e-6, 0.3e-6, 3.75e-6, 6e-6, 0.3e-6);
+const HAIKU45_PRICES: [PricePoint; 7] = full_prices(1e-6, 5e-6, 0.1e-6, 1.25e-6, 2e-6, 0.1e-6);
+const GPT5_PRICES: [PricePoint; 7] =
+    full_prices(1.25e-6, 10e-6, 0.125e-6, 1.25e-6, 1.25e-6, 0.125e-6);
+const GPT55_PRICES: [PricePoint; 7] = full_prices(5e-6, 30e-6, 0.5e-6, 5e-6, 5e-6, 0.5e-6);
+const GPT5_CODEX_PRICES: [PricePoint; 7] =
+    full_prices(1.25e-6, 10e-6, 0.125e-6, 1.25e-6, 1.25e-6, 0.125e-6);
 
 /// Every supported model, in canonical declaration order. Indexed lookups
 /// (`Model::info`) walk this list.
@@ -329,7 +320,6 @@ pub struct Catalog {
     pub limits: &'static [LimitInfo],
     pub limit_types: &'static [LimitType],
     pub token_types: &'static [TokenType],
-    pub windows: &'static [Window],
 }
 
 const ALL_PROVIDERS: &[Provider] = &[Provider::Anthropic, Provider::OpenAI];
@@ -358,12 +348,14 @@ pub const LIMITS: &[LimitInfo] = &[
     },
 ];
 const ALL_TOKEN_TYPES: &[TokenType] = &[
-    TokenType::Input,
-    TokenType::Output,
-    TokenType::CachedRead,
-    TokenType::CachedWrite,
+    TokenType::InputTokens,
+    TokenType::OutputTokens,
+    TokenType::CacheReadInputTokens,
+    TokenType::Ephemeral5mInputTokens,
+    TokenType::Ephemeral1hInputTokens,
+    TokenType::CachedInputTokens,
+    TokenType::ReasoningOutputTokens,
 ];
-const ALL_WINDOWS: &[Window] = &[Window::FiveMin, Window::FiveH];
 
 pub const CATALOG: Catalog = Catalog {
     providers: ALL_PROVIDERS,
@@ -375,7 +367,6 @@ pub const CATALOG: Catalog = Catalog {
     limits: LIMITS,
     limit_types: ALL_LIMIT_TYPES,
     token_types: ALL_TOKEN_TYPES,
-    windows: ALL_WINDOWS,
 };
 
 // --- accessors --------------------------------------------------------------
@@ -440,11 +431,11 @@ impl Model {
         self.info().provider
     }
 
-    pub fn price(self, token_type: TokenType, window: Window) -> Option<f64> {
+    pub fn price(self, token_type: TokenType) -> Option<f64> {
         self.info()
             .prices
             .iter()
-            .find(|p| p.token_type == token_type && p.window == window)
+            .find(|p| p.token_type == token_type)
             .map(|p| p.usd_per_token)
     }
 
@@ -547,22 +538,39 @@ mod tests {
     }
 
     #[test]
-    fn every_model_token_type_window_tuple_has_a_price() {
+    fn every_model_token_type_has_a_price() {
         for model in ALL_MODELS {
             for token_type in [
-                TokenType::Input,
-                TokenType::Output,
-                TokenType::CachedRead,
-                TokenType::CachedWrite,
+                TokenType::InputTokens,
+                TokenType::OutputTokens,
+                TokenType::CacheReadInputTokens,
+                TokenType::Ephemeral5mInputTokens,
+                TokenType::Ephemeral1hInputTokens,
+                TokenType::CachedInputTokens,
+                TokenType::ReasoningOutputTokens,
             ] {
-                for window in [Window::FiveMin, Window::FiveH] {
-                    let price = model.price(token_type, window).unwrap_or_else(|| {
-                        panic!("missing price for {model:?} {token_type:?} {window:?}")
-                    });
-                    assert!(price.is_finite() && price > 0.0);
-                }
+                let price = model
+                    .price(token_type)
+                    .unwrap_or_else(|| panic!("missing price for {model:?} {token_type:?}"));
+                assert!(price.is_finite() && price > 0.0);
             }
         }
+    }
+
+    #[test]
+    fn catalog_token_types_use_raw_provider_terms() {
+        assert_eq!(
+            CATALOG.token_types,
+            &[
+                TokenType::InputTokens,
+                TokenType::OutputTokens,
+                TokenType::CacheReadInputTokens,
+                TokenType::Ephemeral5mInputTokens,
+                TokenType::Ephemeral1hInputTokens,
+                TokenType::CachedInputTokens,
+                TokenType::ReasoningOutputTokens,
+            ]
+        );
     }
 
     #[test]
@@ -571,11 +579,9 @@ mod tests {
             if model.provider() != Provider::Anthropic {
                 continue;
             }
-            for window in [Window::FiveMin, Window::FiveH] {
-                let cached = model.price(TokenType::CachedRead, window).unwrap();
-                let input = model.price(TokenType::Input, window).unwrap();
-                assert!(cached < input, "{model:?} {window:?}");
-            }
+            let cached = model.price(TokenType::CacheReadInputTokens).unwrap();
+            let input = model.price(TokenType::InputTokens).unwrap();
+            assert!(cached < input, "{model:?}");
         }
     }
 

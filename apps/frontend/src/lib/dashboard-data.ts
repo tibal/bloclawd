@@ -14,9 +14,12 @@ import {
   type FilterRow,
 } from "@/lib/dashboard-search";
 import {
+  cellMatchesRow,
+  percentilesForCells,
+} from "@/lib/cohort";
+import {
   useBuckets,
   useManifest,
-  type BucketCell,
   type BucketEnvelope,
   type Percentiles,
 } from "@/lib/r2";
@@ -139,7 +142,7 @@ function buildMeta(
   for (const bucket of buckets) {
     let total = 0;
     for (const cell of bucket.cells) {
-      if (!matchesCell(cell, row)) continue;
+      if (!cellMatchesRow(cell, row)) continue;
       total += cell.n_retained;
     }
     counts.set(bucketTimestampSeconds(bucket), total);
@@ -177,64 +180,9 @@ function extractPercentiles(
   bucket: BucketEnvelope,
   row: ResolvedRow,
 ): Percentiles | null {
-  const candidates: Array<{ weight: number; percentiles: Percentiles }> = [];
-  for (const cell of bucket.cells) {
-    if (!matchesCell(cell, row)) continue;
-    const extracted = cellPercentilesFor(cell, row);
-    if (extracted) candidates.push(extracted);
-  }
-  return weightedAverage(candidates);
-}
-
-function matchesCell(cell: BucketCell, row: ResolvedRow): boolean {
-  if (cell.insufficient_data) return false;
-  // Tier is optional in the resolved row when the catalog has no tier
-  // aliases for the active provider (e.g. OpenAI). When unset, all tiers
-  // emitted for that harness/limit_type pair are accepted.
-  if (row.tier && cell.subscription_tier !== row.tier) return false;
-  if (cell.harness !== row.harness) return false;
-  if (cell.limit_type !== row.limit_type) return false;
-  if (row.region && cell.region !== row.region) return false;
-  return true;
-}
-
-function cellPercentilesFor(
-  cell: BucketCell,
-  row: ResolvedRow,
-): { weight: number; percentiles: Percentiles } | null {
-  const percentiles = cell.api_cost_usd ?? null;
-  if (!percentiles) return null;
-  if (row.model) {
-    const hasModel = cell.typical_mix.some(
-      (entry) =>
-        entry.model === row.model &&
-        (entry.tokens.input > 0 ||
-          entry.tokens.output > 0 ||
-          entry.tokens.cached_read > 0 ||
-          entry.tokens.cached_write > 0),
-    );
-    if (!hasModel) return null;
-  }
-  return { weight: Math.max(1, cell.n_retained), percentiles };
-}
-
-function weightedAverage(
-  values: Array<{ weight: number; percentiles: Percentiles }>,
-): Percentiles | null {
-  if (values.length === 0) return null;
-  const totalWeight = values.reduce((sum, item) => sum + item.weight, 0);
-  const weighted = (key: keyof Percentiles) =>
-    values.reduce(
-      (sum, item) => sum + item.percentiles[key] * item.weight,
-      0,
-    ) / totalWeight;
-  return {
-    p10: weighted("p10"),
-    p25: weighted("p25"),
-    p50: weighted("p50"),
-    p75: weighted("p75"),
-    p90: weighted("p90"),
-  };
+  return percentilesForCells(
+    bucket.cells.filter((cell) => cellMatchesRow(cell, row)),
+  );
 }
 
 function pathsForRange(

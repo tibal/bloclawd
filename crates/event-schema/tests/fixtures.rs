@@ -28,14 +28,13 @@ pub fn sample_event_payload() -> EventPayload {
 /// Sample TokenCounts within accepted bounds (each field <= TOKEN_COUNT_MAX).
 pub fn sample_token_counts() -> TokenCounts {
     TokenCounts {
-        input_5min: 12_345,
-        output_5min: 6_789,
-        cached_read_5min: 1_000,
-        cached_write_5min: 500,
-        input_5h: 123_456,
-        output_5h: 67_890,
-        cached_read_5h: 10_000,
-        cached_write_5h: 5_000,
+        input_tokens: 123_456,
+        output_tokens: 67_890,
+        cache_read_input_tokens: 10_000,
+        ephemeral_5m_input_tokens: 3_000,
+        ephemeral_1h_input_tokens: 2_000,
+        cached_input_tokens: 0,
+        reasoning_output_tokens: 0,
     }
 }
 
@@ -63,5 +62,5 @@ fn sample_payload_round_trips_through_serde() {
     let json = serde_json::to_string(&p).expect("serialize");
     let back: EventPayload = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(p.v, back.v);
-    assert_eq!(p.tokens.input_5min, back.tokens.input_5min);
+    assert_eq!(p.tokens.input_tokens, back.tokens.input_tokens);
 }

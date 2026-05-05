@@ -11,14 +11,11 @@ fn valid_base_json() -> &'static str {
         "harness": "claude-code",
         "region": "NA",
         "tokens": {
-            "input_5min": 1,
-            "output_5min": 2,
-            "cached_read_5min": 3,
-            "cached_write_5min": 4,
-            "input_5h": 5,
-            "output_5h": 6,
-            "cached_read_5h": 7,
-            "cached_write_5h": 8
+            "input_tokens": 1,
+            "output_tokens": 2,
+            "cache_read_input_tokens": 3,
+            "ephemeral_5m_input_tokens": 4,
+            "ephemeral_1h_input_tokens": 5
         }
     }"#
 }
@@ -44,14 +41,11 @@ fn unknown_field_message_starts_with_unknown_field_and_includes_backticked_name(
         "harness": "claude-code",
         "region": "NA",
         "tokens": {
-            "input_5min": 1,
-            "output_5min": 2,
-            "cached_read_5min": 3,
-            "cached_write_5min": 4,
-            "input_5h": 5,
-            "output_5h": 6,
-            "cached_read_5h": 7,
-            "cached_write_5h": 8
+            "input_tokens": 1,
+            "output_tokens": 2,
+            "cache_read_input_tokens": 3,
+            "ephemeral_5m_input_tokens": 4,
+            "ephemeral_1h_input_tokens": 5
         },
         "extra": "x"
     }"#;
@@ -70,14 +64,11 @@ fn unknown_variant_message_starts_with_unknown_variant() {
         "harness": "claude-code",
         "region": "NA",
         "tokens": {
-            "input_5min": 1,
-            "output_5min": 2,
-            "cached_read_5min": 3,
-            "cached_write_5min": 4,
-            "input_5h": 5,
-            "output_5h": 6,
-            "cached_read_5h": 7,
-            "cached_write_5h": 8
+            "input_tokens": 1,
+            "output_tokens": 2,
+            "cache_read_input_tokens": 3,
+            "ephemeral_5m_input_tokens": 4,
+            "ephemeral_1h_input_tokens": 5
         }
     }"#;
     let err = serde_json::from_str::<EventPayload>(raw).unwrap_err();
@@ -95,14 +86,11 @@ fn version_overflow_message_contains_invalid_value_integer_and_expected_u8() {
         "harness": "claude-code",
         "region": "NA",
         "tokens": {
-            "input_5min": 1,
-            "output_5min": 2,
-            "cached_read_5min": 3,
-            "cached_write_5min": 4,
-            "input_5h": 5,
-            "output_5h": 6,
-            "cached_read_5h": 7,
-            "cached_write_5h": 8
+            "input_tokens": 1,
+            "output_tokens": 2,
+            "cache_read_input_tokens": 3,
+            "ephemeral_5m_input_tokens": 4,
+            "ephemeral_1h_input_tokens": 5
         }
     }"#;
     let err = serde_json::from_str::<EventPayload>(raw).unwrap_err();

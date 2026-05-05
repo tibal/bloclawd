@@ -1,7 +1,7 @@
 # Event Payload Schema v1
 
 **Status:** Frozen for v1.
-**Last updated:** 2026-05-02
+**Last updated:** 2026-05-05
 **Source of truth:** canonical types are defined in Rust under `crates/event-schema/`. Enum definitions live in `crates/event-schema/src/enums.rs`; payload structs live in `crates/event-schema/src/payload.rs`; TypeScript bindings for the SPA are generated via `ts-rs` into `apps/web/src/generated/`.
 
 The former enum JSON artifact is not a v1 schema source and is not published to R2. Frontend filters import enum values from the generated TypeScript bindings.
@@ -23,14 +23,13 @@ The former enum JSON artifact is not a v1 schema source and is not published to 
     "harness":         "<one of Harness>",
     "region":          "<one of Region>",
     "tokens": {
-      "input_5min":         <unsigned int>,
-      "output_5min":        <unsigned int>,
-      "cached_read_5min":   <unsigned int>,
-      "cached_write_5min":  <unsigned int>,
-      "input_5h":           <unsigned int>,
-      "output_5h":          <unsigned int>,
-      "cached_read_5h":     <unsigned int>,
-      "cached_write_5h":    <unsigned int>
+      "input_tokens":               <unsigned int>,
+      "output_tokens":              <unsigned int>,
+      "cache_read_input_tokens":     <unsigned int, optional>,
+      "ephemeral_5m_input_tokens":   <unsigned int, optional>,
+      "ephemeral_1h_input_tokens":   <unsigned int, optional>,
+      "cached_input_tokens":         <unsigned int, optional>,
+      "reasoning_output_tokens":     <unsigned int, optional>
     }
   }
 }
@@ -43,6 +42,14 @@ The `payload` object is canonicalized via RFC 8785 JCS (see `spec/payload-canoni
 **`submission_group_id`** (string, base64url no-padding UUIDv4, REQUIRED). Per-invocation linkage id; all events emitted by ONE `bloclawd` invocation share the same value. It is a TRANSPORT field: it is NOT included in the JCS-canonical bytes that produce `payload_hash`, is NOT bound into the 72-byte PoW input, and is NOT signed by HMAC. The Worker validates UUIDv4 format and persists it on the row; cron strips it before any R2 emission. Logging boundary: `submission_group_id` MUST NOT appear in any log line.
 
 **`limit_type`** (`"5h" | "weekly"`, REQUIRED). Top-level transport field, NOT inside payload. Source: CLI flag (`--5h` | `--week`). Used by cron to split each cohort into per-limit-type cells.
+
+`tokens` stores raw provider artifact terminology. Claude Code rows use
+`input_tokens`, `output_tokens`, `cache_read_input_tokens`,
+`ephemeral_5m_input_tokens`, and `ephemeral_1h_input_tokens`. Codex rows use
+`input_tokens`, `cached_input_tokens`, `output_tokens`, and
+`reasoning_output_tokens`. Provider-specific absent fields deserialize as zero
+and are omitted from canonical JSON when zero. `limit_type` is the selected
+collection range only; it is not a token dimension.
 
 ## 2. Field Constraints
 
@@ -105,4 +112,5 @@ These properties are enforced at materialization, not at ingest. The DB rows ret
 
 ---
 *2026-05-05 - R2 aggregation changed from ridge/unified-token output to direct API-cost percentiles plus typical token mix.*
+*2026-05-05 - Token payload fields changed to raw Claude Code/Codex artifact terms; derived `_5min`/`_5h` token fields were removed.*
 *2026-05-02 - `limit_type` added as wire envelope field.*

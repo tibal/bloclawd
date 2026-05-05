@@ -1,30 +1,30 @@
 import { useMemo } from "react";
 
 import {
-  TOKEN_TYPE_COLOR,
-  TOKEN_TYPE_LABEL,
+  TOKEN_MIX_FIELD_COLOR,
+  TOKEN_MIX_FIELD_LABEL,
+  TOKEN_MIX_FIELD_VALUES,
   TONE_GRADIENT,
   TONE_VAR,
   type Tone,
 } from "@/lib/model-catalog";
 import { formatTokens } from "@/lib/format";
-import type { BucketCell } from "@/lib/r2";
-import { TOKEN_TYPE_VALUES } from "@/lib/catalog";
+import type { AggregatedCohortCell } from "@/lib/cohort";
 
 interface TokenMixPanelProps {
-  cell: BucketCell;
+  cell: Pick<AggregatedCohortCell, "typical_mix" | "cell_count">;
 }
 
 export function TokenMixPanel({ cell }: TokenMixPanelProps) {
   const { totals, sumPrimary } = useMemo(() => {
     const mix = cell.typical_mix;
-    const aggregated = TOKEN_TYPE_VALUES.map((tt) => {
+    const aggregated = TOKEN_MIX_FIELD_VALUES.map((field) => {
       let value = 0;
       for (const entry of mix) {
-        value += entry.tokens[tt];
+        value += entry.tokens[field];
       }
-      return { tokenType: tt, value };
-    });
+      return { field, value };
+    }).filter((entry) => entry.value > 0);
     const sum = Math.max(
       0.0001,
       aggregated.reduce((s, t) => s + t.value, 0),
@@ -38,14 +38,14 @@ export function TokenMixPanel({ cell }: TokenMixPanelProps) {
         <div>
           <div className="text-sm font-medium text-foreground">Typical token mix</div>
           <div className="font-mono text-[11.5px] text-muted-foreground">
-            average retained submission · share of token volume
+            average retained submission · raw provider token fields
           </div>
         </div>
-        <span className="tag">cohort</span>
+        <span className="tag">{cell.cell_count} cell{cell.cell_count === 1 ? "" : "s"}</span>
       </div>
       <div className="px-5 pb-5 flex flex-col gap-4">
         <StackedBar entries={totals.map((t) => ({
-          color: TOKEN_TYPE_COLOR[t.tokenType],
+          color: TOKEN_MIX_FIELD_COLOR[t.field],
           weight: t.value / sumPrimary,
         }))} />
 
@@ -53,10 +53,10 @@ export function TokenMixPanel({ cell }: TokenMixPanelProps) {
           {totals.map((t) => {
             const sharePct = (t.value / sumPrimary) * 100;
             return (
-              <div key={t.tokenType}>
+              <div key={t.field}>
                 <div className="flex items-center justify-between text-[12.5px]">
-                  <span className={`tag dot ${TOKEN_TYPE_COLOR[t.tokenType]}`}>
-                    {TOKEN_TYPE_LABEL[t.tokenType]}
+                  <span className={`tag dot ${TOKEN_MIX_FIELD_COLOR[t.field]}`}>
+                    {TOKEN_MIX_FIELD_LABEL[t.field]}
                   </span>
                   <span className="font-mono tabular-nums text-foreground">
                     {sharePct.toFixed(0)}%
@@ -67,7 +67,7 @@ export function TokenMixPanel({ cell }: TokenMixPanelProps) {
                 </div>
                 <ShareTrack
                   value={sharePct}
-                  tone={TOKEN_TYPE_COLOR[t.tokenType]}
+                  tone={TOKEN_MIX_FIELD_COLOR[t.field]}
                 />
               </div>
             );

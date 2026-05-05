@@ -43,9 +43,6 @@ pub struct Args {
     pub five_hour: bool,
 
     /// 7-day window: [end - 7d, end].
-    ///
-    /// In v1, `--week` is parsed for forward compatibility but is supported
-    /// only on the dry-run path; submit mode exits with code 1.
     #[arg(long)]
     pub week: bool,
 

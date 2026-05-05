@@ -9,7 +9,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use bloclawd_schema::{
     BucketCell as Cell, EventPayload, Harness, LimitType, Model, ModelTokenMix, Percentiles,
-    Region, Tier, TokenCounts, TokenType, TokenTypeTotals, Window,
+    Provider, Region, Tier, TokenCounts, TokenMixTotals, TokenType,
 };
 use uuid::Uuid;
 
@@ -33,7 +33,7 @@ struct CellKey {
 #[derive(Debug, Clone)]
 struct SubmissionAggregate {
     api_cost_usd: f64,
-    tokens_by_model: BTreeMap<Model, TokenTypeTotals>,
+    tokens_by_model: BTreeMap<Model, TokenMixTotals>,
 }
 
 pub fn compute_cells(rows: &[EventRow]) -> Vec<Cell> {
@@ -140,7 +140,7 @@ fn aggregate_submissions(rows: &[&EventRow]) -> Vec<SubmissionAggregate> {
 
 fn aggregate_submission(rows: &[&EventRow]) -> SubmissionAggregate {
     let mut api_cost_usd = 0.0;
-    let mut tokens_by_model: BTreeMap<Model, TokenTypeTotals> = BTreeMap::new();
+    let mut tokens_by_model: BTreeMap<Model, TokenMixTotals> = BTreeMap::new();
 
     for row in rows {
         api_cost_usd += api_cost_for_payload(&row.payload);
@@ -157,45 +157,50 @@ fn aggregate_submission(rows: &[&EventRow]) -> SubmissionAggregate {
 fn api_cost_for_payload(payload: &EventPayload) -> f64 {
     let model = payload.model;
     let t = &payload.tokens;
-    cost_part(model, TokenType::Input, Window::FiveMin, t.input_5min)
-        + cost_part(model, TokenType::Output, Window::FiveMin, t.output_5min)
-        + cost_part(
-            model,
-            TokenType::CachedRead,
-            Window::FiveMin,
-            t.cached_read_5min,
-        )
-        + cost_part(
-            model,
-            TokenType::CachedWrite,
-            Window::FiveMin,
-            t.cached_write_5min,
-        )
-        + cost_part(model, TokenType::Input, Window::FiveH, t.input_5h)
-        + cost_part(model, TokenType::Output, Window::FiveH, t.output_5h)
-        + cost_part(
-            model,
-            TokenType::CachedRead,
-            Window::FiveH,
-            t.cached_read_5h,
-        )
-        + cost_part(
-            model,
-            TokenType::CachedWrite,
-            Window::FiveH,
-            t.cached_write_5h,
-        )
+
+    match model.provider() {
+        Provider::Anthropic => {
+            cost_part(model, TokenType::InputTokens, t.input_tokens)
+                + cost_part(model, TokenType::OutputTokens, t.output_tokens)
+                + cost_part(
+                    model,
+                    TokenType::CacheReadInputTokens,
+                    t.cache_read_input_tokens,
+                )
+                + cost_part(
+                    model,
+                    TokenType::Ephemeral5mInputTokens,
+                    t.ephemeral_5m_input_tokens,
+                )
+                + cost_part(
+                    model,
+                    TokenType::Ephemeral1hInputTokens,
+                    t.ephemeral_1h_input_tokens,
+                )
+        }
+        Provider::OpenAI => {
+            let uncached_input_tokens = t.input_tokens.saturating_sub(t.cached_input_tokens);
+            cost_part(model, TokenType::InputTokens, uncached_input_tokens)
+                + cost_part(model, TokenType::CachedInputTokens, t.cached_input_tokens)
+                + cost_part(model, TokenType::OutputTokens, t.output_tokens)
+                + cost_part(
+                    model,
+                    TokenType::ReasoningOutputTokens,
+                    t.reasoning_output_tokens,
+                )
+        }
+    }
 }
 
-fn cost_part(model: Model, token_type: TokenType, window: Window, count: u64) -> f64 {
+fn cost_part(model: Model, token_type: TokenType, count: u64) -> f64 {
     let price = model
-        .price(token_type, window)
-        .expect("catalog price table must cover every model/token/window tuple");
+        .price(token_type)
+        .expect("catalog price table must cover every model/token tuple");
     count as f64 * price
 }
 
 fn average_mix(retained: &[&SubmissionAggregate]) -> Vec<ModelTokenMix> {
-    let mut totals: BTreeMap<Model, TokenTypeTotals> = BTreeMap::new();
+    let mut totals: BTreeMap<Model, TokenMixTotals> = BTreeMap::new();
     for submission in retained {
         for (model, tokens) in &submission.tokens_by_model {
             let entry = totals.entry(*model).or_default();
@@ -257,32 +262,44 @@ fn group_by_submission_refs<'a>(rows: &[&'a EventRow]) -> HashMap<Uuid, Vec<&'a 
     })
 }
 
-fn add_counts(total: &mut TokenTypeTotals, tokens: &TokenCounts) {
-    total.input += (tokens.input_5min + tokens.input_5h) as f64;
-    total.output += (tokens.output_5min + tokens.output_5h) as f64;
-    total.cached_read += (tokens.cached_read_5min + tokens.cached_read_5h) as f64;
-    total.cached_write += (tokens.cached_write_5min + tokens.cached_write_5h) as f64;
+fn add_counts(total: &mut TokenMixTotals, tokens: &TokenCounts) {
+    total.input_tokens += tokens.input_tokens as f64;
+    total.output_tokens += tokens.output_tokens as f64;
+    total.cache_read_input_tokens += tokens.cache_read_input_tokens as f64;
+    total.ephemeral_5m_input_tokens += tokens.ephemeral_5m_input_tokens as f64;
+    total.ephemeral_1h_input_tokens += tokens.ephemeral_1h_input_tokens as f64;
+    total.cached_input_tokens += tokens.cached_input_tokens as f64;
+    total.reasoning_output_tokens += tokens.reasoning_output_tokens as f64;
 }
 
-fn add_totals(total: &mut TokenTypeTotals, other: &TokenTypeTotals) {
-    total.input += other.input;
-    total.output += other.output;
-    total.cached_read += other.cached_read;
-    total.cached_write += other.cached_write;
+fn add_totals(total: &mut TokenMixTotals, other: &TokenMixTotals) {
+    total.input_tokens += other.input_tokens;
+    total.output_tokens += other.output_tokens;
+    total.cache_read_input_tokens += other.cache_read_input_tokens;
+    total.ephemeral_5m_input_tokens += other.ephemeral_5m_input_tokens;
+    total.ephemeral_1h_input_tokens += other.ephemeral_1h_input_tokens;
+    total.cached_input_tokens += other.cached_input_tokens;
+    total.reasoning_output_tokens += other.reasoning_output_tokens;
 }
 
-fn scale_totals(total: &mut TokenTypeTotals, factor: f64) {
-    total.input *= factor;
-    total.output *= factor;
-    total.cached_read *= factor;
-    total.cached_write *= factor;
+fn scale_totals(total: &mut TokenMixTotals, factor: f64) {
+    total.input_tokens *= factor;
+    total.output_tokens *= factor;
+    total.cache_read_input_tokens *= factor;
+    total.ephemeral_5m_input_tokens *= factor;
+    total.ephemeral_1h_input_tokens *= factor;
+    total.cached_input_tokens *= factor;
+    total.reasoning_output_tokens *= factor;
 }
 
-fn is_zero(total: &TokenTypeTotals) -> bool {
-    total.input == 0.0
-        && total.output == 0.0
-        && total.cached_read == 0.0
-        && total.cached_write == 0.0
+fn is_zero(total: &TokenMixTotals) -> bool {
+    total.input_tokens == 0.0
+        && total.output_tokens == 0.0
+        && total.cache_read_input_tokens == 0.0
+        && total.ephemeral_5m_input_tokens == 0.0
+        && total.ephemeral_1h_input_tokens == 0.0
+        && total.cached_input_tokens == 0.0
+        && total.reasoning_output_tokens == 0.0
 }
 
 #[cfg(test)]
@@ -294,7 +311,7 @@ mod tests {
         tier: Tier,
         harness: Harness,
         region: Region,
-        input_5min: u64,
+        input_tokens: u64,
     ) -> EventPayload {
         EventPayload {
             v: 1,
@@ -303,14 +320,13 @@ mod tests {
             harness,
             region,
             tokens: TokenCounts {
-                input_5min,
-                output_5min: 0,
-                cached_read_5min: 0,
-                cached_write_5min: 0,
-                input_5h: 0,
-                output_5h: 0,
-                cached_read_5h: 0,
-                cached_write_5h: 0,
+                input_tokens,
+                output_tokens: 0,
+                cache_read_input_tokens: 0,
+                ephemeral_5m_input_tokens: 0,
+                ephemeral_1h_input_tokens: 0,
+                cached_input_tokens: 0,
+                reasoning_output_tokens: 0,
             },
         }
     }
@@ -322,11 +338,11 @@ mod tests {
         harness: Harness,
         region: Region,
         limit_type: LimitType,
-        input_5min: u64,
+        input_tokens: u64,
     ) -> EventRow {
         EventRow {
             submission_group_id: Uuid::from_u128(group_idx),
-            payload: payload(model, tier, harness, region, input_5min),
+            payload: payload(model, tier, harness, region, input_tokens),
             limit_type,
         }
     }
@@ -412,10 +428,51 @@ mod tests {
     fn compute_cells_uses_catalog_prices() {
         let rows = rows_for_inputs(&[1_000]);
         let cost = api_cost_for_payload(&rows[0].payload);
-        let expected = 1_000.0
+        let expected = 1_000.0 * Model::ClaudeSonnet45.price(TokenType::InputTokens).unwrap();
+        assert_eq!(cost, expected);
+    }
+
+    #[test]
+    fn api_cost_prices_claude_ephemeral_cache_creation_fields() {
+        let mut payload = payload(
+            Model::ClaudeSonnet45,
+            Tier::Pro,
+            Harness::ClaudeCode,
+            Region::Na,
+            0,
+        );
+        payload.tokens.ephemeral_5m_input_tokens = 10;
+        payload.tokens.ephemeral_1h_input_tokens = 20;
+
+        let cost = api_cost_for_payload(&payload);
+        let expected = 10.0
             * Model::ClaudeSonnet45
-                .price(TokenType::Input, Window::FiveMin)
-                .unwrap();
+                .price(TokenType::Ephemeral5mInputTokens)
+                .unwrap()
+            + 20.0
+                * Model::ClaudeSonnet45
+                    .price(TokenType::Ephemeral1hInputTokens)
+                    .unwrap();
+
+        assert_eq!(cost, expected);
+    }
+
+    #[test]
+    fn api_cost_prices_openai_cached_input_as_subset_of_input() {
+        let mut payload = payload(Model::Gpt55, Tier::Max20, Harness::Codex, Region::Na, 100);
+        payload.tokens.cached_input_tokens = 70;
+        payload.tokens.output_tokens = 10;
+        payload.tokens.reasoning_output_tokens = 5;
+
+        let cost = api_cost_for_payload(&payload);
+        let expected = 30.0 * Model::Gpt55.price(TokenType::InputTokens).unwrap()
+            + 70.0 * Model::Gpt55.price(TokenType::CachedInputTokens).unwrap()
+            + 10.0 * Model::Gpt55.price(TokenType::OutputTokens).unwrap()
+            + 5.0
+                * Model::Gpt55
+                    .price(TokenType::ReasoningOutputTokens)
+                    .unwrap();
+
         assert_eq!(cost, expected);
     }
 
@@ -444,8 +501,8 @@ mod tests {
             .find(|entry| entry.model == Model::ClaudeOpus47)
             .unwrap();
 
-        assert_eq!(sonnet.tokens.input, 30.0);
-        assert_eq!(opus.tokens.input, 20.0);
+        assert_eq!(sonnet.tokens.input_tokens, 30.0);
+        assert_eq!(opus.tokens.input_tokens, 20.0);
     }
 
     #[test]

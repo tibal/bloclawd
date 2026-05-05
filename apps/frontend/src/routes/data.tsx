@@ -46,7 +46,7 @@ const fieldAnnotations = [
   {
     field: "tokens",
     meaning:
-      "Per-window token counts for input, output, cached_read, and cached_write over 5min and 5h windows.",
+      "Raw provider token fields for Claude Code and Codex, including distinct cache and reasoning counters.",
     anonymity:
       "Validated below 1e12 server-side and emitted publicly only through smoothed percentiles or powers-of-2 bins.",
   },

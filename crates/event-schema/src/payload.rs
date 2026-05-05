@@ -4,6 +4,10 @@ use ts_rs::TS;
 
 pub const TOKEN_COUNT_MAX: u64 = 1_000_000_000_000;
 
+fn is_zero_u64(value: &u64) -> bool {
+    *value == 0
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS, PartialEq, Eq)]
 #[ts(export)]
 #[serde(deny_unknown_fields)]
@@ -21,21 +25,24 @@ pub struct EventPayload {
 #[serde(deny_unknown_fields)]
 pub struct TokenCounts {
     #[ts(type = "number")]
-    pub input_5min: u64,
+    pub input_tokens: u64,
     #[ts(type = "number")]
-    pub output_5min: u64,
+    pub output_tokens: u64,
+    #[serde(default, skip_serializing_if = "is_zero_u64")]
     #[ts(type = "number")]
-    pub cached_read_5min: u64,
+    pub cache_read_input_tokens: u64,
+    #[serde(default, skip_serializing_if = "is_zero_u64")]
     #[ts(type = "number")]
-    pub cached_write_5min: u64,
+    pub ephemeral_5m_input_tokens: u64,
+    #[serde(default, skip_serializing_if = "is_zero_u64")]
     #[ts(type = "number")]
-    pub input_5h: u64,
+    pub ephemeral_1h_input_tokens: u64,
+    #[serde(default, skip_serializing_if = "is_zero_u64")]
     #[ts(type = "number")]
-    pub output_5h: u64,
+    pub cached_input_tokens: u64,
+    #[serde(default, skip_serializing_if = "is_zero_u64")]
     #[ts(type = "number")]
-    pub cached_read_5h: u64,
-    #[ts(type = "number")]
-    pub cached_write_5h: u64,
+    pub reasoning_output_tokens: u64,
 }
 
 impl EventPayload {
@@ -47,14 +54,13 @@ impl EventPayload {
         }
         let t = &self.tokens;
         for (name, val) in [
-            ("input_5min", t.input_5min),
-            ("output_5min", t.output_5min),
-            ("cached_read_5min", t.cached_read_5min),
-            ("cached_write_5min", t.cached_write_5min),
-            ("input_5h", t.input_5h),
-            ("output_5h", t.output_5h),
-            ("cached_read_5h", t.cached_read_5h),
-            ("cached_write_5h", t.cached_write_5h),
+            ("input_tokens", t.input_tokens),
+            ("output_tokens", t.output_tokens),
+            ("cache_read_input_tokens", t.cache_read_input_tokens),
+            ("ephemeral_5m_input_tokens", t.ephemeral_5m_input_tokens),
+            ("ephemeral_1h_input_tokens", t.ephemeral_1h_input_tokens),
+            ("cached_input_tokens", t.cached_input_tokens),
+            ("reasoning_output_tokens", t.reasoning_output_tokens),
         ] {
             if val > TOKEN_COUNT_MAX {
                 return Err(format!("tokens.{name} = {val} exceeds {TOKEN_COUNT_MAX}"));
@@ -76,14 +82,13 @@ mod tests {
             harness: Harness::ClaudeCode,
             region: Region::Na,
             tokens: TokenCounts {
-                input_5min: 1,
-                output_5min: 2,
-                cached_read_5min: 3,
-                cached_write_5min: 4,
-                input_5h: 5,
-                output_5h: 6,
-                cached_read_5h: 7,
-                cached_write_5h: 8,
+                input_tokens: 1,
+                output_tokens: 2,
+                cache_read_input_tokens: 3,
+                ephemeral_5m_input_tokens: 4,
+                ephemeral_1h_input_tokens: 5,
+                cached_input_tokens: 0,
+                reasoning_output_tokens: 0,
             },
         }
     }
@@ -99,15 +104,15 @@ mod tests {
     #[test]
     fn validate_rejects_token_field_above_limit_with_field_name() {
         let mut payload = sample_payload();
-        payload.tokens.input_5h = TOKEN_COUNT_MAX + 1;
+        payload.tokens.input_tokens = TOKEN_COUNT_MAX + 1;
         let err = payload.validate().unwrap_err();
-        assert!(err.contains("input_5h"));
+        assert!(err.contains("input_tokens"));
     }
 
     #[test]
     fn validate_accepts_high_real_world_cache_reads() {
         let mut payload = sample_payload();
-        payload.tokens.cached_read_5h = 10_378_233;
+        payload.tokens.cache_read_input_tokens = 10_378_233;
         assert!(payload.validate().is_ok());
     }
 
@@ -116,14 +121,35 @@ mod tests {
         let mut payload = sample_payload();
         payload.model = Model::Gpt55;
         payload.harness = Harness::Codex;
-        payload.tokens.input_5h = 2_064_887_608;
-        payload.tokens.cached_read_5h = 1_630_864_859;
+        payload.tokens.input_tokens = 2_064_887_608;
+        payload.tokens.cached_input_tokens = 1_630_864_859;
         assert!(payload.validate().is_ok());
     }
 
     #[test]
     fn validate_accepts_valid_payload() {
         assert!(sample_payload().validate().is_ok());
+    }
+
+    #[test]
+    fn serde_defaults_provider_specific_absent_fields_to_zero() {
+        let raw = r#"{
+            "v": 1,
+            "model": "claude-sonnet-4-5",
+            "tier": "pro",
+            "harness": "claude-code",
+            "region": "NA",
+            "tokens": {
+                "input_tokens": 1,
+                "output_tokens": 2
+            }
+        }"#;
+        let payload: EventPayload = serde_json::from_str(raw).expect("payload parses");
+        assert_eq!(payload.tokens.cache_read_input_tokens, 0);
+        assert_eq!(payload.tokens.ephemeral_5m_input_tokens, 0);
+        assert_eq!(payload.tokens.ephemeral_1h_input_tokens, 0);
+        assert_eq!(payload.tokens.cached_input_tokens, 0);
+        assert_eq!(payload.tokens.reasoning_output_tokens, 0);
     }
 
     #[test]
@@ -135,14 +161,11 @@ mod tests {
             "harness": "claude-code",
             "region": "NA",
             "tokens": {
-                "input_5min": 1,
-                "output_5min": 2,
-                "cached_read_5min": 3,
-                "cached_write_5min": 4,
-                "input_5h": 5,
-                "output_5h": 6,
-                "cached_read_5h": 7,
-                "cached_write_5h": 8
+                "input_tokens": 1,
+                "output_tokens": 2,
+                "cache_read_input_tokens": 3,
+                "ephemeral_5m_input_tokens": 4,
+                "ephemeral_1h_input_tokens": 5
             },
             "extra": "x"
         }"#;

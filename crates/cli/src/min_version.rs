@@ -25,16 +25,28 @@ pub fn cc_first_line_passes_field_shape(line: &Value) -> bool {
         None => return false,
     };
 
+    let has_split_cache_creation = usage
+        .get("cache_creation")
+        .and_then(|creation| creation.get("ephemeral_5m_input_tokens"))
+        .and_then(Value::as_u64)
+        .is_some()
+        && usage
+            .get("cache_creation")
+            .and_then(|creation| creation.get("ephemeral_1h_input_tokens"))
+            .and_then(Value::as_u64)
+            .is_some();
+    let has_legacy_cache_creation = usage
+        .get("cache_creation_input_tokens")
+        .and_then(Value::as_u64)
+        .is_some();
+
     usage.get("input_tokens").and_then(Value::as_u64).is_some()
         && usage.get("output_tokens").and_then(Value::as_u64).is_some()
         && usage
             .get("cache_read_input_tokens")
             .and_then(Value::as_u64)
             .is_some()
-        && usage
-            .get("cache_creation_input_tokens")
-            .and_then(Value::as_u64)
-            .is_some()
+        && (has_split_cache_creation || has_legacy_cache_creation)
 }
 
 pub fn codex_first_token_count_passes_field_shape(line: &Value) -> bool {
