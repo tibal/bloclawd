@@ -1,7 +1,8 @@
 # Deploy worker + frontend to the Cloudflare production environment.
 #
-# Trigger: GitHub Release published (the same event that fires
-# release-smoke.yml). The `production` GitHub Environment requires a
+# Trigger: GitHub Release published by a user/app token, or manual
+# workflow_dispatch for prereleases and GITHUB_TOKEN-created releases.
+# The `production` GitHub Environment requires a
 # reviewer to click Approve before either job starts -- prod is never
 # unattended even if a release tag is cut accidentally. Pre-releases are
 # skipped (operator may still trigger via workflow_dispatch).

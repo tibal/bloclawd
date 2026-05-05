@@ -7,6 +7,10 @@
 # docs/RELEASE.md instead — see plan 05-12. From `0.1.1` onward this
 # workflow is the smoke gate.
 #
+# The workflow can also be dispatched manually with `tag=vX.Y.Z`; release.yml
+# uses that path because releases created with GITHUB_TOKEN do not fan out
+# `release.published` workflows.
+#
 # Status surfaces on the GH Release via Actions check status. Operator
 # decides whether to yank (cargo yank) / hotfix on red — workflow does
 # NOT auto-yank.
@@ -23,12 +27,18 @@ name: Release smoke
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to smoke, for example v0.1.2
+        required: true
+        type: string
 
 concurrency:
   # `cancel-in-progress: true` here is fine — smoke is restartable. (Unlike
   # release.yml which uses cancel-in-progress: false because cargo publish
   # is irreversible.)
-  group: smoke-${{ github.event.release.tag_name }}
+  group: smoke-${{ github.event.release.tag_name || inputs.tag }}
   cancel-in-progress: true
 
 permissions:
@@ -54,7 +64,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           # Use the tagged commit so the fixture matches the release.
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
           # Sparse-checkout the fixture and dist-workspace.toml only —
           # full checkout is wasteful. dist-workspace.toml is needed by
           # the brew step to read the tap path.
@@ -65,7 +75,7 @@ jobs:
       - name: Install via cargo
         if: matrix.channel == 'cargo'
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
         run: |
           # Strip leading 'v' from tag (release.toml emits `vX.Y.Z`; cargo
           # install --version expects `X.Y.Z`).
@@ -132,12 +142,20 @@ jobs:
           # Ensure cargo bin on PATH for curl-installed binary, and
           # /opt/homebrew/bin (Apple Silicon) / /usr/local/bin (Intel + brew default)
           # for brew-installed binary.
-          export PATH="$HOME/.cargo/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
+          INSTALL_HOME="$HOME"
+          export PATH="$INSTALL_HOME/.cargo/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
           FIXTURE=crates/cli/tests/fixtures/cc/sample.jsonl
           if [[ ! -f "$FIXTURE" ]]; then
             echo "::error::Fixture missing: $FIXTURE"; exit 1
           fi
-          bloclawd --5h --cc "$FIXTURE" --dry-run > smoke.stdout 2> smoke.stderr
+          SMOKE_HOME="$RUNNER_TEMP/bloclawd-smoke-home"
+          mkdir -p "$SMOKE_HOME/.claude/projects/redacted-project"
+          cp "$FIXTURE" "$SMOKE_HOME/.claude/projects/redacted-project/sample.jsonl"
+          export HOME="$SMOKE_HOME"
+          export BLOCLAWD_COUNTRY=US
+          export BLOCLAWD_API_URL=https://127.0.0.1:9
+
+          bloclawd --cc --tier max20 --end "2026-01-01T06:00:00" --5h --dry-run > smoke.stdout 2> smoke.stderr
           echo "::group::stdout"; cat smoke.stdout; echo "::endgroup::"
           echo "::group::stderr"; cat smoke.stderr; echo "::endgroup::"
 
@@ -179,7 +197,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v6
         with:
-          name: smoke-${{ matrix.runner }}-${{ matrix.channel }}-${{ github.event.release.tag_name }}
+          name: smoke-${{ matrix.runner }}-${{ matrix.channel }}-${{ github.event.release.tag_name || inputs.tag }}
           path: |
             install.log
             smoke.stdout
@@ -192,7 +210,7 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     env:
-      RELEASE_TAG: ${{ github.event.release.tag_name }}
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
       SMOKE_RESULT: ${{ needs.smoke.result }}
     steps:
       - name: Surface result
