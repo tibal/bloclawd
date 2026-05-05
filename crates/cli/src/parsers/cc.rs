@@ -21,10 +21,11 @@ pub struct CcEvent {
     pub timestamp_utc: DateTime<Utc>,
     pub request_id: String,
     pub model: Model,
-    pub input: u64,
-    pub output: u64,
-    pub cached_read: u64,
-    pub cached_write: u64,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub cache_read_input_tokens: u64,
+    pub ephemeral_5m_input_tokens: u64,
+    pub ephemeral_1h_input_tokens: u64,
 }
 
 pub fn parse_cc_line(line: &str) -> Option<CcEvent> {
@@ -46,25 +47,41 @@ pub fn parse_cc_line(line: &str) -> Option<CcEvent> {
     let model: Model = serde_json::from_value(Value::String(model_str.to_string())).ok()?;
 
     let usage = msg.get("usage")?;
-    let input = usage.get("input_tokens")?.as_u64()?;
-    let output = usage.get("output_tokens")?.as_u64()?;
-    let cached_read = usage
+    let input_tokens = usage.get("input_tokens")?.as_u64()?;
+    let output_tokens = usage.get("output_tokens")?.as_u64()?;
+    let cache_read_input_tokens = usage
         .get("cache_read_input_tokens")
         .and_then(Value::as_u64)
         .unwrap_or(0);
-    let cached_write = usage
+    let legacy_cache_creation_input_tokens = usage
         .get("cache_creation_input_tokens")
         .and_then(Value::as_u64)
         .unwrap_or(0);
+    let cache_creation = usage.get("cache_creation");
+    let parsed_ephemeral_5m_input_tokens = cache_creation
+        .and_then(|creation| creation.get("ephemeral_5m_input_tokens"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let ephemeral_1h_input_tokens = cache_creation
+        .and_then(|creation| creation.get("ephemeral_1h_input_tokens"))
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    let ephemeral_5m_input_tokens =
+        if parsed_ephemeral_5m_input_tokens > 0 || ephemeral_1h_input_tokens > 0 {
+            parsed_ephemeral_5m_input_tokens
+        } else {
+            legacy_cache_creation_input_tokens
+        };
 
     Some(CcEvent {
         timestamp_utc,
         request_id,
         model,
-        input,
-        output,
-        cached_read,
-        cached_write,
+        input_tokens,
+        output_tokens,
+        cache_read_input_tokens,
+        ephemeral_5m_input_tokens,
+        ephemeral_1h_input_tokens,
     })
 }
 
@@ -184,7 +201,7 @@ pub fn parse_session_file(
             checked_shape = true;
             if !cc_first_line_passes_field_shape(&value) {
                 return Err(anyhow!(
-                    "Claude Code session format is unsupported; bloclawd requires Claude Code >= {MIN_CC_VERSION} with assistant message.usage input_tokens, output_tokens, cache_read_input_tokens, and cache_creation_input_tokens"
+                    "Claude Code session format is unsupported; bloclawd requires Claude Code >= {MIN_CC_VERSION} with assistant message.usage input_tokens, output_tokens, cache_read_input_tokens, and cache_creation.ephemeral_5m_input_tokens/ephemeral_1h_input_tokens or legacy cache_creation_input_tokens"
                 ));
             }
         }
@@ -272,10 +289,25 @@ mod tests {
             .expect("assistant usage parses");
         assert_eq!(event.model, Model::ClaudeSonnet45);
         assert_eq!(event.request_id, "req_123");
-        assert_eq!(event.input, 10);
-        assert_eq!(event.output, 20);
-        assert_eq!(event.cached_read, 30);
-        assert_eq!(event.cached_write, 40);
+        assert_eq!(event.input_tokens, 10);
+        assert_eq!(event.output_tokens, 20);
+        assert_eq!(event.cache_read_input_tokens, 30);
+        assert_eq!(event.ephemeral_5m_input_tokens, 40);
+        assert_eq!(event.ephemeral_1h_input_tokens, 0);
+    }
+
+    #[test]
+    fn parse_cc_line_reads_split_cache_creation_ttls() {
+        let mut line = cc_line("claude-opus-4-7", true, "2026-01-01T12:00:00Z");
+        line = line.replace(
+            r#""cache_read_input_tokens":30,"cache_creation_input_tokens":40"#,
+            r#""cache_read_input_tokens":30,"cache_creation_input_tokens":40,"cache_creation":{"ephemeral_5m_input_tokens":12,"ephemeral_1h_input_tokens":28}"#,
+        );
+
+        let event = parse_cc_line(&line).expect("assistant usage parses");
+
+        assert_eq!(event.ephemeral_5m_input_tokens, 12);
+        assert_eq!(event.ephemeral_1h_input_tokens, 28);
     }
 
     #[test]
@@ -312,17 +344,18 @@ mod tests {
             timestamp_utc: ts(0),
             request_id: "req_same".to_string(),
             model: Model::ClaudeSonnet45,
-            input: 1,
-            output: 2,
-            cached_read: 3,
-            cached_write: 4,
+            input_tokens: 1,
+            output_tokens: 2,
+            cache_read_input_tokens: 3,
+            ephemeral_5m_input_tokens: 4,
+            ephemeral_1h_input_tokens: 0,
         };
         let mut events = vec![base.clone(), base.clone(), base];
-        events[2].output = 9;
+        events[2].output_tokens = 9;
 
         let deduped = dedup_by_request_id(events);
         assert_eq!(deduped.len(), 1);
-        assert_eq!(deduped[0].output, 9);
+        assert_eq!(deduped[0].output_tokens, 9);
     }
 
     #[test]
@@ -331,26 +364,28 @@ mod tests {
             timestamp_utc: ts(2),
             request_id: "req_same".to_string(),
             model: Model::ClaudeSonnet45,
-            input: 1,
-            output: 9,
-            cached_read: 3,
-            cached_write: 4,
+            input_tokens: 1,
+            output_tokens: 9,
+            cache_read_input_tokens: 3,
+            ephemeral_5m_input_tokens: 4,
+            ephemeral_1h_input_tokens: 0,
         };
         let newer = CcEvent {
             timestamp_utc: ts(3),
             request_id: "req_same".to_string(),
             model: Model::ClaudeSonnet45,
-            input: 1,
-            output: 99,
-            cached_read: 3,
-            cached_write: 4,
+            input_tokens: 1,
+            output_tokens: 99,
+            cache_read_input_tokens: 3,
+            ephemeral_5m_input_tokens: 4,
+            ephemeral_1h_input_tokens: 0,
         };
 
         let deduped = dedup_by_request_id(vec![newer.clone(), older]);
 
         assert_eq!(deduped.len(), 1);
         assert_eq!(deduped[0].timestamp_utc, newer.timestamp_utc);
-        assert_eq!(deduped[0].output, 99);
+        assert_eq!(deduped[0].output_tokens, 99);
     }
 
     #[test]
@@ -360,46 +395,51 @@ mod tests {
                 timestamp_utc: ts(-2),
                 request_id: "a".into(),
                 model: Model::ClaudeSonnet45,
-                input: 1,
-                output: 1,
-                cached_read: 0,
-                cached_write: 0,
+                input_tokens: 1,
+                output_tokens: 1,
+                cache_read_input_tokens: 0,
+                ephemeral_5m_input_tokens: 0,
+                ephemeral_1h_input_tokens: 0,
             },
             CcEvent {
                 timestamp_utc: ts(-1),
                 request_id: "b".into(),
                 model: Model::ClaudeSonnet45,
-                input: 1,
-                output: 1,
-                cached_read: 0,
-                cached_write: 0,
+                input_tokens: 1,
+                output_tokens: 1,
+                cache_read_input_tokens: 0,
+                ephemeral_5m_input_tokens: 0,
+                ephemeral_1h_input_tokens: 0,
             },
             CcEvent {
                 timestamp_utc: ts(0),
                 request_id: "c".into(),
                 model: Model::ClaudeSonnet45,
-                input: 1,
-                output: 1,
-                cached_read: 0,
-                cached_write: 0,
+                input_tokens: 1,
+                output_tokens: 1,
+                cache_read_input_tokens: 0,
+                ephemeral_5m_input_tokens: 0,
+                ephemeral_1h_input_tokens: 0,
             },
             CcEvent {
                 timestamp_utc: ts(1),
                 request_id: "d".into(),
                 model: Model::ClaudeSonnet45,
-                input: 1,
-                output: 1,
-                cached_read: 0,
-                cached_write: 0,
+                input_tokens: 1,
+                output_tokens: 1,
+                cache_read_input_tokens: 0,
+                ephemeral_5m_input_tokens: 0,
+                ephemeral_1h_input_tokens: 0,
             },
             CcEvent {
                 timestamp_utc: ts(2),
                 request_id: "e".into(),
                 model: Model::ClaudeSonnet45,
-                input: 1,
-                output: 1,
-                cached_read: 0,
-                cached_write: 0,
+                input_tokens: 1,
+                output_tokens: 1,
+                cache_read_input_tokens: 0,
+                ephemeral_5m_input_tokens: 0,
+                ephemeral_1h_input_tokens: 0,
             },
         ];
 
@@ -426,8 +466,9 @@ mod tests {
     fn missing_cache_fields_default_to_zero() {
         let event = parse_cc_line(&cc_line("claude-sonnet-4-5", false, "2026-01-01T12:00:00Z"))
             .expect("assistant usage parses");
-        assert_eq!(event.cached_read, 0);
-        assert_eq!(event.cached_write, 0);
+        assert_eq!(event.cache_read_input_tokens, 0);
+        assert_eq!(event.ephemeral_5m_input_tokens, 0);
+        assert_eq!(event.ephemeral_1h_input_tokens, 0);
     }
 
     #[test]

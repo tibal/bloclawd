@@ -5,18 +5,22 @@ import { describe, expect, it, vi } from "vitest";
 
 import { routeTree } from "@/routeTree.gen";
 
-vi.mock("@/lib/dashboard-data", () => ({
-  useChartData: () => ({
-    data: null,
-    compareData: null,
-    meta: null,
-    loading: false,
-    error: null,
-    bucketsLoaded: 0,
-    bucketsTotal: 0,
-  }),
-  useDelayedLoading: () => false,
-}));
+vi.mock("@/lib/dashboard-data", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/dashboard-data")>();
+  return {
+    ...actual,
+    useChartData: () => ({
+      curves: [],
+      meta: null,
+      loading: false,
+      error: null,
+      bucketsLoaded: 0,
+      bucketsTotal: 0,
+      resolution: "h1" as const,
+    }),
+    useDelayedLoading: () => false,
+  };
+});
 
 vi.mock("@/lib/r2", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/r2")>();
@@ -78,7 +82,7 @@ async function renderPath(path: string) {
 describe("frontend routes", () => {
   it.each([
     ["/", "When do AI subscription users actually hit limits?"],
-    ["/dashboard", "Pick a tier"],
+    ["/dashboard", "API-equivalent cost"],
     ["/compare", "Pro vs Max5 vs Max20"],
     ["/methodology", "How bloclawd computes what you see"],
     ["/methodology/changelog", "Methodology changelog"],

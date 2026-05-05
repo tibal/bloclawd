@@ -8,8 +8,8 @@ import type { ModelTokenMix } from "@web/ModelTokenMix";
 import type { Percentiles } from "@web/Percentiles";
 import type { ReportResolution } from "@web/ReportResolution";
 import type { StatusJson } from "@web/StatusJson";
+import type { TokenMixTotals } from "@web/TokenMixTotals";
 import type { TokenType } from "@web/TokenType";
-import type { TokenTypeTotals } from "@web/TokenTypeTotals";
 
 // Empty default = same-origin: SPA fetches `/reports/v1/...` via the
 // frontend Worker, which proxies the R2 bucket through its BUCKET
@@ -52,8 +52,8 @@ export type {
   ModelTokenMix,
   Percentiles,
   StatusJson,
+  TokenMixTotals,
   TokenType,
-  TokenTypeTotals,
 };
 
 export type Tier = ReportResolution;

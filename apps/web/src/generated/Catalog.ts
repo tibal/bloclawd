@@ -8,11 +8,10 @@ import type { Provider } from "./Provider";
 import type { Region } from "./Region";
 import type { Tier } from "./Tier";
 import type { TokenType } from "./TokenType";
-import type { Window } from "./Window";
 
 /**
  * Whole catalog as a single serializable document. Used by xtask to emit
  * `apps/web/src/generated/catalog.json`; consumed by the frontend for
  * cascading filter logic.
  */
-export type Catalog = { providers: Array<Provider>, plans: Array<PlanInfo>, models: Array<ModelInfo>, tiers: Array<Tier>, harnesses: Array<Harness>, regions: Array<Region>, limits: Array<LimitInfo>, limit_types: Array<LimitType>, token_types: Array<TokenType>, windows: Array<Window>, };
+export type Catalog = { providers: Array<Provider>, plans: Array<PlanInfo>, models: Array<ModelInfo>, tiers: Array<Tier>, harnesses: Array<Harness>, regions: Array<Region>, limits: Array<LimitInfo>, limit_types: Array<LimitType>, token_types: Array<TokenType>, };

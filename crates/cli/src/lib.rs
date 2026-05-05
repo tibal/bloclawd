@@ -69,12 +69,6 @@ pub fn run_inner_with_output<W: Write, E: Write>(
         ));
     }
 
-    if args.week && !args.dry_run {
-        return Err(IngestCliError::UserError(
-            "--week submit not supported in v1; use --dry-run only".into(),
-        ));
-    }
-
     let (tier, _) = resolve_tier(&args, stderr)?;
 
     let harness_schema = if args.cc {
@@ -115,8 +109,7 @@ pub fn run_inner_with_output<W: Write, E: Write>(
         (Vec::new(), 0)
     };
 
-    let by_model = aggregate::aggregate(&cc_events, &codex_events, WindowKind::FiveHour)
-        .map_err(|e| IngestCliError::UserError(e.to_string()))?;
+    let by_model = aggregate::aggregate(&cc_events, &codex_events, WindowKind::FiveHour);
     if by_model.is_empty() {
         return Err(IngestCliError::NoEvents);
     }

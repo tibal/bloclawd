@@ -5,7 +5,7 @@
 use bloclawd_schema::{
     BucketCell, BucketEnvelope, Catalog, EventPayload, Harness, IngestHealth, LimitInfo, Manifest,
     ManifestTiers, Model, ModelInfo, ModelTokenMix, Percentiles, Plan, PlanInfo, PricePoint,
-    Provider, Region, ReportResolution, StatusJson, Tier, TokenCounts, TokenTypeTotals,
+    Provider, Region, ReportResolution, StatusJson, Tier, TokenCounts, TokenMixTotals,
 };
 
 #[test]
@@ -26,7 +26,7 @@ fn types_load() {
     let _ = std::any::type_name::<ReportResolution>();
     let _ = std::any::type_name::<IngestHealth>();
     let _ = std::any::type_name::<Percentiles>();
-    let _ = std::any::type_name::<TokenTypeTotals>();
+    let _ = std::any::type_name::<TokenMixTotals>();
     let _ = std::any::type_name::<ModelTokenMix>();
     let _ = std::any::type_name::<BucketCell>();
     let _ = std::any::type_name::<BucketEnvelope>();

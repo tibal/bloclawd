@@ -65,23 +65,20 @@ pub enum LimitType {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, TS)]
 #[ts(export)]
 pub enum TokenType {
-    #[serde(rename = "input")]
-    Input,
-    #[serde(rename = "output")]
-    Output,
-    #[serde(rename = "cached_read")]
-    CachedRead,
-    #[serde(rename = "cached_write")]
-    CachedWrite,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, TS)]
-#[ts(export)]
-pub enum Window {
-    #[serde(rename = "5min")]
-    FiveMin,
-    #[serde(rename = "5h")]
-    FiveH,
+    #[serde(rename = "input_tokens")]
+    InputTokens,
+    #[serde(rename = "output_tokens")]
+    OutputTokens,
+    #[serde(rename = "cache_read_input_tokens")]
+    CacheReadInputTokens,
+    #[serde(rename = "ephemeral_5m_input_tokens")]
+    Ephemeral5mInputTokens,
+    #[serde(rename = "ephemeral_1h_input_tokens")]
+    Ephemeral1hInputTokens,
+    #[serde(rename = "cached_input_tokens")]
+    CachedInputTokens,
+    #[serde(rename = "reasoning_output_tokens")]
+    ReasoningOutputTokens,
 }
 
 #[cfg(test)]
@@ -141,35 +138,34 @@ mod tests {
     #[test]
     fn token_types_round_trip() {
         assert_eq!(
-            serde_json::to_string(&TokenType::Input).unwrap(),
-            r#""input""#
+            serde_json::to_string(&TokenType::InputTokens).unwrap(),
+            r#""input_tokens""#
         );
         assert_eq!(
-            serde_json::to_string(&TokenType::Output).unwrap(),
-            r#""output""#
+            serde_json::to_string(&TokenType::OutputTokens).unwrap(),
+            r#""output_tokens""#
         );
         assert_eq!(
-            serde_json::to_string(&TokenType::CachedRead).unwrap(),
-            r#""cached_read""#
+            serde_json::to_string(&TokenType::CacheReadInputTokens).unwrap(),
+            r#""cache_read_input_tokens""#
         );
         assert_eq!(
-            serde_json::to_string(&TokenType::CachedWrite).unwrap(),
-            r#""cached_write""#
+            serde_json::to_string(&TokenType::Ephemeral5mInputTokens).unwrap(),
+            r#""ephemeral_5m_input_tokens""#
+        );
+        assert_eq!(
+            serde_json::to_string(&TokenType::Ephemeral1hInputTokens).unwrap(),
+            r#""ephemeral_1h_input_tokens""#
+        );
+        assert_eq!(
+            serde_json::to_string(&TokenType::CachedInputTokens).unwrap(),
+            r#""cached_input_tokens""#
+        );
+        assert_eq!(
+            serde_json::to_string(&TokenType::ReasoningOutputTokens).unwrap(),
+            r#""reasoning_output_tokens""#
         );
         assert!(serde_json::from_str::<TokenType>(r#""INPUT""#).is_err());
-        assert!(serde_json::from_str::<TokenType>(r#""input_tokens""#).is_err());
         assert!(serde_json::from_str::<TokenType>(r#""reads_cached""#).is_err());
-    }
-
-    #[test]
-    fn windows_round_trip() {
-        assert_eq!(
-            serde_json::to_string(&Window::FiveMin).unwrap(),
-            r#""5min""#
-        );
-        assert_eq!(serde_json::to_string(&Window::FiveH).unwrap(), r#""5h""#);
-        assert!(serde_json::from_str::<Window>(r#""5min_codex""#).is_err());
-        assert!(serde_json::from_str::<Window>(r#""5h_codex""#).is_err());
-        assert!(serde_json::from_str::<Window>(r#""daily""#).is_err());
     }
 }

@@ -21,16 +21,15 @@ pub fn render_dry_run(group_id: &str, events: &[SubmittedEvent]) -> Result<Strin
     }
 
     let header = format!(
-        "| {:<22} | {:>10} | {:>11} | {:>16} | {:>17} | {:>10} | {:>10} | {:>15} | {:>15} |",
+        "| {:<22} | {:>12} | {:>13} | {:>23} | {:>25} | {:>25} | {:>19} | {:>23} |",
         "model",
-        "input_5min",
-        "output_5min",
-        "cached_read_5min",
-        "cached_write_5min",
-        "input_5h",
-        "output_5h",
-        "cached_read_5h",
-        "cached_write_5h"
+        "input_tokens",
+        "output_tokens",
+        "cache_read_input_tokens",
+        "ephemeral_5m_input_tokens",
+        "ephemeral_1h_input_tokens",
+        "cached_input_tokens",
+        "reasoning_output_tokens"
     );
     let sep: String = header
         .chars()
@@ -47,16 +46,15 @@ pub fn render_dry_run(group_id: &str, events: &[SubmittedEvent]) -> Result<Strin
     for event in events {
         let tokens = &event.payload.tokens;
         let row = format!(
-            "| {:<22} | {:>10} | {:>11} | {:>16} | {:>17} | {:>10} | {:>10} | {:>15} | {:>15} |",
+            "| {:<22} | {:>12} | {:>13} | {:>23} | {:>25} | {:>25} | {:>19} | {:>23} |",
             model_name(event)?,
-            tokens.input_5min,
-            tokens.output_5min,
-            tokens.cached_read_5min,
-            tokens.cached_write_5min,
-            tokens.input_5h,
-            tokens.output_5h,
-            tokens.cached_read_5h,
-            tokens.cached_write_5h
+            tokens.input_tokens,
+            tokens.output_tokens,
+            tokens.cache_read_input_tokens,
+            tokens.ephemeral_5m_input_tokens,
+            tokens.ephemeral_1h_input_tokens,
+            tokens.cached_input_tokens,
+            tokens.reasoning_output_tokens
         );
         out.push_str(&row);
         out.push('\n');
@@ -157,14 +155,13 @@ mod tests {
                 harness: Harness::ClaudeCode,
                 region: Region::Na,
                 tokens: TokenCounts {
-                    input_5min: 10 + index as u64,
-                    output_5min: 20 + index as u64,
-                    cached_read_5min: 30 + index as u64,
-                    cached_write_5min: 40 + index as u64,
-                    input_5h: 100 + index as u64,
-                    output_5h: 200 + index as u64,
-                    cached_read_5h: 300 + index as u64,
-                    cached_write_5h: 400 + index as u64,
+                    input_tokens: 100 + index as u64,
+                    output_tokens: 200 + index as u64,
+                    cache_read_input_tokens: 300 + index as u64,
+                    ephemeral_5m_input_tokens: 40 + index as u64,
+                    ephemeral_1h_input_tokens: 50 + index as u64,
+                    cached_input_tokens: 0,
+                    reasoning_output_tokens: 0,
                 },
             },
         }

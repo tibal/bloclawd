@@ -180,7 +180,7 @@ mod tests {
     use std::time::{Duration, UNIX_EPOCH};
 
     use bloclawd_schema::{
-        Harness, LimitType, Model, ModelTokenMix, Percentiles, Region, Tier, TokenTypeTotals,
+        Harness, LimitType, Model, ModelTokenMix, Percentiles, Region, Tier, TokenMixTotals,
     };
 
     const FIXTURE_NAME: &str = "r2_v1_schema.json";
@@ -296,11 +296,14 @@ mod tests {
             n_retained: 21,
             typical_mix: vec![ModelTokenMix {
                 model: Model::ClaudeSonnet45,
-                tokens: TokenTypeTotals {
-                    input: 1200.0,
-                    output: 450.0,
-                    cached_read: 8000.0,
-                    cached_write: 100.0,
+                tokens: TokenMixTotals {
+                    input_tokens: 1200.0,
+                    output_tokens: 450.0,
+                    cache_read_input_tokens: 8000.0,
+                    ephemeral_5m_input_tokens: 100.0,
+                    ephemeral_1h_input_tokens: 20.0,
+                    cached_input_tokens: 0.0,
+                    reasoning_output_tokens: 0.0,
                 },
             }],
             insufficient_data: false,

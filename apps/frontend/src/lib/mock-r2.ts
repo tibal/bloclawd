@@ -24,7 +24,7 @@ import type {
   Percentiles,
   StatusJson,
   Tier as ResTier,
-  TokenTypeTotals,
+  TokenMixTotals,
 } from "@/lib/r2";
 
 const TIER_BASELINE_TOKENS: Record<Tier, number> = {
@@ -43,36 +43,38 @@ type MixSeed = { model: Model; tokenType: TokenType; share: number };
 
 const HARNESS_MIX: Record<Harness, readonly MixSeed[]> = {
   "claude-code": [
-    { model: "claude-sonnet-4-5", tokenType: "input", share: 0.18 },
-    { model: "claude-sonnet-4-5", tokenType: "output", share: 0.16 },
-    { model: "claude-sonnet-4-5", tokenType: "cached_read", share: 0.14 },
-    { model: "claude-sonnet-4-5", tokenType: "cached_write", share: 0.06 },
-    { model: "claude-opus-4-7", tokenType: "input", share: 0.06 },
-    { model: "claude-opus-4-7", tokenType: "output", share: 0.08 },
-    { model: "claude-opus-4-7", tokenType: "cached_read", share: 0.05 },
-    { model: "claude-opus-4-7", tokenType: "cached_write", share: 0.03 },
-    { model: "claude-haiku-4-5", tokenType: "input", share: 0.06 },
-    { model: "claude-haiku-4-5", tokenType: "output", share: 0.04 },
-    { model: "claude-haiku-4-5", tokenType: "cached_read", share: 0.03 },
-    { model: "claude-haiku-4-5", tokenType: "cached_write", share: 0.01 },
-    { model: "claude-sonnet-4-6", tokenType: "input", share: 0.04 },
-    { model: "claude-sonnet-4-6", tokenType: "output", share: 0.03 },
-    { model: "claude-sonnet-4-6", tokenType: "cached_read", share: 0.02 },
-    { model: "claude-sonnet-4-6", tokenType: "cached_write", share: 0.01 },
+    { model: "claude-sonnet-4-5", tokenType: "input_tokens", share: 0.18 },
+    { model: "claude-sonnet-4-5", tokenType: "output_tokens", share: 0.16 },
+    { model: "claude-sonnet-4-5", tokenType: "cache_read_input_tokens", share: 0.14 },
+    { model: "claude-sonnet-4-5", tokenType: "ephemeral_5m_input_tokens", share: 0.05 },
+    { model: "claude-sonnet-4-5", tokenType: "ephemeral_1h_input_tokens", share: 0.01 },
+    { model: "claude-opus-4-7", tokenType: "input_tokens", share: 0.06 },
+    { model: "claude-opus-4-7", tokenType: "output_tokens", share: 0.08 },
+    { model: "claude-opus-4-7", tokenType: "cache_read_input_tokens", share: 0.05 },
+    { model: "claude-opus-4-7", tokenType: "ephemeral_5m_input_tokens", share: 0.02 },
+    { model: "claude-opus-4-7", tokenType: "ephemeral_1h_input_tokens", share: 0.01 },
+    { model: "claude-haiku-4-5", tokenType: "input_tokens", share: 0.06 },
+    { model: "claude-haiku-4-5", tokenType: "output_tokens", share: 0.04 },
+    { model: "claude-haiku-4-5", tokenType: "cache_read_input_tokens", share: 0.03 },
+    { model: "claude-haiku-4-5", tokenType: "ephemeral_5m_input_tokens", share: 0.01 },
+    { model: "claude-sonnet-4-6", tokenType: "input_tokens", share: 0.04 },
+    { model: "claude-sonnet-4-6", tokenType: "output_tokens", share: 0.03 },
+    { model: "claude-sonnet-4-6", tokenType: "cache_read_input_tokens", share: 0.02 },
+    { model: "claude-sonnet-4-6", tokenType: "ephemeral_5m_input_tokens", share: 0.01 },
   ],
   codex: [
-    { model: "gpt-5-codex", tokenType: "input", share: 0.20 },
-    { model: "gpt-5-codex", tokenType: "output", share: 0.22 },
-    { model: "gpt-5-codex", tokenType: "cached_read", share: 0.16 },
-    { model: "gpt-5-codex", tokenType: "cached_write", share: 0.06 },
-    { model: "gpt-5", tokenType: "input", share: 0.08 },
-    { model: "gpt-5", tokenType: "output", share: 0.07 },
-    { model: "gpt-5", tokenType: "cached_read", share: 0.05 },
-    { model: "gpt-5", tokenType: "cached_write", share: 0.02 },
-    { model: "gpt-5.5", tokenType: "input", share: 0.04 },
-    { model: "gpt-5.5", tokenType: "output", share: 0.05 },
-    { model: "gpt-5.5", tokenType: "cached_read", share: 0.03 },
-    { model: "gpt-5.5", tokenType: "cached_write", share: 0.02 },
+    { model: "gpt-5-codex", tokenType: "input_tokens", share: 0.20 },
+    { model: "gpt-5-codex", tokenType: "output_tokens", share: 0.12 },
+    { model: "gpt-5-codex", tokenType: "cached_input_tokens", share: 0.16 },
+    { model: "gpt-5-codex", tokenType: "reasoning_output_tokens", share: 0.10 },
+    { model: "gpt-5", tokenType: "input_tokens", share: 0.08 },
+    { model: "gpt-5", tokenType: "output_tokens", share: 0.05 },
+    { model: "gpt-5", tokenType: "cached_input_tokens", share: 0.05 },
+    { model: "gpt-5", tokenType: "reasoning_output_tokens", share: 0.02 },
+    { model: "gpt-5.5", tokenType: "input_tokens", share: 0.04 },
+    { model: "gpt-5.5", tokenType: "output_tokens", share: 0.04 },
+    { model: "gpt-5.5", tokenType: "cached_input_tokens", share: 0.03 },
+    { model: "gpt-5.5", tokenType: "reasoning_output_tokens", share: 0.02 },
   ],
 };
 
@@ -110,11 +112,14 @@ function buildTypicalMix(
   const mix = HARNESS_MIX[harness];
 
   return MODELS_BY_HARNESS[harness].map((model) => {
-    const tokens: TokenTypeTotals = {
-      input: tokensFor(model, "input", mix, baseline, rng),
-      output: tokensFor(model, "output", mix, baseline, rng),
-      cached_read: tokensFor(model, "cached_read", mix, baseline, rng),
-      cached_write: tokensFor(model, "cached_write", mix, baseline, rng),
+    const tokens: TokenMixTotals = {
+      input_tokens: tokensFor(model, "input_tokens", mix, baseline, rng),
+      output_tokens: tokensFor(model, "output_tokens", mix, baseline, rng),
+      cache_read_input_tokens: tokensFor(model, "cache_read_input_tokens", mix, baseline, rng),
+      ephemeral_5m_input_tokens: tokensFor(model, "ephemeral_5m_input_tokens", mix, baseline, rng),
+      ephemeral_1h_input_tokens: tokensFor(model, "ephemeral_1h_input_tokens", mix, baseline, rng),
+      cached_input_tokens: tokensFor(model, "cached_input_tokens", mix, baseline, rng),
+      reasoning_output_tokens: tokensFor(model, "reasoning_output_tokens", mix, baseline, rng),
     };
     return {
       model,

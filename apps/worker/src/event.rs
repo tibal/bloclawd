@@ -377,13 +377,13 @@ mod tests {
     #[test]
     fn validate_field_extraction_parses_leading_token() {
         assert_eq!(
-            extract_validate_field("tokens.input_5min = 1 exceeds 0"),
-            "tokens.input_5min"
+            extract_validate_field("tokens.input_tokens = 1 exceeds 0"),
+            "tokens.input_tokens"
         );
         assert_eq!(extract_validate_field("output negative"), "output");
         assert_eq!(
-            extract_validate_field("cached_read > 10_000_000"),
-            "cached_read"
+            extract_validate_field("cache_read_input_tokens > 10_000_000"),
+            "cache_read_input_tokens"
         );
     }
 
@@ -395,7 +395,7 @@ mod tests {
     #[test]
     fn enum_invalid_field_only_allows_payload_enum_fields() {
         assert_eq!(enum_invalid_field("model"), "model");
-        assert_eq!(enum_invalid_field("tokens.input_5min"), "unknown");
+        assert_eq!(enum_invalid_field("tokens.input_tokens"), "unknown");
         assert_eq!(
             enum_invalid_field("bogus-model-name-not-in-enum"),
             "unknown"
@@ -415,7 +415,7 @@ mod tests {
 
     #[test]
     fn enum_invalid_field_returns_unknown_for_other_paths() {
-        assert_eq!(enum_invalid_field("payload.tokens.input_5h"), "unknown");
+        assert_eq!(enum_invalid_field("payload.tokens.input_tokens"), "unknown");
         assert_eq!(enum_invalid_field("event_id"), "unknown");
         assert_eq!(enum_invalid_field("submission_group_id"), "unknown");
     }
@@ -428,14 +428,11 @@ mod tests {
             "harness": "claude-code",
             "region": "NA",
             "tokens": {
-                "input_5min": 1,
-                "output_5min": 2,
-                "cached_read_5min": 3,
-                "cached_write_5min": 4,
-                "input_5h": 5,
-                "output_5h": 6,
-                "cached_read_5h": 7,
-                "cached_write_5h": 8
+                "input_tokens": 5,
+                "output_tokens": 6,
+                "cache_read_input_tokens": 7,
+                "ephemeral_5m_input_tokens": 4,
+                "ephemeral_1h_input_tokens": 8
             }
         })
     }

@@ -10,10 +10,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
-import { EnvelopeToggle } from "@/components/EnvelopeToggle";
-import { PercentilePicker } from "@/components/PercentilePicker";
+import { DistributionPicker } from "@/components/DistributionPicker";
 import { Filters } from "@/components/Filters";
-import { TierToggle } from "@/components/TierToggle";
+import { PercentilePicker } from "@/components/PercentilePicker";
 import { Route as DashboardRouteImport } from "@/routes/dashboard";
 
 let dashboardNode: React.ReactNode = null;
@@ -87,12 +86,12 @@ describe("Filters", () => {
     );
 
     try {
-      expect(container.querySelector('[aria-label="Model"]')?.textContent).toContain(
-        "Claude Opus 4.7",
-      );
-      expect(container.querySelector('[aria-label="Tier"]')?.textContent).toContain(
-        "max20",
-      );
+      expect(
+        container.querySelector('[aria-label="Model"]')?.textContent,
+      ).toContain("Claude Opus 4.7");
+      expect(
+        container.querySelector('[aria-label="Tier"]')?.textContent,
+      ).toContain("max20");
     } finally {
       cleanup();
     }
@@ -112,9 +111,9 @@ describe("Filters", () => {
       );
       await settle();
 
-      const option = Array.from(document.body.querySelectorAll('[role="option"]')).find(
-        (item) => item.textContent?.includes("pro"),
-      );
+      const option = Array.from(
+        document.body.querySelectorAll('[role="option"]'),
+      ).find((item) => item.textContent?.includes("pro"));
       expect(option).not.toBeUndefined();
       option?.dispatchEvent(
         new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
@@ -127,41 +126,42 @@ describe("Filters", () => {
     }
   });
 
-  it("round-trips percentile picker, envelope toggle, and tier compare through URL search", async () => {
+  it("round-trips percentile picker and distribution toggles through URL search", async () => {
     const { container, router, cleanup } = await renderDashboard(
       <>
         <PercentilePicker />
-        <EnvelopeToggle />
-        <TierToggle />
+        <DistributionPicker />
       </>,
-      "/dashboard?primary=p50&envelope=neighbors&compare=false",
+      "/dashboard?primary=p50",
     );
 
     try {
-      // pick p25 line
       const p25Button = Array.from(container.querySelectorAll("button")).find(
         (button) => button.textContent?.trim() === "p25",
       );
-      // switch to wide envelope
-      const wideButton = Array.from(container.querySelectorAll("button")).find(
-        (button) => button.textContent?.includes("p10–p90"),
-      );
-      const tierButton = Array.from(container.querySelectorAll("button")).find(
-        (button) => button.textContent?.includes("Compare tiers"),
-      );
-
       expect(p25Button).not.toBeUndefined();
-      expect(wideButton).not.toBeUndefined();
-      expect(tierButton).not.toBeUndefined();
       click(p25Button!);
-      click(wideButton!);
-      click(tierButton!);
+      await settle();
+
+      // open the distribution dropdown
+      const distTrigger = container.querySelector(
+        '[aria-label="Distribution envelopes"]',
+      );
+      expect(distTrigger).not.toBeNull();
+      click(distTrigger!);
+      await settle();
+
+      // toggle outer envelope off
+      const outerOption = Array.from(
+        document.body.querySelectorAll('[role="button"], button'),
+      ).find((el) => el.textContent?.includes("p10 — p90"));
+      expect(outerOption).not.toBeUndefined();
+      click(outerOption!);
       await settle();
 
       expect(router.state.location.search).toMatchObject({
         primary: "p25",
-        envelope: "wide",
-        compare: true,
+        dist: ["p25-p75"],
       });
     } finally {
       cleanup();

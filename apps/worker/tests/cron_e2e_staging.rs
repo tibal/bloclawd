@@ -78,14 +78,11 @@ async fn cron_e2e_staging() {
             "harness": "claude-code",
             "region": "EU",
             "tokens": {
-                "input_5min": 1000 + idx,
-                "output_5min": 500 + idx,
-                "cached_read_5min": 100 + idx,
-                "cached_write_5min": 50 + idx,
-                "input_5h": 5000 + idx,
-                "output_5h": 2500 + idx,
-                "cached_read_5h": 500 + idx,
-                "cached_write_5h": 250 + idx
+                "input_tokens": 5000 + idx,
+                "output_tokens": 2500 + idx,
+                "cache_read_input_tokens": 500 + idx,
+                "ephemeral_5m_input_tokens": 150 + idx,
+                "ephemeral_1h_input_tokens": 100 + idx
             }
         });
         let payload_json = payload.to_string();

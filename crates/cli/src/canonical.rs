@@ -34,14 +34,13 @@ mod tests {
             harness: Harness::ClaudeCode,
             region: Region::Na,
             tokens: TokenCounts {
-                input_5min: 11,
-                output_5min: 22,
-                cached_read_5min: 33,
-                cached_write_5min: 44,
-                input_5h: 111,
-                output_5h: 222,
-                cached_read_5h: 333,
-                cached_write_5h: 444,
+                input_tokens: 111,
+                output_tokens: 222,
+                cache_read_input_tokens: 333,
+                ephemeral_5m_input_tokens: 44,
+                ephemeral_1h_input_tokens: 55,
+                cached_input_tokens: 0,
+                reasoning_output_tokens: 0,
             },
         }
     }

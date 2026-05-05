@@ -18,9 +18,9 @@ import {
   useChartData,
   useDelayedLoading,
 } from "@/lib/dashboard-data";
+import type { DashboardSearch } from "@/lib/dashboard-search";
 import { isR2NotFound } from "@/lib/r2";
 import { routeHead } from "@/lib/route-head";
-import type { DashboardSearch } from "@/routes/dashboard";
 
 const compareSearchSchema = z.object({
   limit_type: z.enum(LIMIT_TYPE_VALUES).default("5h"),
@@ -74,22 +74,21 @@ function ComparePage() {
     () => ({
       harness: "claude-code",
       limit_type: search.limit_type,
-      window: search.window,
+      range: rangeFromWindow(search.window),
       primary: "p50",
-      envelope: "neighbors",
-      brush_start: 0,
-      brush_end: 1,
+      dist: ["p25-p75"],
       compare: true,
+      // Seed three rows (pro/max5/max20) so the chart shows tier overlays.
+      rows: TIER_VALUES.map((tier) => ({
+        harness: "claude-code" as const,
+        tier,
+        limit_type: search.limit_type,
+      })),
     }),
     [search.limit_type, search.window],
   );
-  const { compareData, loading, error } = useChartData(dashboardFilters);
+  const { curves, loading, error } = useChartData(dashboardFilters);
   const delayedLoading = useDelayedLoading(loading);
-  const compareModeProp = useMemo(
-    () => (compareData ? { tiers: compareData } : undefined),
-    [compareData],
-  );
-  const fallbackChartData = compareData?.[0]?.data ?? [[], [], [], [], [], []];
 
   return (
     <section className="space-y-12 py-4">
@@ -189,9 +188,9 @@ function ComparePage() {
           ) : (
             <Chart
               ariaLabel="Compare Pro, Max5, and Max20 percentile envelopes"
-              envelope="neighbors"
-              compareMode={compareModeProp}
-              data={fallbackChartData}
+              curves={curves}
+              dist={["p25-p75"]}
+              primary="p50"
             />
           )}
         </div>
@@ -274,4 +273,10 @@ function windowLabel(window: CompareSearch["window"]): string {
     "30d": "last 30d",
     "90d": "last 90d",
   } as const)[window];
+}
+
+function rangeFromWindow(window: CompareSearch["window"]): "1w" | "1m" | "3m" {
+  if (window === "24h" || window === "7d") return "1w";
+  if (window === "30d") return "1m";
+  return "3m";
 }

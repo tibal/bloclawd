@@ -92,8 +92,13 @@ async fn process_one(env: &Env, tier: &str, bucket_ts: SystemTime) -> Result<()>
     let mut event_rows = Vec::with_capacity(rows.len());
     for row in rows {
         let payload_value: Value = row.get(1);
-        let payload: EventPayload = serde_json::from_value(payload_value)
-            .map_err(|e| worker::Error::RustError(format!("payload json: {e}")))?;
+        let payload: EventPayload = match serde_json::from_value(payload_value) {
+            Ok(payload) => payload,
+            Err(e) => {
+                console_log!("cron tick skipped payload schema mismatch err={}", e);
+                continue;
+            }
+        };
         let limit_type_text: String = row.get(2);
         event_rows.push(aggregate::EventRow {
             submission_group_id: row.get::<_, Uuid>(0),

@@ -7,7 +7,7 @@
     {
       "plan": "anthropic-pro",
       "provider": "anthropic",
-      "display_name": "Pro",
+      "display_name": "Claude Pro $20",
       "monthly_cost_usd": 20.0,
       "harnesses": [
         "claude-code"
@@ -26,7 +26,7 @@
     {
       "plan": "anthropic-max5",
       "provider": "anthropic",
-      "display_name": "Max 5x",
+      "display_name": "Claude Max 5× $100",
       "monthly_cost_usd": 100.0,
       "harnesses": [
         "claude-code"
@@ -46,7 +46,7 @@
     {
       "plan": "anthropic-max20",
       "provider": "anthropic",
-      "display_name": "Max 20x",
+      "display_name": "Claude Max 20× $200",
       "monthly_cost_usd": 200.0,
       "harnesses": [
         "claude-code"
@@ -66,7 +66,7 @@
     {
       "plan": "openai-plus",
       "provider": "openai",
-      "display_name": "ChatGPT Plus",
+      "display_name": "ChatGPT Plus $20",
       "monthly_cost_usd": 20.0,
       "harnesses": [
         "codex"
@@ -81,9 +81,28 @@
       "tier_alias": null
     },
     {
+      "plan": "openai-pro-100",
+      "provider": "openai",
+      "display_name": "ChatGPT Pro $100",
+      "monthly_cost_usd": 100.0,
+      "harnesses": [
+        "codex"
+      ],
+      "models": [
+        "gpt-5",
+        "gpt-5.5",
+        "gpt-5-codex"
+      ],
+      "limit_types": [
+        "5h",
+        "weekly"
+      ],
+      "tier_alias": null
+    },
+    {
       "plan": "openai-pro",
       "provider": "openai",
-      "display_name": "ChatGPT Pro",
+      "display_name": "ChatGPT Pro $200",
       "monthly_cost_usd": 200.0,
       "harnesses": [
         "codex"
@@ -107,44 +126,32 @@
       "display_name": "Claude Opus 4.7",
       "prices": [
         {
-          "token_type": "input",
-          "window": "5min",
+          "token_type": "input_tokens",
           "usd_per_token": 5e-6
         },
         {
-          "token_type": "output",
-          "window": "5min",
+          "token_type": "output_tokens",
           "usd_per_token": 0.000025
         },
         {
-          "token_type": "cached_read",
-          "window": "5min",
+          "token_type": "cache_read_input_tokens",
           "usd_per_token": 5e-7
         },
         {
-          "token_type": "cached_write",
-          "window": "5min",
+          "token_type": "ephemeral_5m_input_tokens",
           "usd_per_token": 6.25e-6
         },
         {
-          "token_type": "input",
-          "window": "5h",
-          "usd_per_token": 5e-6
+          "token_type": "ephemeral_1h_input_tokens",
+          "usd_per_token": 0.00001
         },
         {
-          "token_type": "output",
-          "window": "5h",
+          "token_type": "cached_input_tokens",
+          "usd_per_token": 5e-7
+        },
+        {
+          "token_type": "reasoning_output_tokens",
           "usd_per_token": 0.000025
-        },
-        {
-          "token_type": "cached_read",
-          "window": "5h",
-          "usd_per_token": 5e-7
-        },
-        {
-          "token_type": "cached_write",
-          "window": "5h",
-          "usd_per_token": 6.25e-6
         }
       ]
     },
@@ -154,44 +161,32 @@
       "display_name": "Claude Sonnet 4.6",
       "prices": [
         {
-          "token_type": "input",
-          "window": "5min",
+          "token_type": "input_tokens",
           "usd_per_token": 3e-6
         },
         {
-          "token_type": "output",
-          "window": "5min",
+          "token_type": "output_tokens",
           "usd_per_token": 0.000015
         },
         {
-          "token_type": "cached_read",
-          "window": "5min",
+          "token_type": "cache_read_input_tokens",
           "usd_per_token": 3e-7
         },
         {
-          "token_type": "cached_write",
-          "window": "5min",
+          "token_type": "ephemeral_5m_input_tokens",
           "usd_per_token": 3.75e-6
         },
         {
-          "token_type": "input",
-          "window": "5h",
-          "usd_per_token": 3e-6
+          "token_type": "ephemeral_1h_input_tokens",
+          "usd_per_token": 6e-6
         },
         {
-          "token_type": "output",
-          "window": "5h",
+          "token_type": "cached_input_tokens",
+          "usd_per_token": 3e-7
+        },
+        {
+          "token_type": "reasoning_output_tokens",
           "usd_per_token": 0.000015
-        },
-        {
-          "token_type": "cached_read",
-          "window": "5h",
-          "usd_per_token": 3e-7
-        },
-        {
-          "token_type": "cached_write",
-          "window": "5h",
-          "usd_per_token": 3.75e-6
         }
       ]
     },
@@ -201,44 +196,32 @@
       "display_name": "Claude Sonnet 4.5",
       "prices": [
         {
-          "token_type": "input",
-          "window": "5min",
+          "token_type": "input_tokens",
           "usd_per_token": 3e-6
         },
         {
-          "token_type": "output",
-          "window": "5min",
+          "token_type": "output_tokens",
           "usd_per_token": 0.000015
         },
         {
-          "token_type": "cached_read",
-          "window": "5min",
+          "token_type": "cache_read_input_tokens",
           "usd_per_token": 3e-7
         },
         {
-          "token_type": "cached_write",
-          "window": "5min",
+          "token_type": "ephemeral_5m_input_tokens",
           "usd_per_token": 3.75e-6
         },
         {
-          "token_type": "input",
-          "window": "5h",
-          "usd_per_token": 3e-6
+          "token_type": "ephemeral_1h_input_tokens",
+          "usd_per_token": 6e-6
         },
         {
-          "token_type": "output",
-          "window": "5h",
+          "token_type": "cached_input_tokens",
+          "usd_per_token": 3e-7
+        },
+        {
+          "token_type": "reasoning_output_tokens",
           "usd_per_token": 0.000015
-        },
-        {
-          "token_type": "cached_read",
-          "window": "5h",
-          "usd_per_token": 3e-7
-        },
-        {
-          "token_type": "cached_write",
-          "window": "5h",
-          "usd_per_token": 3.75e-6
         }
       ]
     },
@@ -248,44 +231,32 @@
       "display_name": "Claude Haiku 4.5",
       "prices": [
         {
-          "token_type": "input",
-          "window": "5min",
+          "token_type": "input_tokens",
           "usd_per_token": 1e-6
         },
         {
-          "token_type": "output",
-          "window": "5min",
+          "token_type": "output_tokens",
           "usd_per_token": 5e-6
         },
         {
-          "token_type": "cached_read",
-          "window": "5min",
+          "token_type": "cache_read_input_tokens",
           "usd_per_token": 1e-7
         },
         {
-          "token_type": "cached_write",
-          "window": "5min",
+          "token_type": "ephemeral_5m_input_tokens",
           "usd_per_token": 1.25e-6
         },
         {
-          "token_type": "input",
-          "window": "5h",
-          "usd_per_token": 1e-6
+          "token_type": "ephemeral_1h_input_tokens",
+          "usd_per_token": 2e-6
         },
         {
-          "token_type": "output",
-          "window": "5h",
+          "token_type": "cached_input_tokens",
+          "usd_per_token": 1e-7
+        },
+        {
+          "token_type": "reasoning_output_tokens",
           "usd_per_token": 5e-6
-        },
-        {
-          "token_type": "cached_read",
-          "window": "5h",
-          "usd_per_token": 1e-7
-        },
-        {
-          "token_type": "cached_write",
-          "window": "5h",
-          "usd_per_token": 1.25e-6
         }
       ]
     },
@@ -295,44 +266,32 @@
       "display_name": "GPT-5",
       "prices": [
         {
-          "token_type": "input",
-          "window": "5min",
+          "token_type": "input_tokens",
           "usd_per_token": 1.25e-6
         },
         {
-          "token_type": "output",
-          "window": "5min",
+          "token_type": "output_tokens",
           "usd_per_token": 0.00001
         },
         {
-          "token_type": "cached_read",
-          "window": "5min",
+          "token_type": "cache_read_input_tokens",
           "usd_per_token": 1.25e-7
         },
         {
-          "token_type": "cached_write",
-          "window": "5min",
+          "token_type": "ephemeral_5m_input_tokens",
           "usd_per_token": 1.25e-6
         },
         {
-          "token_type": "input",
-          "window": "5h",
+          "token_type": "ephemeral_1h_input_tokens",
           "usd_per_token": 1.25e-6
         },
         {
-          "token_type": "output",
-          "window": "5h",
+          "token_type": "cached_input_tokens",
+          "usd_per_token": 1.25e-7
+        },
+        {
+          "token_type": "reasoning_output_tokens",
           "usd_per_token": 0.00001
-        },
-        {
-          "token_type": "cached_read",
-          "window": "5h",
-          "usd_per_token": 1.25e-7
-        },
-        {
-          "token_type": "cached_write",
-          "window": "5h",
-          "usd_per_token": 1.25e-6
         }
       ]
     },
@@ -342,44 +301,32 @@
       "display_name": "GPT-5.5",
       "prices": [
         {
-          "token_type": "input",
-          "window": "5min",
+          "token_type": "input_tokens",
           "usd_per_token": 5e-6
         },
         {
-          "token_type": "output",
-          "window": "5min",
+          "token_type": "output_tokens",
           "usd_per_token": 0.00003
         },
         {
-          "token_type": "cached_read",
-          "window": "5min",
+          "token_type": "cache_read_input_tokens",
           "usd_per_token": 5e-7
         },
         {
-          "token_type": "cached_write",
-          "window": "5min",
+          "token_type": "ephemeral_5m_input_tokens",
           "usd_per_token": 5e-6
         },
         {
-          "token_type": "input",
-          "window": "5h",
+          "token_type": "ephemeral_1h_input_tokens",
           "usd_per_token": 5e-6
         },
         {
-          "token_type": "output",
-          "window": "5h",
+          "token_type": "cached_input_tokens",
+          "usd_per_token": 5e-7
+        },
+        {
+          "token_type": "reasoning_output_tokens",
           "usd_per_token": 0.00003
-        },
-        {
-          "token_type": "cached_read",
-          "window": "5h",
-          "usd_per_token": 5e-7
-        },
-        {
-          "token_type": "cached_write",
-          "window": "5h",
-          "usd_per_token": 5e-6
         }
       ]
     },
@@ -389,44 +336,32 @@
       "display_name": "GPT-5 Codex",
       "prices": [
         {
-          "token_type": "input",
-          "window": "5min",
+          "token_type": "input_tokens",
           "usd_per_token": 1.25e-6
         },
         {
-          "token_type": "output",
-          "window": "5min",
+          "token_type": "output_tokens",
           "usd_per_token": 0.00001
         },
         {
-          "token_type": "cached_read",
-          "window": "5min",
+          "token_type": "cache_read_input_tokens",
           "usd_per_token": 1.25e-7
         },
         {
-          "token_type": "cached_write",
-          "window": "5min",
+          "token_type": "ephemeral_5m_input_tokens",
           "usd_per_token": 1.25e-6
         },
         {
-          "token_type": "input",
-          "window": "5h",
+          "token_type": "ephemeral_1h_input_tokens",
           "usd_per_token": 1.25e-6
         },
         {
-          "token_type": "output",
-          "window": "5h",
+          "token_type": "cached_input_tokens",
+          "usd_per_token": 1.25e-7
+        },
+        {
+          "token_type": "reasoning_output_tokens",
           "usd_per_token": 0.00001
-        },
-        {
-          "token_type": "cached_read",
-          "window": "5h",
-          "usd_per_token": 1.25e-7
-        },
-        {
-          "token_type": "cached_write",
-          "window": "5h",
-          "usd_per_token": 1.25e-6
         }
       ]
     }
@@ -466,13 +401,12 @@
     "weekly"
   ],
   "token_types": [
-    "input",
-    "output",
-    "cached_read",
-    "cached_write"
-  ],
-  "windows": [
-    "5min",
-    "5h"
+    "input_tokens",
+    "output_tokens",
+    "cache_read_input_tokens",
+    "ephemeral_5m_input_tokens",
+    "ephemeral_1h_input_tokens",
+    "cached_input_tokens",
+    "reasoning_output_tokens"
   ]
 }

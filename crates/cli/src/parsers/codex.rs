@@ -15,9 +15,10 @@ use crate::min_version::{MIN_CODEX_VERSION, codex_first_token_count_passes_field
 pub struct CodexEvent {
     pub timestamp_utc: DateTime<Utc>,
     pub model: Model,
-    pub input: u64,
-    pub output: u64,
-    pub cached_read: u64,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub cached_input_tokens: u64,
+    pub reasoning_output_tokens: u64,
 }
 
 pub fn parse_codex_session(
@@ -102,19 +103,19 @@ pub fn parse_codex_session_checked(
                     continue;
                 };
 
-                let input = last
+                let input_tokens = last
                     .get("input_tokens")
                     .and_then(Value::as_u64)
                     .unwrap_or(0);
-                let output = last
+                let output_tokens = last
                     .get("output_tokens")
                     .and_then(Value::as_u64)
                     .unwrap_or(0);
-                let reasoning = last
+                let reasoning_output_tokens = last
                     .get("reasoning_output_tokens")
                     .and_then(Value::as_u64)
                     .unwrap_or(0);
-                let cached_read = last
+                let cached_input_tokens = last
                     .get("cached_input_tokens")
                     .and_then(Value::as_u64)
                     .unwrap_or(0);
@@ -122,9 +123,10 @@ pub fn parse_codex_session_checked(
                 events.push(CodexEvent {
                     timestamp_utc,
                     model,
-                    input,
-                    output: output.saturating_add(reasoning),
-                    cached_read,
+                    input_tokens,
+                    output_tokens,
+                    cached_input_tokens,
+                    reasoning_output_tokens,
                 });
             }
             _ => continue,
@@ -343,21 +345,22 @@ mod tests {
     }
 
     #[test]
-    fn reasoning_output_tokens_are_added_to_output() {
+    fn reasoning_output_tokens_are_kept_separate_from_output() {
         let raw = vec![turn_context("gpt-5.5"), token_count(10, 20, 5, 7)];
 
         let (events, _) = parse_codex_session(lines(&raw));
 
-        assert_eq!(events[0].output, 25);
+        assert_eq!(events[0].output_tokens, 20);
+        assert_eq!(events[0].reasoning_output_tokens, 5);
     }
 
     #[test]
-    fn codex_event_has_no_cached_write_field() {
+    fn codex_event_uses_cached_input_tokens() {
         let raw = vec![turn_context("gpt-5"), token_count(1, 1, 0, 9)];
 
         let (events, _) = parse_codex_session(lines(&raw));
 
-        assert_eq!(events[0].cached_read, 9);
+        assert_eq!(events[0].cached_input_tokens, 9);
     }
 
     #[test]

@@ -1,12 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { formatTokens } from "@/lib/format";
-import {
-  PERCENTILE_INDEX,
-  TIER_COLOR_VAR,
-  TIER_DASH,
-  type TierName,
-} from "@/lib/chart-tokens";
+import type { PercentileKey } from "@/components/PercentilePicker";
 import {
   asSeries,
   bandPath,
@@ -17,20 +11,24 @@ import {
   type Series,
 } from "@/lib/chart-geometry";
 import {
-  sliceByBrush,
-  sliceMetaByBrush,
   type AlignedData,
   type ChartMeta,
 } from "@/lib/chart-data";
-import { neighborBand, type PercentileKey } from "@/components/PercentilePicker";
+import { PERCENTILE_INDEX } from "@/lib/chart-tokens";
+import type { DistKey } from "@/lib/dashboard-search";
+import { formatUsd } from "@/lib/format";
+
+export interface ChartCurve {
+  key: string;
+  label: string;
+  data: AlignedData;
+}
 
 export interface ChartProps {
-  data: AlignedData;
+  curves: ChartCurve[];
   primary?: PercentileKey;
-  envelope?: "off" | "neighbors" | "wide";
-  compareMode?: { tiers: Array<{ tier: TierName; data: AlignedData }> };
+  dist?: DistKey[];
   ariaLabel: string;
-  brush?: { start: number; end: number };
   meta?: ChartMeta;
   yLabel?: string;
 }
@@ -48,13 +46,21 @@ const RESOLUTION_LABEL: Record<NonNullable<ChartMeta["resolution"]>, string> = {
   d1: "1 day",
 };
 
+// Curve palette used in compare mode (primary curve always uses --chart-1).
+const CURVE_PALETTE: readonly string[] = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--violet)",
+  "var(--coral)",
+  "var(--amber)",
+];
+
 export function Chart({
-  data,
+  curves,
   primary = "p50",
-  envelope = "neighbors",
-  compareMode,
+  dist = ["p10-p90", "p25-p75"],
   ariaLabel,
-  brush,
   meta,
   yLabel,
 }: ChartProps) {
@@ -75,20 +81,20 @@ export function Chart({
     return;
   }, []);
 
-  const sliced = useMemo(() => sliceByBrush(data, brush), [data, brush]);
-  const slicedMeta = useMemo(
-    () => sliceMetaByBrush(meta, data[0]?.length ?? 0, brush),
-    [meta, data, brush],
+  const compareMode = curves.length > 1;
+
+  const xs = useMemo(
+    () => alignedXs(curves[0]?.data) as readonly number[],
+    [curves],
   );
 
   const geometry = useMemo(
-    () => buildGeometry({ data: sliced, compareMode, width, primary }),
-    [sliced, compareMode, width, primary],
+    () => buildGeometry({ curves, width, primary }),
+    [curves, width, primary],
   );
 
   const innerWidth = Math.max(0, width - PAD_L - PAD_R);
   const innerHeight = Math.max(0, HEIGHT - PAD_T - PAD_B);
-  const xs = asSeries(sliced[0]);
 
   const onPointerMove = (event: React.PointerEvent<SVGRectElement>) => {
     if (!xs.length) return;
@@ -101,12 +107,13 @@ export function Chart({
     setHoverIndex((prev) => (prev === next ? prev : next));
   };
 
-  const [bandLo, bandHi] = neighborBand(primary);
   const yLabelText =
     yLabel ??
     (meta?.resolution
-      ? `tokens / ${RESOLUTION_LABEL[meta.resolution]}`
-      : "tokens / window");
+      ? `USD · ${RESOLUTION_LABEL[meta.resolution]}`
+      : "USD / window");
+
+  const primaryCurve = curves[0];
 
   return (
     <div
@@ -167,7 +174,7 @@ export function Chart({
               x={PAD_L - 10}
               y={tick.y + 4}
             >
-              {formatTokens(tick.value)}
+              {formatYTick(tick.value)}
             </text>
           </g>
         ))}
@@ -186,79 +193,67 @@ export function Chart({
           </text>
         ))}
 
-        {compareMode ? (
-          compareMode.tiers.map(({ tier, data: tierData }) => {
-            const path = pathFor(
-              xs as readonly number[],
-              asSeries(tierData[PERCENTILE_INDEX.p50]),
-              geometry.xAt,
-              geometry.yAt,
-            );
-            if (!path) return null;
-            return (
-              <path
-                key={tier}
-                d={path}
-                data-tier={tier}
-                fill="none"
-                stroke={TIER_COLOR_VAR[tier]}
-                strokeDasharray={TIER_DASH[tier]?.join(" ") ?? undefined}
-                strokeLinecap="round"
-                strokeWidth={tier === "max20" ? 2 : 1.6}
-              />
-            );
-          })
-        ) : (
-          <>
-            {envelope === "wide" && geometry.outerBandPath ? (
-              <path
-                d={geometry.outerBandPath}
-                data-band="p10-p90"
-                fill="url(#bloclawd-band-outer)"
-              />
-            ) : null}
-            {envelope === "neighbors" && geometry.neighborBandPath ? (
-              <path
-                d={geometry.neighborBandPath}
-                data-band={`${bandLo}-${bandHi}`}
-                fill="url(#bloclawd-band-inner)"
-              />
-            ) : null}
-            {geometry.primaryPath ? (
-              <path
-                d={geometry.primaryPath}
-                data-series={primary}
-                fill="none"
-                filter="url(#bloclawd-line-glow)"
-                stroke="var(--chart-1)"
-                strokeLinecap="round"
-                strokeWidth="2"
-              />
-            ) : null}
-          </>
-        )}
-
-        {hoverIndex != null && geometry.primaryPoints[hoverIndex] ? (
-          <g>
-            <line
-              stroke="var(--chart-crosshair)"
-              strokeDasharray="2 3"
-              strokeOpacity="0.55"
-              x1={geometry.xAt(hoverIndex)}
-              x2={geometry.xAt(hoverIndex)}
-              y1={PAD_T}
-              y2={PAD_T + innerHeight}
-            />
-            <circle
-              cx={geometry.xAt(hoverIndex)}
-              cy={geometry.primaryPoints[hoverIndex]!.y}
-              fill="var(--bg)"
-              r="4"
-              stroke="var(--chart-1)"
-              strokeWidth="1.5"
-            />
-          </g>
+        {/* Envelopes only render in single-curve mode; comparing multiple
+            cohorts becomes unreadable with overlapping bands. */}
+        {!compareMode && primaryCurve && dist.includes("p10-p90") &&
+        geometry.outerBandPath ? (
+          <path
+            d={geometry.outerBandPath}
+            data-band="p10-p90"
+            fill="url(#bloclawd-band-outer)"
+          />
         ) : null}
+        {!compareMode && primaryCurve && dist.includes("p25-p75") &&
+        geometry.innerBandPath ? (
+          <path
+            d={geometry.innerBandPath}
+            data-band="p25-p75"
+            fill="url(#bloclawd-band-inner)"
+          />
+        ) : null}
+
+        {geometry.curveLines.map(({ key, path, color }) => (
+          <path
+            key={key}
+            d={path}
+            data-curve={key}
+            fill="none"
+            filter={curves.length === 1 ? "url(#bloclawd-line-glow)" : undefined}
+            stroke={color}
+            strokeLinecap="round"
+            strokeWidth="2"
+          />
+        ))}
+
+        {hoverIndex != null && geometry.crosshair ? (
+          <line
+            stroke="var(--chart-crosshair)"
+            strokeDasharray="2 3"
+            strokeOpacity="0.55"
+            x1={geometry.crosshair.x}
+            x2={geometry.crosshair.x}
+            y1={PAD_T}
+            y2={PAD_T + innerHeight}
+          />
+        ) : null}
+
+        {hoverIndex != null
+          ? geometry.curveLines.map(({ key, primaryPoints, color }) => {
+              const pt = primaryPoints[hoverIndex];
+              if (!pt) return null;
+              return (
+                <circle
+                  key={`dot-${key}`}
+                  cx={pt.x}
+                  cy={pt.y}
+                  fill="var(--bg)"
+                  r="4"
+                  stroke={color}
+                  strokeWidth="1.5"
+                />
+              );
+            })
+          : null}
 
         <rect
           fill="transparent"
@@ -272,65 +267,76 @@ export function Chart({
       </svg>
 
       <HoverTooltip
-        data={sliced}
-        hoverIndex={hoverIndex}
+        curves={curves}
         primary={primary}
-        meta={slicedMeta}
+        compareMode={compareMode}
+        dist={dist}
+        hoverIndex={hoverIndex}
+        meta={meta}
       />
     </div>
   );
 }
 
 function HoverTooltip({
-  data,
-  hoverIndex,
+  curves,
   primary,
+  compareMode,
+  dist,
+  hoverIndex,
   meta,
 }: {
-  data: AlignedData;
-  hoverIndex: number | null;
+  curves: ChartCurve[];
   primary: PercentileKey;
+  compareMode: boolean;
+  dist: DistKey[];
+  hoverIndex: number | null;
   meta: ChartMeta | undefined;
 }) {
   if (hoverIndex == null) return null;
-  const ts = asSeries(data[0])[hoverIndex];
+  const xs = alignedXs(curves[0]?.data);
+  const ts = xs[hoverIndex];
   if (typeof ts !== "number") return null;
-  const orderedKeys: PercentileKey[] = ["p90", "p75", "p50", "p25", "p10"];
-  const values = orderedKeys.map((key) => ({
-    key,
-    value: numericAt(asSeries(data[PERCENTILE_INDEX[key]]), hoverIndex),
-  }));
   const submissions = meta?.submissions?.[hoverIndex] ?? null;
 
   return (
-    <div className="pointer-events-none absolute left-20 top-5 min-w-[220px] rounded-xl border border-border bg-[var(--bg-2)]/95 p-3 shadow-[var(--shadow-card)] backdrop-blur-md">
+    <div className="pointer-events-none absolute left-20 top-5 min-w-[240px] rounded-xl border border-border bg-[var(--bg-2)]/95 p-3 shadow-[var(--shadow-card)] backdrop-blur-md">
       <div className="mb-2 font-mono text-[11px] text-muted-foreground">
         {formatTooltipTimestamp(ts, meta?.resolution)}
       </div>
-      <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
-        {values.map(({ key, value }) => (
-          <div key={key} className="contents">
-            <span
-              className={
-                key === primary
-                  ? "font-semibold text-primary"
-                  : "text-muted-foreground"
-              }
-            >
-              {key}
-            </span>
-            <span
-              className={
-                key === primary
-                  ? "text-right font-mono font-semibold text-foreground tabular-nums"
-                  : "text-right font-mono text-foreground/80 tabular-nums"
-              }
-            >
-              {value == null ? "NA" : formatTokens(value)}
-            </span>
-          </div>
-        ))}
-      </div>
+      {compareMode ? (
+        <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11.5px]">
+          {curves.map((curve, i) => {
+            const value = numericAt(
+              asSeries(curve.data[PERCENTILE_INDEX[primary]]),
+              hoverIndex,
+            );
+            const color = CURVE_PALETTE[i % CURVE_PALETTE.length];
+            return (
+              <div key={curve.key} className="contents">
+                <span className="flex min-w-0 items-center gap-2 truncate text-foreground">
+                  <span
+                    aria-hidden
+                    className="inline-block h-1.5 w-3 rounded-full"
+                    style={{ background: color }}
+                  />
+                  <span className="truncate">{curve.label}</span>
+                </span>
+                <span className="text-right font-mono tabular-nums text-foreground">
+                  {value == null ? "—" : formatUsd(value)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <SinglePercentileBlock
+          curve={curves[0]}
+          primary={primary}
+          dist={dist}
+          hoverIndex={hoverIndex}
+        />
+      )}
       {submissions != null ? (
         <div className="mt-2.5 border-t border-border/60 pt-2 font-mono text-[11px] text-muted-foreground">
           <span className="text-foreground">
@@ -343,29 +349,89 @@ function HoverTooltip({
   );
 }
 
+function SinglePercentileBlock({
+  curve,
+  primary,
+  dist,
+  hoverIndex,
+}: {
+  curve: ChartCurve | undefined;
+  primary: PercentileKey;
+  dist: DistKey[];
+  hoverIndex: number;
+}) {
+  if (!curve) return null;
+  const showOuter = dist.includes("p10-p90");
+  const showInner = dist.includes("p25-p75");
+  const orderedKeys: PercentileKey[] = [];
+  if (showOuter) orderedKeys.push("p90");
+  if (showInner) orderedKeys.push("p75");
+  orderedKeys.push(primary);
+  if (showInner && primary !== "p25") orderedKeys.push("p25");
+  if (showOuter && primary !== "p10") orderedKeys.push("p10");
+
+  const seen = new Set<PercentileKey>();
+  const uniq = orderedKeys.filter((k) => (seen.has(k) ? false : (seen.add(k), true)));
+
+  return (
+    <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+      {uniq.map((key) => {
+        const value = numericAt(
+          asSeries(curve.data[PERCENTILE_INDEX[key]]),
+          hoverIndex,
+        );
+        const isPrimary = key === primary;
+        return (
+          <div key={key} className="contents">
+            <span
+              className={
+                isPrimary
+                  ? "font-semibold text-primary"
+                  : "text-muted-foreground"
+              }
+            >
+              {key}
+            </span>
+            <span
+              className={
+                isPrimary
+                  ? "text-right font-mono font-semibold text-foreground tabular-nums"
+                  : "text-right font-mono text-foreground/80 tabular-nums"
+              }
+            >
+              {value == null ? "—" : formatUsd(value)}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 interface ChartGeometry {
-  xAt: (idx: number) => number;
-  yAt: (value: number) => number;
   yTicks: Array<{ value: number; y: number }>;
   xTicks: Array<{ x: number; label: string }>;
-  neighborBandPath: string | null;
+  innerBandPath: string | null;
   outerBandPath: string | null;
-  primaryPath: string | null;
-  primaryPoints: Array<Point | null>;
+  curveLines: Array<{
+    key: string;
+    path: string;
+    color: string;
+    primaryPoints: Array<Point | null>;
+  }>;
+  crosshair: { x: number } | null;
 }
 
 function buildGeometry({
-  data,
-  compareMode,
+  curves,
   width,
   primary,
 }: {
-  data: AlignedData;
-  compareMode: ChartProps["compareMode"];
+  curves: ChartCurve[];
   width: number;
   primary: PercentileKey;
 }): ChartGeometry {
-  const xs = asSeries(data[0]) as readonly number[];
+  const xs = alignedXs(curves[0]?.data) as readonly number[];
   const innerWidth = Math.max(0, width - PAD_L - PAD_R);
   const innerHeight = Math.max(0, HEIGHT - PAD_T - PAD_B);
   const length = xs.length;
@@ -373,27 +439,23 @@ function buildGeometry({
   const xAt = (idx: number) =>
     length <= 1 ? PAD_L : PAD_L + (idx / (length - 1)) * innerWidth;
 
-  const seriesForYMax: ReadonlyArray<Series> = compareMode
-    ? compareMode.tiers.map(({ data: tierData }) =>
-        asSeries(tierData[PERCENTILE_INDEX.p50]),
-      )
-    : [
-        asSeries(data[PERCENTILE_INDEX.p10]),
-        asSeries(data[PERCENTILE_INDEX.p90]),
-        asSeries(data[PERCENTILE_INDEX.p50]),
-      ];
-
   let rawMax = 0;
-  for (const series of seriesForYMax) {
-    for (let i = 0; i < series.length; i++) {
-      const v = series[i];
-      if (typeof v === "number" && Number.isFinite(v) && v > rawMax) {
-        rawMax = v;
+  for (const curve of curves) {
+    for (const seriesIdx of [
+      PERCENTILE_INDEX.p10,
+      PERCENTILE_INDEX.p90,
+      PERCENTILE_INDEX[primary],
+    ]) {
+      const series = asSeries(curve.data[seriesIdx]);
+      for (let i = 0; i < series.length; i++) {
+        const v = series[i];
+        if (typeof v === "number" && Number.isFinite(v) && v > rawMax) {
+          rawMax = v;
+        }
       }
     }
   }
   const yMax = (rawMax || 1) * 1.08;
-
   const yAt = (value: number) =>
     PAD_T + innerHeight - (value / yMax) * innerHeight;
 
@@ -414,38 +476,61 @@ function buildGeometry({
     };
   });
 
-  const primaryPoints = pointsFor(
-    xs,
-    asSeries(data[PERCENTILE_INDEX[primary]]),
-    xAt,
-    yAt,
-  );
-  const [neighborLo, neighborHi] = neighborBand(primary);
-  const neighborBandPath = bandPath(
-    xs,
-    asSeries(data[PERCENTILE_INDEX[neighborLo]]),
-    asSeries(data[PERCENTILE_INDEX[neighborHi]]),
-    xAt,
-    yAt,
-  );
-  const outerBandPath = bandPath(
-    xs,
-    asSeries(data[PERCENTILE_INDEX.p10]),
-    asSeries(data[PERCENTILE_INDEX.p90]),
-    xAt,
-    yAt,
-  );
+  // Bands derived from the primary (first) curve in single-mode only;
+  // hide them in compare so multiple bands don't muddy the picture.
+  const primaryCurve = curves[0];
+  const innerBandPath =
+    primaryCurve && curves.length === 1
+      ? bandPath(
+          xs,
+          asSeries(primaryCurve.data[PERCENTILE_INDEX.p25]),
+          asSeries(primaryCurve.data[PERCENTILE_INDEX.p75]),
+          xAt,
+          yAt,
+        )
+      : null;
+  const outerBandPath =
+    primaryCurve && curves.length === 1
+      ? bandPath(
+          xs,
+          asSeries(primaryCurve.data[PERCENTILE_INDEX.p10]),
+          asSeries(primaryCurve.data[PERCENTILE_INDEX.p90]),
+          xAt,
+          yAt,
+        )
+      : null;
+
+  const curveLines = curves
+    .map((curve, i) => {
+      const points = pointsFor(
+        xs,
+        asSeries(curve.data[PERCENTILE_INDEX[primary]]),
+        xAt,
+        yAt,
+      );
+      const path = pathFromPoints(points);
+      if (!path) return null;
+      return {
+        key: curve.key,
+        path,
+        color: CURVE_PALETTE[i % CURVE_PALETTE.length]!,
+        primaryPoints: points,
+      };
+    })
+    .flatMap((curve) => (curve ? [curve] : []));
 
   return {
-    xAt,
-    yAt,
     yTicks,
     xTicks,
-    neighborBandPath,
+    innerBandPath,
     outerBandPath,
-    primaryPath: pathFromPoints(primaryPoints),
-    primaryPoints,
+    curveLines,
+    crosshair: null,
   };
+}
+
+function alignedXs(data: AlignedData | undefined): readonly number[] {
+  return (data?.[0] ?? []) as readonly number[];
 }
 
 function numericAt(series: Series, index: number): number | null {
@@ -457,6 +542,13 @@ function roundTick(value: number): number {
   if (value === 0) return 0;
   const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(value))));
   return Math.round(value / magnitude) * magnitude;
+}
+
+function formatYTick(value: number): string {
+  if (Math.abs(value) >= 1000) {
+    return `$${(value / 1000).toFixed(1)}k`;
+  }
+  return `$${value.toFixed(value < 1 ? 2 : 0)}`;
 }
 
 function formatXTick(ts: number): string {
@@ -480,3 +572,15 @@ function formatTooltipTimestamp(
     .slice(11, 16);
   return `${iso.slice(0, 10)} · ${startMin} – ${end} UTC`;
 }
+
+// Backwards-compatible adapter so existing callers that hand a single
+// AlignedData keep working.
+export function singleCurveChart(
+  data: AlignedData,
+  label: string = "primary",
+): ChartCurve {
+  return { key: "primary", label, data };
+}
+
+// Re-export for callers used to import bandPath/etc. from this module.
+export { bandPath, pathFor, pathFromPoints, pointsFor };

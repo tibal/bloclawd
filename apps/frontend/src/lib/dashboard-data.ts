@@ -1,56 +1,61 @@
 import { useEffect, useMemo, useState } from "react";
-import type { Tier } from "@web/Tier";
 
-import type { DashboardSearch } from "@/routes/dashboard";
-import {
-  useBuckets,
-  useManifest,
-  type BucketCell,
-  type BucketEnvelope,
-  type Percentiles,
-} from "@/lib/r2";
-import { pickTier, type Tier as BucketTier } from "@/lib/tier-picker";
-import { TIER_VALUES } from "@/lib/catalog";
+import { resolveRow, type ResolvedRow } from "@/lib/catalog";
 import {
   EMPTY_ALIGNED_DATA,
   type AlignedData,
   type ChartMeta,
+  type Series,
 } from "@/lib/chart-data";
+import {
+  primaryRowFromSearch,
+  rangeWindow,
+  type DashboardSearch,
+  type FilterRow,
+} from "@/lib/dashboard-search";
+import {
+  cellMatchesRow,
+  percentilesForCells,
+} from "@/lib/cohort";
+import {
+  useBuckets,
+  useManifest,
+  type BucketEnvelope,
+  type Percentiles,
+} from "@/lib/r2";
+import { pickTier, type Tier as BucketTier } from "@/lib/tier-picker";
 
-type SubscriptionTier = Tier;
-type WindowParam = DashboardSearch["window"];
+export type CurveResult = {
+  // Stable key for React lists; primary row uses `primary`.
+  key: string;
+  label: string;
+  filters: ResolvedRow;
+  data: AlignedData;
+};
 
 export type ChartDataResult = {
-  data: AlignedData | null;
-  compareData: { tier: SubscriptionTier; data: AlignedData }[] | null;
+  curves: CurveResult[];
   meta: ChartMeta | null;
   loading: boolean;
   error: Error | null;
   bucketsLoaded: number;
   bucketsTotal: number;
+  resolution: BucketTier;
 };
 
-const COMPARE_TIERS: readonly SubscriptionTier[] = TIER_VALUES;
 const EMPTY_PATHS: string[] = [];
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const WINDOW_DAYS: Record<WindowParam, number> = {
-  "24h": 1,
-  "7d": 7,
-  "30d": 30,
-  "90d": 90,
-};
 
-export function useChartData(filters: DashboardSearch): ChartDataResult {
-  const windowDays = windowDaysFor(filters.window);
-  const bucketTier = pickTier(windowDays);
-  const manifest = useManifest();
-  const manifestPaths = manifest.data?.tiers[bucketTier] ?? EMPTY_PATHS;
+export function useChartData(search: DashboardSearch): ChartDataResult {
   const nowMs = Date.now();
+  const { startMs, endMs, days } = rangeWindow(search, nowMs);
+  const resolution = pickTier(days);
+  const manifest = useManifest();
+  const manifestPaths = manifest.data?.tiers[resolution] ?? EMPTY_PATHS;
   const paths = useMemo(
-    () => pathsForWindow(manifestPaths, bucketTier, windowDays, nowMs),
-    [bucketTier, manifestPaths, nowMs, windowDays],
+    () => pathsForRange(manifestPaths, resolution, startMs, endMs),
+    [manifestPaths, resolution, startMs, endMs],
   );
-  const bucketResults = useBuckets(bucketTier, paths);
+  const bucketResults = useBuckets(resolution, paths);
   const buckets = bucketResults.flatMap((result) =>
     result.data ? [result.data] : [],
   );
@@ -58,42 +63,44 @@ export function useChartData(filters: DashboardSearch): ChartDataResult {
   const loading = manifest.isLoading || bucketLoading;
   const error = toError(manifest.error);
 
+  const primaryRow = primaryRowFromSearch(search);
+  const rows: FilterRow[] = search.compare
+    ? [primaryRow, ...search.rows]
+    : [primaryRow];
+
   if (error) {
     return {
-      data: null,
-      compareData: null,
+      curves: [],
       meta: null,
       loading: false,
       error,
       bucketsLoaded: 0,
       bucketsTotal: paths.length,
+      resolution,
     };
   }
 
-  const meta = buildMeta(buckets, filters, bucketTier);
-
-  if (filters.compare) {
+  const curves = rows.map((row, idx) => {
+    const resolved = resolveRow(row);
     return {
-      data: null,
-      compareData: buildCompareData(buckets, filters),
-      meta,
-      loading,
-      error: null,
-      bucketsLoaded: buckets.length,
-      bucketsTotal: paths.length,
+      key: idx === 0 ? "primary" : `row-${idx - 1}`,
+      label: rowLabel(resolved),
+      filters: resolved,
+      data: buildAlignedData(buckets, resolved) ?? EMPTY_ALIGNED_DATA,
     };
-  }
+  });
+
+  const primary = curves[0];
+  const meta = primary ? buildMeta(buckets, primary.filters, resolution) : null;
 
   return {
-    data: filters.tier
-      ? buildAlignedData(buckets, filters, filters.tier) ?? null
-      : null,
-    compareData: null,
+    curves,
     meta,
     loading,
     error: null,
     bucketsLoaded: buckets.length,
     bucketsTotal: paths.length,
+    resolution,
   };
 }
 
@@ -105,7 +112,6 @@ export function useDelayedLoading(loading: boolean, delayMs = 300): boolean {
       setDelayed(false);
       return;
     }
-
     const timeoutId = window.setTimeout(() => setDelayed(true), delayMs);
     return () => window.clearTimeout(timeoutId);
   }, [delayMs, loading]);
@@ -113,13 +119,22 @@ export function useDelayedLoading(loading: boolean, delayMs = 300): boolean {
   return delayed;
 }
 
-export function windowDaysFor(window: WindowParam): number {
-  return WINDOW_DAYS[window];
+export function rowLabel(row: ResolvedRow): string {
+  // Compact label suited for the chart legend / cohort row badges.
+  // Aggregable fields appear only when narrowed.
+  const provider = row.provider === "anthropic" ? "Anthropic" : "OpenAI";
+  const parts: string[] = [`${provider} · ${row.harness}`];
+  if (row.tier) parts.push(row.tier);
+  parts.push(row.limit_type);
+  if (row.region) parts.push(row.region);
+  if (row.model) parts.push(row.model);
+  if (row.plan) parts.push(row.plan);
+  return parts.join(" · ");
 }
 
 function buildMeta(
   buckets: BucketEnvelope[],
-  filters: DashboardSearch,
+  row: ResolvedRow,
   resolution: BucketTier,
 ): ChartMeta {
   const timestamps = sortedUniqueTimestamps(buckets);
@@ -127,10 +142,7 @@ function buildMeta(
   for (const bucket of buckets) {
     let total = 0;
     for (const cell of bucket.cells) {
-      if (cell.insufficient_data) continue;
-      if (cell.harness !== filters.harness) continue;
-      if (cell.limit_type !== filters.limit_type) continue;
-      if (filters.region && cell.region !== filters.region) continue;
+      if (!cellMatchesRow(cell, row)) continue;
       total += cell.n_retained;
     }
     counts.set(bucketTimestampSeconds(bucket), total);
@@ -141,49 +153,19 @@ function buildMeta(
   };
 }
 
-function buildCompareData(
-  buckets: BucketEnvelope[],
-  filters: DashboardSearch,
-): { tier: SubscriptionTier; data: AlignedData }[] {
-  const timestamps = sortedUniqueTimestamps(buckets);
-
-  return COMPARE_TIERS.map((tier) => ({
-    tier,
-    data: buildAlignedData(buckets, filters, tier, timestamps) ?? [
-      timestamps,
-      [],
-      [],
-      [],
-      [],
-      [],
-    ],
-  }));
-}
-
 function buildAlignedData(
   buckets: BucketEnvelope[],
-  filters: DashboardSearch,
-  tier: SubscriptionTier,
-  timestamps?: number[],
+  row: ResolvedRow,
 ): AlignedData | null {
   const points = new Map<number, Percentiles>();
-
   for (const bucket of buckets) {
-    const values = extractPercentiles(bucket, filters, tier);
+    const values = extractPercentiles(bucket, row);
     if (values) {
       points.set(bucketTimestampSeconds(bucket), values);
     }
   }
-
-  if (points.size === 0 && !timestamps) {
-    return null;
-  }
-
-  const xs = timestamps ?? Array.from(points.keys()).sort((a, b) => a - b);
-  if (xs.length === 0) {
-    return EMPTY_ALIGNED_DATA;
-  }
-
+  if (points.size === 0) return null;
+  const xs = Array.from(points.keys()).sort((a, b) => a - b);
   return [
     xs,
     xs.map((ts) => points.get(ts)?.p10 ?? null),
@@ -196,95 +178,22 @@ function buildAlignedData(
 
 function extractPercentiles(
   bucket: BucketEnvelope,
-  filters: DashboardSearch,
-  tier: SubscriptionTier,
+  row: ResolvedRow,
 ): Percentiles | null {
-  const values: Array<{ weight: number; percentiles: Percentiles }> = [];
-
-  for (const cell of bucket.cells) {
-    if (!matchesCell(cell, filters, tier)) {
-      continue;
-    }
-
-    const extracted = extractCellPercentiles(cell, filters);
-    if (extracted) {
-      values.push(extracted);
-    }
-  }
-
-  return weightedAverage(values);
-}
-
-function matchesCell(
-  cell: BucketCell,
-  filters: DashboardSearch,
-  tier: SubscriptionTier,
-): boolean {
-  return (
-    cell.subscription_tier === tier &&
-    cell.harness === filters.harness &&
-    cell.limit_type === filters.limit_type &&
-    !cell.insufficient_data &&
-    (!filters.region || cell.region === filters.region)
+  return percentilesForCells(
+    bucket.cells.filter((cell) => cellMatchesRow(cell, row)),
   );
 }
 
-function extractCellPercentiles(
-  cell: BucketCell,
-  filters: DashboardSearch,
-): { weight: number; percentiles: Percentiles } | null {
-  const percentiles = cell.api_cost_usd ?? null;
-  if (!percentiles) return null;
-
-  if (filters.model) {
-    const hasModel = cell.typical_mix.some(
-      (entry) =>
-        entry.model === filters.model &&
-        (entry.tokens.input > 0 ||
-          entry.tokens.output > 0 ||
-          entry.tokens.cached_read > 0 ||
-          entry.tokens.cached_write > 0),
-    );
-    if (!hasModel) return null;
-  }
-
-  return { weight: Math.max(1, cell.n_retained), percentiles };
-}
-
-function weightedAverage(
-  values: Array<{ weight: number; percentiles: Percentiles }>,
-): Percentiles | null {
-  if (values.length === 0) {
-    return null;
-  }
-
-  const totalWeight = values.reduce((sum, item) => sum + item.weight, 0);
-  const weighted = (key: keyof Percentiles) =>
-    values.reduce(
-      (sum, item) => sum + item.percentiles[key] * item.weight,
-      0,
-    ) / totalWeight;
-
-  return {
-    p10: weighted("p10"),
-    p25: weighted("p25"),
-    p50: weighted("p50"),
-    p75: weighted("p75"),
-    p90: weighted("p90"),
-  };
-}
-
-function pathsForWindow(
+function pathsForRange(
   paths: string[],
   tier: BucketTier,
-  windowDays: number,
-  nowMs: number,
+  startMs: number,
+  endMs: number,
 ): string[] {
-  const cutoffMs = nowMs - windowDays * MS_PER_DAY;
-
   return paths
     .map((path) => ({ path, ts: pathTimestampMs(path, tier) }))
-    .filter(({ ts }) => ts !== null && ts >= cutoffMs && ts <= nowMs)
+    .filter(({ ts }) => ts !== null && ts >= startMs && ts <= endMs)
     .sort((a, b) => a.ts! - b.ts!)
     .map(({ path }) => path);
 }
@@ -300,22 +209,15 @@ function pathTimestampMs(path: string, tier: BucketTier): number | null {
   const parsedMonth = Number(month);
   const parsedDay = Number(day);
 
-  if (!parsedYear || !parsedMonth || !parsedDay) {
-    return null;
-  }
-
-  if (tier === "d1") {
-    return Date.UTC(parsedYear, parsedMonth - 1, parsedDay);
-  }
+  if (!parsedYear || !parsedMonth || !parsedDay) return null;
+  if (tier === "d1") return Date.UTC(parsedYear, parsedMonth - 1, parsedDay);
 
   const [hourPart, minutePart = "0"] = (time ?? "").split("-");
   const parsedHour = Number(hourPart);
   const parsedMinute = Number(minutePart);
-
   if (!Number.isFinite(parsedHour) || !Number.isFinite(parsedMinute)) {
     return null;
   }
-
   return Date.UTC(
     parsedYear,
     parsedMonth - 1,
@@ -336,9 +238,24 @@ function bucketTimestampSeconds(bucket: BucketEnvelope): number {
 }
 
 function toError(error: unknown): Error | null {
-  if (!error) {
-    return null;
-  }
-
+  if (!error) return null;
   return error instanceof Error ? error : new Error(String(error));
 }
+
+export function alignedHasValues(data: AlignedData | null): boolean {
+  if (!data) return false;
+  const p50 = data[3] ?? [];
+  for (let i = 0; i < p50.length; i++) {
+    const v = p50[i];
+    if (typeof v === "number" && Number.isFinite(v)) return true;
+  }
+  return false;
+}
+
+// Helper retained for tests; prefer rangeWindow + pickTier in new code.
+export function windowDaysFor(_unused: unknown): number {
+  void _unused;
+  return 7;
+}
+
+export type { Series };
