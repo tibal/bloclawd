@@ -6,4 +6,4 @@
  * `Tier` enum is still the price-bucket dimension that lands on R2; `Plan`
  * is a richer descriptor used by the UI and cost helpers.
  */
-export type Plan = "anthropic-pro" | "anthropic-max5" | "anthropic-max20" | "openai-plus" | "openai-pro";
+export type Plan = "anthropic-pro" | "anthropic-max5" | "anthropic-max20" | "openai-plus" | "openai-pro-100" | "openai-pro";

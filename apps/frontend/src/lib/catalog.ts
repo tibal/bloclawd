@@ -155,8 +155,9 @@ export function tierMonthlyCostUsd(tier: Tier): number {
 }
 
 export function tierLabel(tier: Tier): string {
-  const plan = primaryPlanForTier(tier);
-  return `${plan.display_name} · $${plan.monthly_cost_usd}/mo`;
+  // The tier's primary plan already carries the price in its display_name
+  // (post-2026-05 catalog refresh), so use it verbatim.
+  return primaryPlanForTier(tier).display_name;
 }
 
 export function limitWindowsPerMonth(limitType: LimitType): number {
@@ -592,5 +593,8 @@ function providerLabel(provider: Provider): string {
 }
 
 function planLabel(plan: PlanInfo): string {
-  return `${providerLabel(plan.provider)} ${plan.display_name}`;
+  // Catalog `display_name` is pre-disambiguated by price (e.g.
+  // "ChatGPT Pro $100" vs "ChatGPT Pro $200"), so we render it
+  // verbatim without re-prefixing the provider.
+  return plan.display_name;
 }

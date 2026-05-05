@@ -43,6 +43,14 @@ pub enum Plan {
     AnthropicMax20,
     #[serde(rename = "openai-plus")]
     OpenAIPlus,
+    /// OpenAI's mid-tier "Pro" plan introduced 2026-04-09 at $100/mo.
+    /// Branded "ChatGPT Pro" with the same model suite as the $200 ceiling
+    /// but lower usage limits (≈5x Plus). Disambiguated from `OpenAIPro` by
+    /// price.
+    #[serde(rename = "openai-pro-100")]
+    OpenAIPro100,
+    /// OpenAI's flagship "ChatGPT Pro" at $200/mo. Slug kept stable for
+    /// wire compatibility; display name carries the price.
     #[serde(rename = "openai-pro")]
     OpenAIPro,
 }
@@ -236,11 +244,15 @@ const OPENAI_HARNESSES: &[Harness] = &[Harness::Codex];
 const STANDARD_LIMITS: &[LimitType] = &[LimitType::FiveH, LimitType::Weekly];
 
 /// Every supported plan, in canonical declaration order.
+///
+/// Display names are pre-disambiguated by price (e.g. "ChatGPT Pro $100" vs
+/// "ChatGPT Pro $200") so the frontend can render `display_name` verbatim
+/// without fighting same-named tiers across providers.
 pub const PLANS: &[PlanInfo] = &[
     PlanInfo {
         plan: Plan::AnthropicPro,
         provider: Provider::Anthropic,
-        display_name: "Pro",
+        display_name: "Claude Pro $20",
         monthly_cost_usd: 20.0,
         harnesses: ANTHROPIC_HARNESSES,
         models: ANTHROPIC_PRO_MODELS,
@@ -250,7 +262,7 @@ pub const PLANS: &[PlanInfo] = &[
     PlanInfo {
         plan: Plan::AnthropicMax5,
         provider: Provider::Anthropic,
-        display_name: "Max 5x",
+        display_name: "Claude Max 5× $100",
         monthly_cost_usd: 100.0,
         harnesses: ANTHROPIC_HARNESSES,
         models: ANTHROPIC_MAX5_MODELS,
@@ -260,7 +272,7 @@ pub const PLANS: &[PlanInfo] = &[
     PlanInfo {
         plan: Plan::AnthropicMax20,
         provider: Provider::Anthropic,
-        display_name: "Max 20x",
+        display_name: "Claude Max 20× $200",
         monthly_cost_usd: 200.0,
         harnesses: ANTHROPIC_HARNESSES,
         models: ANTHROPIC_MAX20_MODELS,
@@ -270,7 +282,7 @@ pub const PLANS: &[PlanInfo] = &[
     PlanInfo {
         plan: Plan::OpenAIPlus,
         provider: Provider::OpenAI,
-        display_name: "ChatGPT Plus",
+        display_name: "ChatGPT Plus $20",
         monthly_cost_usd: 20.0,
         harnesses: OPENAI_HARNESSES,
         models: OPENAI_PLUS_MODELS,
@@ -278,9 +290,20 @@ pub const PLANS: &[PlanInfo] = &[
         tier_alias: None,
     },
     PlanInfo {
+        plan: Plan::OpenAIPro100,
+        provider: Provider::OpenAI,
+        display_name: "ChatGPT Pro $100",
+        monthly_cost_usd: 100.0,
+        harnesses: OPENAI_HARNESSES,
+        // Same model suite as the $200 ceiling per OpenAI launch notes.
+        models: OPENAI_PRO_MODELS,
+        limit_types: STANDARD_LIMITS,
+        tier_alias: None,
+    },
+    PlanInfo {
         plan: Plan::OpenAIPro,
         provider: Provider::OpenAI,
-        display_name: "ChatGPT Pro",
+        display_name: "ChatGPT Pro $200",
         monthly_cost_usd: 200.0,
         harnesses: OPENAI_HARNESSES,
         models: OPENAI_PRO_MODELS,
@@ -465,6 +488,7 @@ mod tests {
         Plan::AnthropicMax5,
         Plan::AnthropicMax20,
         Plan::OpenAIPlus,
+        Plan::OpenAIPro100,
         Plan::OpenAIPro,
     ];
     const ALL_TIERS: &[Tier] = &[Tier::Pro, Tier::Max5, Tier::Max20];
@@ -631,7 +655,39 @@ mod tests {
     #[test]
     fn openai_plans_have_no_wire_tier_yet() {
         assert!(Plan::OpenAIPlus.info().tier_alias.is_none());
+        assert!(Plan::OpenAIPro100.info().tier_alias.is_none());
         assert!(Plan::OpenAIPro.info().tier_alias.is_none());
+    }
+
+    #[test]
+    fn plan_display_names_are_unique() {
+        let mut seen: Vec<&'static str> = Vec::new();
+        for plan in ALL_PLANS {
+            let name = plan.info().display_name;
+            assert!(!seen.contains(&name), "duplicate display name: {name}");
+            seen.push(name);
+        }
+    }
+
+    #[test]
+    fn plan_display_names_carry_price() {
+        for plan in ALL_PLANS {
+            let info = plan.info();
+            let suffix = format!("${}", info.monthly_cost_usd as u32);
+            assert!(
+                info.display_name.contains(&suffix),
+                "{:?} display_name '{}' must contain price suffix '{}'",
+                info.plan,
+                info.display_name,
+                suffix,
+            );
+        }
+    }
+
+    #[test]
+    fn openai_pro_tiers_are_distinct_at_100_and_200() {
+        assert_eq!(Plan::OpenAIPro100.info().monthly_cost_usd, 100.0);
+        assert_eq!(Plan::OpenAIPro.info().monthly_cost_usd, 200.0);
     }
 
     #[test]
@@ -655,6 +711,10 @@ mod tests {
         assert_eq!(
             serde_json::to_string(&Plan::OpenAIPro).unwrap(),
             r#""openai-pro""#
+        );
+        assert_eq!(
+            serde_json::to_string(&Plan::OpenAIPro100).unwrap(),
+            r#""openai-pro-100""#
         );
     }
 
