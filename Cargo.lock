@@ -150,7 +150,7 @@ dependencies = [
 
 [[package]]
 name = "bloclawd"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "anyhow",
  "base64",
@@ -173,7 +173,7 @@ dependencies = [
 
 [[package]]
 name = "bloclawd-pow"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "base64",
  "hex",
@@ -187,7 +187,7 @@ dependencies = [
 
 [[package]]
 name = "bloclawd-schema"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_jcs",
@@ -199,7 +199,7 @@ dependencies = [
 
 [[package]]
 name = "bloclawd-worker"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "base64",
  "bloclawd-pow",
