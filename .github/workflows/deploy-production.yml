@@ -104,16 +104,16 @@ jobs:
           set -euo pipefail
           # Brief warm-up retry; custom-domain edge propagation is usually
           # <30s but the first request after a cold deploy can race.
-          for attempt in 1 2 3 4 5; do
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
             if curl -fsS --max-time 10 https://api.bloclawd.com/challenge \
-                | jq -e '.challenge_id and .expires_at and .k' >/dev/null; then
+                | jq -e '.challenge_id and .expires_in and .difficulty and .sig' >/dev/null; then
               echo "Worker healthy on attempt $attempt"
               exit 0
             fi
             echo "Attempt $attempt failed; retrying in 6s"
             sleep 6
           done
-          echo "::error::Worker failed health check after 5 attempts"
+          echo "::error::Worker failed health check after 10 attempts"
           exit 1
 
   deploy-frontend:
