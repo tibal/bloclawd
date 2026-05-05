@@ -88,12 +88,15 @@ jobs:
           rustup toolchain install stable --profile minimal --no-self-update
           cargo +stable install -q worker-build@0.8.1 --locked
 
+      - name: Install Wrangler CLI
+        run: npm install --global wrangler@4.87.0
+
       - name: Deploy worker (wrangler.toml [build] runs worker-build automatically)
         working-directory: apps/worker
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: npm exec --yes --package wrangler@4.87.0 -- wrangler deploy --env production
+        run: wrangler deploy --env production
 
       - name: Health check (challenge endpoint)
         run: |
@@ -134,6 +137,9 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      - name: Install Wrangler CLI
+        run: npm install --global wrangler@4.87.0
+
       # @cloudflare/vite-plugin owns env selection: must be set at build
       # time via CLOUDFLARE_ENV; passing --env to wrangler deploy is now
       # rejected when a vite-redirected wrangler.json exists.
@@ -159,7 +165,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         # No --env: vite plugin baked the env into the redirected
         # wrangler.json at build time (CLOUDFLARE_ENV above).
-        run: npm exec --yes --package wrangler@4.87.0 -- wrangler deploy
+        run: wrangler deploy
 
       - name: Health check (root + install.sh content-type)
         # SPA fallback (not_found_handling = "single-page-application") would
