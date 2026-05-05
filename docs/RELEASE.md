@@ -15,10 +15,10 @@ The following operator-side prerequisites must be in place before the first `0.1
 | 1 | Apple Developer Program enrollment ($99/yr) | Individual: 24-48h activation. Org: 1-3 weeks (DUNS verification) |
 | 2 | Developer ID Application certificate exported as `.p12` | Generate in Keychain Access; export with strong password |
 | 3 | App Store Connect API key (.p8) generated | App Store Connect → Users and Access → Keys; **download the .p8 ONCE** (cannot be re-downloaded) |
-| 4 | `homebrew-bloclawd` GitHub repo created | Convention: `homebrew-<name>`. One initial commit on `main` (README only) |
+| 4 | `bloclawd/homebrew-tap` GitHub repo created | Homebrew convention: `homebrew-<tapname>`. One initial commit on `main` (README only) |
 | 5 | crates.io account exists for the operator | Account linked to GitHub recommended |
 | 6 | Cloudflare zone access for `bloclawd.com` (and `bloclawd.org`) | Admin-level for DNS attach + Bulk Redirect + HSTS toggle |
-| 7 | GitHub branch protection on `main` configured | Required reviewers = 0 OR install.sh-sync PAT on bypass list (D-121 auto-merge); ALSO enable Private Vulnerability Reporting (Settings → Security) |
+| 7 | GitHub branch protection on `main` configured | Required reviewers = 0, required checks enabled, and auto-merge enabled; ALSO enable Private Vulnerability Reporting (Settings → Security) |
 | 8 | Pre-existing CNAME records for the four canonical domains DELETED | Custom-domain attach fails if a CNAME shadows the target name |
 
 ## GH Actions secrets
@@ -34,7 +34,8 @@ Set these via Repo Settings → Secrets and variables → Actions:
 | `APPLE_API_KEY_ID` | 10-char alphanumeric, App Store Connect → Keys |
 | `APPLE_API_ISSUER` | UUID, App Store Connect → Keys → Issuer ID |
 | `CARGO_REGISTRY_TOKEN` | crates.io → Account → API tokens → New token (publish-only scope, ideally per-package) |
-| `HOMEBREW_TAP_TOKEN` | GitHub fine-grained PAT scoped to `homebrew-bloclawd` only with `Contents: Write` + `Pull Requests: Write` |
+| `HOMEBREW_TAP_TOKEN` | GitHub fine-grained PAT scoped to `bloclawd/homebrew-tap` with `Contents: Write` |
+| `INSTALL_SH_SYNC_TOKEN` | GitHub fine-grained PAT scoped to `bloclawd/bloclawd` with `Contents: Write`, `Pull Requests: Write`, and `Actions: Write`; this must be a user/app token, not `GITHUB_TOKEN`, so PR checks fire and the workflow can dispatch `release-smoke.yml` |
 
 (`CODESIGN_OPTIONS=runtime` is set in workflow YAML, NOT a secret — see `.github/workflows/release.yml`. Hardened runtime is REQUIRED for notarize.)
 
@@ -109,7 +110,7 @@ Version-management upgrade path (post-ISSUE-01 fix in plan 05-03): the workspace
    ```
 7. **Run a real smoke** against an actual session (not the fixture):
    ```bash
-   bloclawd --5h --cc --tier max20 --dry-run
+   bloclawd --cc --tier max20 --end "16:00" --5h --dry-run
    ```
    Confirm: exit 0; no crash; no error envelopes; output looks reasonable.
 8. **Update `docs/SUPPORTED-VERSIONS.md`** "Last tested" cells with the actual harness versions used during the smoke (CC version + Codex version).
@@ -125,7 +126,7 @@ From `0.1.1` onward, `release-smoke.yml` (the GH Actions matrix) carries the smo
 2. `cargo release --workspace patch` (dry-run)
 3. `cargo release --workspace --execute patch` (execute)
 4. Watch `release.yml`. If it fails, see recovery sections below.
-5. After `release.yml` succeeds, watch `release-smoke.yml` (auto-triggered on `release.published`; matrix covers cargo / brew / curl across ubuntu-latest + macos-14 + macos-13 cells).
+5. After `release.yml` succeeds, watch `release-smoke.yml` (dispatched by the release cascade after install.sh sync; matrix covers cargo / brew / curl across ubuntu-latest + macos-latest cells).
 6. If smoke is green: announce per Phase 5 D-discretion (out of scope for this runbook).
 7. If smoke is red: download smoke artifact logs, identify the failed cell (e.g., curl-on-ubuntu), fix root cause, cut a hotfix `cargo release --execute patch`.
 
@@ -224,7 +225,7 @@ The wrangler config in `apps/worker/wrangler.toml` already declares `[[env.produ
 
 ```bash
 cd apps/worker
-npx --yes wrangler@4.34.0 deploy --env production
+npx --yes wrangler@4.87.0 deploy --env production
 ```
 
 Verify:
@@ -239,7 +240,7 @@ Same pattern:
 ```bash
 cd apps/frontend
 pnpm build       # ensures dist/ is up-to-date including install.sh
-npx --yes wrangler@4.34.0 deploy --env production
+npx --yes wrangler@4.87.0 deploy --env production
 ```
 
 Verify:
@@ -312,7 +313,7 @@ The supported recovery surface is therefore **roll-forward**, not rollback:
 
 1. **Code regression**: cut a fresh patch (`cargo release --execute patch`) reverting the offending commit. The new version supersedes the bad one across all three channels.
 2. **crates.io poison**: `cargo yank --version X.Y.Z -p bloclawd` (and per-crate as needed). Yank does NOT remove the tarball — anyone with `Cargo.lock` pinned can still resolve it — but new `cargo install bloclawd` invocations will skip the yanked version. Always pair a yank with a roll-forward patch release.
-3. **Homebrew tap regression**: revert the offending commit on `homebrew-bloclawd` `main` directly (operator push), OR cut a fresh patch which auto-updates the tap.
+3. **Homebrew tap regression**: revert the offending commit on `bloclawd/homebrew-tap` `main` directly (operator push), OR cut a fresh patch which auto-updates the tap.
 4. **install.sh regression**: revert in `apps/frontend/public/install.sh` (or rebuild output dir) and `npx wrangler deploy --env production` from `apps/frontend/`. Cache-Control is `max-age=300` (D-123), so global propagation is ≤5 min.
 5. **Cloudflare custom domain misconfig**: `npx wrangler r2 bucket domain remove bloclawd-reports --domain data.bloclawd.com --zone-id "$ZONE_ID"` reverts the R2 attach. For Worker routes, edit `apps/{worker,frontend}/wrangler.toml` and redeploy.
 
@@ -354,7 +355,7 @@ Apple Developer ID Application certificates are valid for 5 years. Calendar-remi
 ### `HOMEBREW_TAP_TOKEN` — annually
 
 1. GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token.
-2. Scope: `homebrew-bloclawd` repo only; `Contents: Write` + `Pull Requests: Write`.
+2. Scope: `bloclawd/homebrew-tap` repo only; `Contents: Write`.
 3. Update GH Actions secret `HOMEBREW_TAP_TOKEN`.
 4. Revoke the old token.
 
@@ -366,14 +367,14 @@ The `release.yml` and `release-smoke.yml` logs are public on a public repo. The 
 
 In practice this is naturally satisfied because the release pipeline does not touch the `events` PostgreSQL table or the public R2 reports. But:
 
-- `release-smoke.yml` runs `bloclawd --5h --cc <fixture> --dry-run` — and has an inline anonymity grep that fails the cell if `event_id` (UUIDv4 regex), nonce (literal string), IPv4, or IPv6 appear in stdout. This is the canonical enforcement (Phase 5 plan 05-05).
+- `release-smoke.yml` copies a checked-in CC fixture into a temporary `HOME` and runs `bloclawd --cc --tier max20 --end "2026-01-01T06:00:00" --5h --dry-run`; it has an inline anonymity grep that fails the cell if `event_id` (UUIDv4 regex), nonce (literal string), IPv4, or IPv6 appear in stdout. This is the canonical enforcement (Phase 5 plan 05-05).
 - If the operator ever adds a step to `release.yml` that touches events data (e.g., a future "post-release verification" that hits the production R2 manifest), they MUST add the same anonymity grep to that step's output capture.
 
 ---
 
-## install.sh sync (auto-PR on release; manual merge if branch protection blocks auto-merge)
+## install.sh sync (auto-merge PR on release; closed on failure)
 
-After `release.yml` succeeds, the final job in the cascade (`update-install-sh`) opens a pull request against `main` replacing `apps/frontend/public/install.sh` with the just-published `bloclawd-installer.sh` asset from the GitHub Release. The installer carries the release artifact URLs and SHA-256 checksums generated by cargo-dist. The PR is auto-merged if the install.sh-sync PAT is on the branch-protection bypass list (D-121); if not, the operator must manually merge it before the next release ceremony to keep `https://bloclawd.com/install.sh` in sync with the latest published binaries.
+After `release.yml` succeeds, the final job in the cascade (`update-install-sh`) opens a pull request against `main` replacing `apps/frontend/public/install.sh` with the just-published `bloclawd-installer.sh` asset from the GitHub Release. The installer carries the release artifact URLs and SHA-256 checksums generated by cargo-dist. The PR must auto-merge after required checks pass; if auto-merge is unavailable or checks do not complete within 30 minutes, the workflow closes the PR and fails so no release PR is left hanging.
 
 To verify the auto-PR landed:
 
@@ -382,12 +383,12 @@ gh pr list --state merged --search "install.sh sync" --limit 1
 gh run list --workflow release.yml --limit 1
 ```
 
-If the PR is open and unmerged, review the diff (it should be limited to checksum lines + the embedded `BLOCLAWD_VERSION` constant) and merge manually. Then redeploy the frontend Worker:
+If the job failed, review the workflow logs. After fixing the token or branch-protection issue, rerun the failed `update-install-sh` job. If you sync manually, keep the diff limited to checksum lines plus the embedded `BLOCLAWD_VERSION` constant, then redeploy the frontend Worker:
 
 ```bash
 cd apps/frontend
 pnpm build
-npx --yes wrangler@4.34.0 deploy --env production
+npx --yes wrangler@4.87.0 deploy --env production
 ```
 
 Cache-Control on `install.sh` is `max-age=300` (D-123), so global propagation completes ≤5 min.
@@ -400,7 +401,7 @@ Cache-Control on `install.sh` is `max-age=300` (D-123), so global propagation co
 |------|---------|--------------|
 | cargo-dist | 0.31.0 | `dist-workspace.toml` `cargo-dist-version` |
 | cargo-release | 1.1.2 | (operator-side install: `cargo install cargo-release@1.1.2 --locked`; requires rustc ≥ 1.91 to install) |
-| wrangler | 4.34.0 (pinned per ISSUE-11) | `apps/{frontend,worker}/wrangler.toml` (config); operator runs `npx --yes wrangler@4.34.0 ...` (NOT `@latest`) per docs/RELEASE.md commands |
+| wrangler | 4.87.0 | `package.json`, `pnpm-lock.yaml`, and deploy workflows; operator runs `npx --yes wrangler@4.87.0 ...` (NOT `@latest`) per docs/RELEASE.md commands |
 | rustc (build) | 1.86 (2024 edition) | `rust-toolchain.toml` |
 | rustc (cargo-dist install) | ≥ 1.88 | operator's default stable channel |
 | rustc (cargo-release install) | ≥ 1.91 | operator's default stable channel |
