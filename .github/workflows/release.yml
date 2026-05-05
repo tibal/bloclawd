@@ -212,16 +212,28 @@ jobs:
           LOG_FILE="/tmp/notarytool-${GITHUB_RUN_ID}.log"
           shopt -s nullglob
           for ARCHIVE in target/distrib/*-apple-darwin*.zip target/distrib/*-apple-darwin*.tar.xz; do
+            TMP_EXTRACT=""
+            NOTARY_INPUT="$ARCHIVE"
+            TMP_NOTARY_INPUT=""
+            if [[ "$ARCHIVE" == *.tar.xz ]]; then
+              TMP_EXTRACT="$(mktemp -d)"
+              NOTARY_INPUT="${RUNNER_TEMP}/notary-$(basename "$ARCHIVE" .tar.xz).zip"
+              TMP_NOTARY_INPUT="$NOTARY_INPUT"
+              tar -xf "$ARCHIVE" -C "$TMP_EXTRACT"
+              ditto -c -k --sequesterRsrc "$TMP_EXTRACT" "$NOTARY_INPUT"
+            fi
+
             echo "::group::Notarize $ARCHIVE"
-            xcrun notarytool submit "$ARCHIVE" \
+            xcrun notarytool submit "$NOTARY_INPUT" \
               --key "$KEYFILE" \
               --key-id "$APPLE_API_KEY_ID" \
               --issuer "$APPLE_API_ISSUER" \
               --wait \
               --timeout 30m 2>&1 | tee -a "$LOG_FILE"
-            # Stapler only succeeds on .dmg/.pkg/.app bundles. Raw CLI tarballs
-            # cannot be stapled; users get online-Gatekeeper checks on first run.
+            # Stapler only succeeds on .dmg/.pkg/.app bundles. Raw CLI
+            # archives get online Gatekeeper ticket checks on first run.
             xcrun stapler staple "$ARCHIVE" || echo "Stapler skipped (CLI archive, expected)"
+            rm -rf "${TMP_EXTRACT:-}" "${TMP_NOTARY_INPUT:-}"
             echo "::endgroup::"
           done
       - name: Cleanup notarize keyfile

@@ -143,6 +143,7 @@ Steps:
 2. Download the `notarytool-log-vX.Y.Z` artifact (uploaded by the notarize step on failure; 14-day retention).
 3. Inspect the log. Common failure modes:
    - **`status: invalid` from notarytool**: open the inner JSON log; common causes are missing entitlements, missing hardened runtime (`CODESIGN_OPTIONS=runtime` not set?), or expired Developer ID cert.
+   - **`must be a zip archive (.zip), flat installer package (.pkg), or UDIF disk image (.dmg)`**: the workflow should submit a temporary zip for Apple notarization while still publishing cargo-dist's original tarball. If this recurs, inspect the "Notarize macOS binaries" step in `.github/workflows/release.yml`.
    - **30-minute timeout**: Apple's notarize queue is degraded. Re-run the workflow (GH Actions → Re-run jobs). If it times out twice in a row, increase the `--timeout 30m` to `--timeout 60m` in `.github/workflows/release.yml` step "Decode .p8 + notarize" and commit.
    - **Cert expired**: see "Secret rotation" below.
 4. Fix the root cause locally.
