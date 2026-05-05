@@ -6,15 +6,57 @@
 import catalogJson from "@web/catalog.json";
 import type { Catalog } from "@web/Catalog";
 import type { Harness } from "@web/Harness";
+import type { LimitInfo } from "@web/LimitInfo";
 import type { LimitType } from "@web/LimitType";
 import type { Model } from "@web/Model";
 import type { ModelInfo } from "@web/ModelInfo";
 import type { Plan } from "@web/Plan";
 import type { PlanInfo } from "@web/PlanInfo";
 import type { Provider } from "@web/Provider";
+import type { Region } from "@web/Region";
 import type { Tier } from "@web/Tier";
+import type { TokenType } from "@web/TokenType";
+import type { Window } from "@web/Window";
 
 export const CATALOG: Catalog = catalogJson as Catalog;
+
+export type NonEmptyValues<T extends string> = readonly [T, ...T[]];
+
+function nonEmptyValues<T extends string>(
+  values: readonly T[],
+  label: string,
+): NonEmptyValues<T> {
+  if (values.length === 0) {
+    throw new Error(`catalog has no ${label}`);
+  }
+  return values as NonEmptyValues<T>;
+}
+
+export const MODEL_VALUES = nonEmptyValues(
+  CATALOG.models.map((m) => m.model),
+  "models",
+);
+export const HARNESS_VALUES = nonEmptyValues(CATALOG.harnesses, "harnesses");
+export const DASHBOARD_HARNESS_VALUES = nonEmptyValues(
+  ["cc" as const, ...CATALOG.harnesses],
+  "dashboard harnesses",
+);
+export const REGION_VALUES = nonEmptyValues(CATALOG.regions, "regions");
+export const TIER_VALUES = nonEmptyValues(CATALOG.tiers, "tiers");
+export const PROVIDER_VALUES = nonEmptyValues(CATALOG.providers, "providers");
+export const PLAN_VALUES = nonEmptyValues(
+  CATALOG.plans.map((p) => p.plan),
+  "plans",
+);
+export const LIMIT_TYPE_VALUES = nonEmptyValues(
+  CATALOG.limit_types,
+  "limit types",
+);
+export const TOKEN_TYPE_VALUES = nonEmptyValues(
+  CATALOG.token_types,
+  "token types",
+);
+export const WINDOW_VALUES = nonEmptyValues(CATALOG.windows, "windows");
 
 export type CatalogFilters = {
   provider?: Provider;
@@ -29,6 +71,14 @@ export function planInfo(plan: Plan): PlanInfo {
   const found = CATALOG.plans.find((p) => p.plan === plan);
   if (!found) {
     throw new Error(`unknown plan: ${plan}`);
+  }
+  return found;
+}
+
+export function limitInfo(limitType: LimitType): LimitInfo {
+  const found = CATALOG.limits.find((limit) => limit.limit_type === limitType);
+  if (!found) {
+    throw new Error(`unknown limit type: ${limitType}`);
   }
   return found;
 }
@@ -85,6 +135,31 @@ export function plansForTier(tier: Tier): readonly PlanInfo[] {
 
 export function tierForPlan(plan: Plan): Tier | null {
   return planInfo(plan).tier_alias;
+}
+
+export function primaryPlanForTier(tier: Tier): PlanInfo {
+  const plan = plansForTier(tier)[0];
+  if (!plan) {
+    throw new Error(`no catalog plan aliases tier: ${tier}`);
+  }
+  return plan;
+}
+
+export function tierDisplayName(tier: Tier): string {
+  return primaryPlanForTier(tier).display_name;
+}
+
+export function tierMonthlyCostUsd(tier: Tier): number {
+  return primaryPlanForTier(tier).monthly_cost_usd;
+}
+
+export function tierLabel(tier: Tier): string {
+  const plan = primaryPlanForTier(tier);
+  return `${plan.display_name} · $${plan.monthly_cost_usd}/mo`;
+}
+
+export function limitWindowsPerMonth(limitType: LimitType): number {
+  return limitInfo(limitType).windows_per_month;
 }
 
 export function planIncludesModel(plan: Plan, model: Model): boolean {
@@ -256,18 +331,22 @@ export function harnessOptions(filters: CatalogFilters): Options<Harness> {
 }
 
 export function tierOptions(): Options<Tier> {
-  // Tiers come from the wire schema; show every plan that has a tier_alias
-  // grouped by alias so the filter exposes the dimension that actually
-  // gates the published aggregates.
-  const seen = new Set<Tier>();
-  const out: { value: Tier; label: string }[] = [];
-  for (const plan of CATALOG.plans) {
-    if (plan.tier_alias && !seen.has(plan.tier_alias)) {
-      seen.add(plan.tier_alias);
-      out.push({ value: plan.tier_alias, label: plan.tier_alias });
-    }
-  }
-  return out;
+  return CATALOG.tiers.map((tier) => ({ value: tier, label: tier }));
+}
+
+export function regionOptions(): Options<Region> {
+  return CATALOG.regions.map((region) => ({ value: region, label: region }));
+}
+
+export function tokenTypeOptions(): Options<TokenType> {
+  return CATALOG.token_types.map((tokenType) => ({
+    value: tokenType,
+    label: tokenType,
+  }));
+}
+
+export function windowOptions(): Options<Window> {
+  return CATALOG.windows.map((window) => ({ value: window, label: window }));
 }
 
 export function limitTypeOptions(filters: CatalogFilters): Options<LimitType> {

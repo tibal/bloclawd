@@ -155,19 +155,23 @@ async fn cron_e2e_staging() {
 
     eprintln!("Validating emitted q15 bucket envelope");
     assert_eq!(envelope["schema_version"], "v1");
-    assert_eq!(envelope["bin_edges"].as_array().unwrap().len(), 19);
     let cells = envelope["cells"].as_array().expect("cells array");
     let cell = cells
         .iter()
         .find(|cell| {
-            cell["tier"] == "max20"
+            cell["subscription_tier"] == "max20"
                 && cell["harness"] == "claude-code"
                 && cell["region"] == "EU"
                 && cell["limit_type"] == "5h"
         })
         .expect("max20 claude-code EU 5h cohort cell present");
-    assert_eq!(cell["n_submissions"], 30);
-    assert!(cell["unified_cost"].get("Mean").is_some());
+    assert_eq!(cell["n_retained"], 30);
+    assert!(cell["api_cost_usd"].get("p50").is_some());
+    assert!(
+        cell["typical_mix"]
+            .as_array()
+            .is_some_and(|items| !items.is_empty())
+    );
 
     let raw = serde_json::to_string(&envelope).unwrap();
     for forbidden in ["submission_group_id", "event_id", "nonce", "tz_offset"] {

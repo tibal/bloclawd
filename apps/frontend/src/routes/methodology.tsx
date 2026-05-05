@@ -41,19 +41,19 @@ const sections: Section[] = [
   {
     id: "outliers",
     n: "02",
-    title: "Outlier handling: 2σ unified-cost trim",
+    title: "Outlier handling: 2σ API-cost trim",
     body: (
       <>
         <p>
           For each cohort of tier, harness, region, and limit type, bloclawd
-          computes one unified token cost per submission. Submissions outside
-          plus or minus 2σ of the cohort mean are trimmed before percentile
-          computation. This public policy replaces the earlier double-MAD
-          rule and keeps model-specific token mixes comparable.
+          computes one API-equivalent cost per submission from the published
+          per-model, per-token-type prices in the shared catalog. Submissions
+          outside plus or minus 2σ of the cohort mean are trimmed before
+          percentile computation.
         </p>
         <p className="text-sm">
-          Cohorts with trim rates above 10% are flagged for review instead of
-          silently treated as clean data.
+          The public cell records how many submissions were dropped and how
+          many remained after trimming.
         </p>
       </>
     ),
@@ -69,7 +69,7 @@ const sections: Section[] = [
         <code className="font-mono text-foreground">
           insufficient_data: true
         </code>{" "}
-        and emit no percentile or model breakdown. The k≥5 floor is a hard
+        and emit no percentile or token-mix breakdown. The k≥5 floor is a hard
         public-data boundary.
       </p>
     ),
@@ -77,40 +77,38 @@ const sections: Section[] = [
   {
     id: "percentiles",
     n: "04",
-    title: "Windowed L-estimator percentiles",
+    title: "API-cost percentiles",
     body: (
       <p>
-        When a trimmed cohort has enough contributors, each p10, p25, p50,
-        p75, and p90 value is emitted as the arithmetic mean of a centered
-        five-sample window. The public percentile is therefore a smoothed
-        statistic, not an individual submission value.
+        When a trimmed cohort has enough contributors, the public R2 cell
+        emits p10, p25, p50, p75, and p90 for API-equivalent cost in USD.
+        These values are computed from retained submissions only.
       </p>
     ),
   },
   {
-    id: "binning",
+    id: "mix",
     n: "05",
-    title: "Powers-of-2 log-bin fallback",
+    title: "Typical model and token mix",
     body: (
       <p>
-        If a five-sample percentile window cannot fit, bloclawd emits a
-        powers-of-2 bin index instead of a raw token count. The bin edges
-        span 2^10 through 2^28 tokens and are shared with the SPA so labels
-        match the cron calculation.
+        Each public cell also emits the average token mix across retained
+        submissions, grouped by model and token type: input, output,
+        cached-read, and cached-write. This shows what the typical
+        rate-limit-hitting workload looked like without publishing raw events.
       </p>
     ),
   },
   {
-    id: "weights",
+    id: "catalog",
     n: "06",
-    title: "Ridge weight fit and stratified fallback",
+    title: "Catalog-backed pricing",
     body: (
       <p>
-        Per-model token weights are fit with ridge regression toward
-        published Anthropic and OpenAI per-token prices as a Bayesian prior.
-        Low-volume cohorts fall back from cohort to tier and harness, then
-        to tier, then to the prior itself. Each public model entry records
-        which weight source applied.
+        Model lists, harness mappings, supported limit types, token types,
+        and API prices come from the shared Rust catalog. Adding a model or
+        changing pricing in that catalog updates aggregation inputs and the
+        generated TypeScript catalog used by the frontend.
       </p>
     ),
   },

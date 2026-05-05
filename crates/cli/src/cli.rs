@@ -1,30 +1,7 @@
 //! clap derive Args.
-//!
-//! `CliTier` mirrors `bloclawd_schema::Tier` character-for-character via
-//! `#[value(name = "...")]` so CLI values match wire values.
 
-use bloclawd_schema::{LimitType, Tier};
-use clap::{ArgGroup, Parser, ValueEnum};
-
-#[derive(Clone, Copy, Debug, ValueEnum, PartialEq, Eq)]
-pub enum CliTier {
-    #[value(name = "pro")]
-    Pro,
-    #[value(name = "max5")]
-    Max5,
-    #[value(name = "max20")]
-    Max20,
-}
-
-impl From<CliTier> for Tier {
-    fn from(t: CliTier) -> Self {
-        match t {
-            CliTier::Pro => Tier::Pro,
-            CliTier::Max5 => Tier::Max5,
-            CliTier::Max20 => Tier::Max20,
-        }
-    }
-}
+use bloclawd_schema::{CATALOG, LimitType, Tier};
+use clap::{ArgGroup, Parser};
 
 /// Anonymous community analytics for AI-subscription rate-limit data.
 #[derive(Parser, Debug)]
@@ -51,8 +28,8 @@ pub struct Args {
 
     /// Subscription tier. Auto-persists to ~/.config/bloclawd/config.toml.
     /// On absence, the CLI loads the value from the config file.
-    #[arg(long, value_enum)]
-    pub tier: Option<CliTier>,
+    #[arg(long, value_name = "TIER", value_parser = parse_tier_arg)]
+    pub tier: Option<Tier>,
 
     /// Window-close in local time. Accepted forms:
     ///   HH:MM (today, local TZ)
@@ -91,6 +68,26 @@ pub struct Args {
     /// Increase verbosity (repeatable; debug-only flags out of scope for v1).
     #[arg(long, short = 'v', action = clap::ArgAction::Count)]
     pub verbose: u8,
+}
+
+fn parse_tier_arg(value: &str) -> Result<Tier, String> {
+    serde_json::from_value(serde_json::Value::String(value.to_string())).map_err(|_| {
+        format!(
+            "invalid tier `{value}`; expected one of: {}",
+            tier_choices()
+        )
+    })
+}
+
+fn tier_choices() -> String {
+    CATALOG
+        .tiers
+        .iter()
+        .copied()
+        .filter_map(|tier| serde_json::to_value(tier).ok())
+        .filter_map(|value| value.as_str().map(str::to_string))
+        .collect::<Vec<_>>()
+        .join("|")
 }
 
 impl Args {
@@ -133,15 +130,14 @@ mod tests {
 
     #[test]
     fn cli_tiers_are_provider_neutral_price_buckets() {
-        let parsed = CliTier::from_str("max20", true).expect("parses");
-        assert_eq!(parsed, CliTier::Max20);
-        assert_eq!(Tier::from(parsed), Tier::Max20);
+        let parsed = parse_tier_arg("max20").expect("parses");
+        assert_eq!(parsed, Tier::Max20);
     }
 
     #[test]
     fn cli_tier_rejects_non_individual_business_tier() {
-        assert!(CliTier::from_str("business", true).is_err());
-        assert!(CliTier::from_str("pro_codex", true).is_err());
+        assert!(parse_tier_arg("business").is_err());
+        assert!(parse_tier_arg("pro_codex").is_err());
     }
 
     #[test]

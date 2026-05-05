@@ -1,7 +1,6 @@
 //! Compat shim over `catalog`. Pricing data lives in `catalog::MODELS` per
-//! `ModelInfo::prices`. This module preserves the `model_price_lookup` API
-//! that the cron weight-fit calls and exposes a flattened `MODEL_PRICES` table
-//! for code that prefers the tuple form.
+//! `ModelInfo::prices`. This module preserves the `model_price_lookup` API and
+//! exposes a flattened `MODEL_PRICES` table for code that prefers the tuple form.
 
 use crate::catalog::MODELS;
 use crate::enums::{Model, TokenType, Window};

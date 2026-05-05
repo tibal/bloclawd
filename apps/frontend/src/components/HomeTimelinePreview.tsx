@@ -2,7 +2,7 @@ import { useMemo } from "react";
 
 import { Chart } from "@/components/Chart";
 import type { AlignedData } from "@/lib/chart-data";
-import { decodePercentiles, useBuckets, useManifest } from "@/lib/r2";
+import { useBuckets, useManifest } from "@/lib/r2";
 import { mulberry32 } from "@/lib/rng";
 
 // Procedural shape used as a last-resort fallback when the public dataset
@@ -91,12 +91,12 @@ function buildAlignedFromBuckets(
     if (!env) continue;
     const cell = env.cells.find(
       (c) =>
-        c.tier === "max20" &&
+        c.subscription_tier === "max20" &&
         c.harness === "claude-code" &&
         c.limit_type === "5h" &&
         !c.insufficient_data,
     );
-    const pcts = decodePercentiles(cell?.unified_cost);
+    const pcts = cell?.api_cost_usd ?? null;
     if (!pcts) continue;
     rows.push({
       ts: Math.floor(new Date(env.bucket_ts).getTime() / 1000),

@@ -29,11 +29,11 @@ necessary but not sufficient. The combination
 > don't store IP" is necessary but **not sufficient**. The combination
 > `(model, tier, harness, region, tz_offset, token_5min)` is a fingerprint
 > (Sweeney-style re-identification). Defense layer cake at *materialization*
-> (cron, not ingest): k-anonymity suppression of any cell with n<5; bin
-> token counts to log-spaced buckets before storing in public R2; **drop
+> (cron, not ingest): k-anonymity suppression of any cell with n<5; publish
+> only aggregate API-cost percentiles and average retained token mix; **drop
 > `tz_offset` entirely** (or coarsen to {Americas, EMEA, APAC, Other});
-> never write `event_id` or `nonce` to public R2 files; never log
-> per-event solve-time anywhere persistent.
+> never write `event_id`, `submission_group_id`, or `nonce` to public R2
+> files; never log per-event solve-time anywhere persistent.
 
 Operational consequences enforced in the codebase:
 
@@ -244,11 +244,10 @@ What `bloclawd` does NOT promise. Read these as carefully as the promises.
 - **Not a substitute for Anthropic's or OpenAI's own usage telemetry.**
   Provider-side dashboards are authoritative for your account; bloclawd
   is a community-aggregate view of when other users hit limits.
-- **Weight priors in `crates/event-schema/src/model_prices.rs` are
-  public-pricing best-effort and may be stale.** Per-token cost weights
-  used in the unified-cost ridge regression (Phase 4 AGGR-15) are
-  operator-curated from public Anthropic + OpenAI pricing pages; users
-  see the "as-of" date on `/methodology`.
+- **API prices in `crates/event-schema/src/catalog.rs` are public-pricing
+  best-effort and may be stale.** Per-token prices used for public
+  API-equivalent cost are operator-curated from public Anthropic + OpenAI
+  pricing pages; users see the "as-of" date on `/methodology`.
 - **Supported-version table is best-effort.** Claude Code and Codex
   JSONL formats are upstream-driven; minimum-supported versions are
   enforced as a non-fatal stderr warning, not a hard block (Phase 3
@@ -273,7 +272,7 @@ Each promise above is automated-tested or grep-gated in CI:
 | Promise | Enforcement surface |
 |---------|---------------------|
 | k-anonymity n ≥ 5 | `apps/worker/src/cron/aggregate.rs` (cron k-anon filter); Phase 4 verification harness |
-| Log-binned tokens | Cron materialization: per-cohort log-bin transform before R2 write; `crates/event-schema/src/log_bins.rs` |
+| Public aggregates only | Cron materialization emits API-cost percentiles and average retained token mix, never raw event rows; `apps/worker/src/cron/aggregate.rs` |
 | `tz_offset` / SGID / nonce / per-event timing stripped | Strip-at-cron (Phase 3 D-56, Phase 4 D-103); release-pipeline anonymity grep gate |
 | UUIDv4 only | `crates/event-schema` JCS conformance test; `crates/cli` integration round-trip |
 | PoW invariant | `crates/pow` Rust test suite + `spec/pow-fixtures.json` KAT vectors; CI gate in `.github/workflows/pow.yml` |

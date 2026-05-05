@@ -94,11 +94,14 @@ The aggregation cron writes a derived form of the payload to R2:
 
 - `tz_offset` is not in the wire payload at all, so the cron has nothing to drop.
 - `event_id` and `nonce` are dropped before R2 write.
-- Token counts are log-binned before R2 emission.
+- `submission_group_id` is used only to group rows into one submission before R2 write.
+- Each submission is priced with catalog-backed per-model/per-token-type API prices.
+- Public cells emit `api_cost_usd` percentiles (`p10`, `p25`, `p50`, `p75`, `p90`), `n_dropped`, `n_retained`, and `typical_mix` averaged over retained submissions.
 - Cells with `n < 5` are suppressed for k-anonymity.
 - Enum sets for filters come from `apps/web/src/generated/`, not an R2 enum manifest.
 
 These properties are enforced at materialization, not at ingest. The DB rows retain the precise private form for re-aggregation; only R2 is public.
 
 ---
+*2026-05-05 - R2 aggregation changed from ridge/unified-token output to direct API-cost percentiles plus typical token mix.*
 *2026-05-02 - `limit_type` added as wire envelope field.*

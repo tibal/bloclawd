@@ -73,7 +73,7 @@ The `bloclawd-reports` production bucket is served from `data.bloclawd.com`. Sta
 
 ### Cloudflare Workers Paid subscription requirement
 
-The `#[event(scheduled)]` cron handler requires the Workers Paid subscription ($5/mo). The free tier caps cron at 10ms CPU per invocation, which is insufficient for ridge fits and R2 writes. Confirm the Cloudflare account has the paid subscription before deploying cron triggers; otherwise deploy fails with a quota error.
+The `#[event(scheduled)]` cron handler requires the Workers Paid subscription ($5/mo). The free tier caps cron at 10ms CPU per invocation, which is insufficient for cohort aggregation and R2 writes. Confirm the Cloudflare account has the paid subscription before deploying cron triggers; otherwise deploy fails with a quota error.
 
 ### 2. Set the per-env WORKER_SECRET
 
@@ -185,7 +185,7 @@ Manual browser checklist:
 
 1. Open `https://bloclawd-frontend-staging.<account-hash>.workers.dev/dashboard?tier=max20&harness=cc&region=EU&limit_type=5h&window=7d`.
 2. Confirm the chrome row shows recent public data, event count, approximate contributor count, and a `Healthy` chip.
-3. Confirm the chart renders a unified-cost timeseries and the table shows p10/p25/p50/p75/p90 values.
+3. Confirm the chart renders an API-cost timeseries and the table shows p10/p25/p50/p75/p90 values.
 4. Toggle `Compare tiers`; max20 should have data and missing tiers should not invent values.
 5. Open `/methodology`; confirm all methodology sections render.
 6. Open `/data`; confirm canonical JSON bytes and field annotations render.

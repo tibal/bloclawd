@@ -40,44 +40,31 @@ import {
   type ChartMeta,
   type Series,
 } from "@/lib/chart-data";
-import { formatTokens } from "@/lib/format";
+import { formatUsd } from "@/lib/format";
 import { routeHead } from "@/lib/route-head";
+import {
+  DASHBOARD_HARNESS_VALUES,
+  LIMIT_TYPE_VALUES,
+  MODEL_VALUES,
+  PLAN_VALUES,
+  PROVIDER_VALUES,
+  REGION_VALUES,
+  TIER_VALUES,
+} from "@/lib/catalog";
 
-const MODEL_VALUES = [
-  "claude-opus-4-7",
-  "claude-sonnet-4-6",
-  "claude-sonnet-4-5",
-  "claude-haiku-4-5",
-  "gpt-5",
-  "gpt-5.5",
-  "gpt-5-codex",
-] as const;
-const HARNESS_VALUES = ["cc", "claude-code", "codex"] as const;
-const REGION_VALUES = ["NA", "EU", "AS", "SA", "OC", "AF", "AN"] as const;
-const TIER_VALUES = ["pro", "max5", "max20"] as const;
-// Provider / Plan literal tuples must mirror `crates/event-schema/src/catalog.rs`.
-// `Filters.test` asserts that the catalog JSON matches these values.
-const PROVIDER_VALUES = ["anthropic", "openai"] as const;
-const PLAN_VALUES = [
-  "anthropic-pro",
-  "anthropic-max5",
-  "anthropic-max20",
-  "openai-plus",
-  "openai-pro",
-] as const;
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
 
 export const dashboardSearchSchema = z.object({
   model: z.enum(MODEL_VALUES).optional(),
   region: z.enum(REGION_VALUES).optional(),
   harness: z
-    .enum(HARNESS_VALUES)
+    .enum(DASHBOARD_HARNESS_VALUES)
     .default("claude-code")
     .transform((value) => (value === "cc" ? "claude-code" : value)),
   tier: z.enum(TIER_VALUES).optional(),
   provider: z.enum(PROVIDER_VALUES).optional(),
   plan: z.enum(PLAN_VALUES).optional(),
-  limit_type: z.enum(["5h", "weekly"]).default("5h"),
+  limit_type: z.enum(LIMIT_TYPE_VALUES).default("5h"),
   window: z.enum(["24h", "7d", "30d", "90d"]).default("7d"),
   primary: z.enum(["p10", "p25", "p50", "p75", "p90"]).default("p50"),
   envelope: z.enum(["off", "neighbors", "wide"]).default("neighbors"),
@@ -145,13 +132,13 @@ function DashboardPage() {
             <span className="tag">v1</span>
           </div>
           <h1 className="text-3xl font-semibold leading-tight tracking-tight text-foreground sm:text-4xl">
-            Tokens to rate limit · {limitTypeLabel(search.limit_type)}
+            API-equivalent cost · {limitTypeLabel(search.limit_type)}
           </h1>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
             Where your tier's limits actually fire. Pick Pro, Max5, or Max20
-            for the live percentile envelope, or toggle Compare for
-            tier-to-tier drift. Cells with fewer than 5 contributors are
-            suppressed for anonymity.
+            for the live API-cost envelope, or toggle Compare for tier-to-tier
+            drift. Cells with fewer than 5 contributors are suppressed for
+            anonymity.
           </p>
           <Chrome />
           {statusNotice?.kind === "degraded" ? (
@@ -172,7 +159,7 @@ function DashboardPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
           <div>
             <div className="text-sm font-medium text-foreground">
-              Token burn · {windowLabel(search.window)}
+              API cost · {windowLabel(search.window)}
             </div>
             <div className="font-mono text-[11.5px] text-muted-foreground">
               {resolutionLabel(search.window)} bins · k ≥ 5 cells only ·{" "}
@@ -233,7 +220,7 @@ function CohortPanels({ search }: { search: DashboardSearch }) {
     () =>
       bucket
         ? pickCellFromBucket(bucket, {
-            tier: search.tier ?? "max20",
+            subscription_tier: search.tier ?? "max20",
             harness: search.harness,
             region: search.region ?? "NA",
             limit_type: search.limit_type,
@@ -254,8 +241,8 @@ function CohortPanels({ search }: { search: DashboardSearch }) {
 
   return (
     <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr]">
-      <BreakdownTable cell={cell} primary={search.primary} />
-      <TokenMixPanel cell={cell} primary={search.primary} />
+      <BreakdownTable cell={cell} />
+      <TokenMixPanel cell={cell} />
       <CostEquivalentPanel
         bucket={bucket}
         primary={search.primary}
@@ -267,12 +254,15 @@ function CohortPanels({ search }: { search: DashboardSearch }) {
 
 function pickCellFromBucket(
   bucket: BucketEnvelope,
-  match: Partial<Pick<BucketCell, "tier" | "harness" | "region" | "limit_type">>,
+  match: Partial<
+    Pick<BucketCell, "subscription_tier" | "harness" | "region" | "limit_type">
+  >,
 ): BucketCell | null {
   return (
     bucket.cells.find(
       (cell) =>
-        (match.tier == null || cell.tier === match.tier) &&
+        (match.subscription_tier == null ||
+          cell.subscription_tier === match.subscription_tier) &&
         (match.harness == null || cell.harness === match.harness) &&
         (match.region == null || cell.region === match.region) &&
         (match.limit_type == null || cell.limit_type === match.limit_type) &&
@@ -399,9 +389,9 @@ function KpiRow({ kpis, hasData }: { kpis: ComputedKpis; hasData: boolean }) {
   const items = [
     {
       label: "Median p50",
-      value: hasData ? formatTokens(kpis.medianP50) : "—",
+      value: hasData ? formatUsd(kpis.medianP50) : "—",
       sub: hasData
-        ? `peak ${formatTokens(kpis.peak)} at slot ${kpis.peakIdx}`
+        ? `peak ${formatUsd(kpis.peak)} at slot ${kpis.peakIdx}`
         : "no contributors",
     },
     {
@@ -414,12 +404,12 @@ function KpiRow({ kpis, hasData }: { kpis: ComputedKpis; hasData: boolean }) {
     },
     {
       label: "p25 — p75 spread",
-      value: hasData ? formatTokens(kpis.iqr) : "—",
+      value: hasData ? formatUsd(kpis.iqr) : "—",
       sub: hasData ? "interquartile range" : "—",
     },
     {
       label: "p10 — p90 spread",
-      value: hasData ? formatTokens(kpis.outerSpread) : "—",
+      value: hasData ? formatUsd(kpis.outerSpread) : "—",
       sub: hasData ? "outer envelope" : "—",
     },
   ];
@@ -451,7 +441,7 @@ function ChartLegend({
   if (compare) {
     return (
       <div className="flex flex-wrap items-center gap-4 text-[11.5px] text-muted-foreground">
-        {(["pro", "max5", "max20"] as const).map((tier) => (
+        {TIER_VALUES.map((tier) => (
           <LegendDot
             color={TIER_COLOR_VAR[tier]}
             dash={TIER_DASH[tier]?.join(" ")}

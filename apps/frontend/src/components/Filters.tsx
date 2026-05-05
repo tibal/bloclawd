@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import type { Harness } from "@web/Harness";
 import type { LimitType } from "@web/LimitType";
 import type { Model } from "@web/Model";
@@ -22,6 +22,7 @@ import {
   modelOptions,
   planOptions,
   providerOptions,
+  regionOptions,
   tierOptions,
   type CatalogFilters,
 } from "@/lib/catalog";
@@ -31,29 +32,34 @@ type SearchPatch = Partial<DashboardSearch>;
 type HarnessParam = DashboardSearch["harness"];
 type WindowParam = DashboardSearch["window"];
 
-const REGION_OPTIONS = [
-  "NA",
-  "EU",
-  "AS",
-  "SA",
-  "OC",
-  "AF",
-  "AN",
-] as const satisfies readonly Region[];
 const WINDOW_OPTIONS = ["24h", "7d", "30d", "90d"] as const satisfies readonly WindowParam[];
+const WINDOW_SELECT_OPTIONS = WINDOW_OPTIONS.map((w) => ({ value: w, label: w }));
+const PROVIDER_SELECT_OPTIONS = providerOptions();
+const TIER_SELECT_OPTIONS = tierOptions();
+const REGION_SELECT_OPTIONS = regionOptions();
 
 export function Filters() {
   const search = Route.useSearch();
   const updateSearch = useDashboardSearchUpdater();
 
-  const filters: CatalogFilters = {
-    provider: search.provider as Provider | undefined,
-    plan: search.plan as Plan | undefined,
-    model: search.model,
-    tier: search.tier,
-    harness: harnessFromSearch(search.harness),
-    limit_type: search.limit_type,
-  };
+  const filters: CatalogFilters = useMemo(
+    () => ({
+      provider: search.provider as Provider | undefined,
+      plan: search.plan as Plan | undefined,
+      model: search.model,
+      tier: search.tier,
+      harness: harnessFromSearch(search.harness),
+      limit_type: search.limit_type,
+    }),
+    [
+      search.provider,
+      search.plan,
+      search.model,
+      search.tier,
+      search.harness,
+      search.limit_type,
+    ],
+  );
 
   const handleProviderChange = useCallback(
     (value: string) => {
@@ -119,7 +125,7 @@ export function Filters() {
       <FilterSelect
         label="Provider"
         onValueChange={handleProviderChange}
-        options={providerOptions()}
+        options={PROVIDER_SELECT_OPTIONS}
         value={filters.provider ?? "all"}
         withAll
       />
@@ -140,7 +146,7 @@ export function Filters() {
       <FilterSelect
         label="Tier"
         onValueChange={handleTierChange}
-        options={tierOptions()}
+        options={TIER_SELECT_OPTIONS}
         value={filters.tier ?? "all"}
         withAll
       />
@@ -153,14 +159,14 @@ export function Filters() {
       <FilterSelect
         label="Region"
         onValueChange={handleRegionChange}
-        options={REGION_OPTIONS.map((r) => ({ value: r, label: r }))}
+        options={REGION_SELECT_OPTIONS}
         value={search.region ?? "all"}
         withAll
       />
       <FilterSelect
         label="Window"
         onValueChange={handleWindowChange}
-        options={WINDOW_OPTIONS.map((w) => ({ value: w, label: w }))}
+        options={WINDOW_SELECT_OPTIONS}
         value={search.window}
       />
       <FilterSelect

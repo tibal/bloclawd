@@ -28,7 +28,7 @@ pub mod submit;
 pub mod window;
 pub mod wire_error;
 
-pub use cli::{Args, CliTier};
+pub use cli::Args;
 pub use wire_error::IngestCliError;
 
 /// Production entry: clap-parsed args -> orchestration with fresh UUIDs.
@@ -245,8 +245,7 @@ pub fn run_inner_with_output<W: Write, E: Write>(
 fn resolve_tier<E: Write>(args: &Args, stderr: &mut E) -> Result<(Tier, String), IngestCliError> {
     let tier_str = match args.tier {
         Some(cli_tier) => {
-            let tier = Tier::from(cli_tier);
-            let tier_str = tier_wire_name(tier).to_string();
+            let tier_str = wire_name(cli_tier);
             if let Err(err) = config::save_tier(&tier_str) {
                 writeln!(stderr, "warning: could not persist tier: {err}")
                     .map_err(|_| IngestCliError::ServerUnavailable)?;
@@ -264,7 +263,7 @@ fn resolve_tier<E: Write>(args: &Args, stderr: &mut E) -> Result<(Tier, String),
             }
             Ok(None) => {
                 return Err(IngestCliError::UserError(
-                    "--tier <pro|max5|max20> is required (no config found)".into(),
+                    "--tier <TIER> is required (no config found)".into(),
                 ));
             }
             Err(err) => return Err(IngestCliError::UserError(err.to_string())),
@@ -317,16 +316,12 @@ fn build_submitted_events(
     Ok(out)
 }
 
-fn tier_wire_name(tier: Tier) -> &'static str {
-    match tier {
-        Tier::Pro => "pro",
-        Tier::Max5 => "max5",
-        Tier::Max20 => "max20",
-    }
+fn model_name(model: bloclawd_schema::Model) -> String {
+    wire_name(model)
 }
 
-fn model_name(model: bloclawd_schema::Model) -> String {
-    serde_json::to_value(model)
+fn wire_name<T: serde::Serialize>(value: T) -> String {
+    serde_json::to_value(value)
         .ok()
         .and_then(|value| value.as_str().map(str::to_string))
         .unwrap_or_else(|| "?".to_string())

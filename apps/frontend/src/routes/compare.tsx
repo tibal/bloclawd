@@ -9,6 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TIER_COLOR_VAR, TIER_DASH } from "@/lib/chart-tokens";
 import {
+  LIMIT_TYPE_VALUES,
+  TIER_VALUES,
+  tierDisplayName,
+  tierMonthlyCostUsd,
+} from "@/lib/catalog";
+import {
   useChartData,
   useDelayedLoading,
 } from "@/lib/dashboard-data";
@@ -17,7 +23,7 @@ import { routeHead } from "@/lib/route-head";
 import type { DashboardSearch } from "@/routes/dashboard";
 
 const compareSearchSchema = z.object({
-  limit_type: z.enum(["5h", "weekly"]).default("5h"),
+  limit_type: z.enum(LIMIT_TYPE_VALUES).default("5h"),
   window: z.enum(["24h", "7d", "30d", "90d"]).default("30d"),
 });
 
@@ -29,29 +35,19 @@ export const Route = createFileRoute("/compare")({
   head: () => routeHead("/compare"),
 });
 
-const TIERS = [
-  {
-    id: "pro" as const,
-    name: "Pro",
-    price: "$20 / mo",
-    blurb:
-      "Entry-tier individual plan. The most-bonked tier in the dataset — small 5-hour budget, frequent walls.",
-  },
-  {
-    id: "max5" as const,
-    name: "Max5",
-    price: "$100 / mo",
-    blurb:
-      "5× the Pro budget. Power users typically land here when Pro starts firing daily limits during pair-programming sessions.",
-  },
-  {
-    id: "max20" as const,
-    name: "Max20",
-    price: "$200 / mo",
-    blurb:
-      "20× the Pro budget. Still bonkable on long agentic runs — and the tier where users most often suspect silent throttling.",
-  },
-];
+const TIER_BLURB = {
+  pro: "Entry-tier individual plan. The most-bonked tier in the dataset — small 5-hour budget, frequent walls.",
+  max5: "5× the Pro budget. Power users typically land here when Pro starts firing daily limits during pair-programming sessions.",
+  max20:
+    "20× the Pro budget. Still bonkable on long agentic runs — and the tier where users most often suspect silent throttling.",
+} as const;
+
+const TIERS = TIER_VALUES.map((id) => ({
+  id,
+  name: tierDisplayName(id),
+  price: `$${tierMonthlyCostUsd(id)} / mo`,
+  blurb: TIER_BLURB[id],
+}));
 
 const FAQ = [
   {
@@ -63,8 +59,8 @@ const FAQ = [
     a: "Either you've hit a heavier model mix, or you may be in a cohort the provider is silently A/B testing. The drift chart shows shifts before any official changelog mentions them.",
   },
   {
-    q: "How is 'tokens to limit' defined across tiers?",
-    a: "It's the unified token cost summed over the 5-hour or weekly window leading into a rate-limit hit. Per-model token weights are fit with ridge regression toward published per-token prices. See the methodology page for the full computation.",
+    q: "How is API-equivalent cost defined across tiers?",
+    a: "Each submission is priced with the published API price for its model and token type. The chart shows p10 through p90 after trimming submissions outside plus or minus 2σ of that cohort's mean.",
   },
   {
     q: "Why are some cells suppressed?",
@@ -106,10 +102,10 @@ function ComparePage() {
           Pro vs Max5 vs Max20: where each tier's limits actually fire
         </h1>
         <p className="max-w-2xl text-base leading-7 text-muted-foreground">
-          Side-by-side percentile envelope of tokens consumed before Claude
-          Code and Codex rate limits trigger, broken down by subscription
-          tier. Built from real bonks submitted by real users — anonymously,
-          one CLI command at a time.
+          Side-by-side percentile envelope of API-equivalent cost before
+          Claude Code and Codex rate limits trigger, broken down by
+          subscription tier. Built from real bonks submitted by real users —
+          anonymously, one CLI command at a time.
         </p>
         <Chrome />
       </header>
@@ -144,7 +140,7 @@ function ComparePage() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/60 px-5 py-4">
           <div>
             <div className="text-sm font-medium text-foreground">
-              Token burn · {windowLabel(search.window)} ·{" "}
+              API cost · {windowLabel(search.window)} ·{" "}
               {limitTypeLabel(search.limit_type)}
             </div>
             <div className="font-mono text-[11.5px] text-muted-foreground">
@@ -152,7 +148,7 @@ function ComparePage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4 text-[11.5px] text-muted-foreground">
-            {(["pro", "max5", "max20"] as const).map((tier) => (
+            {TIER_VALUES.map((tier) => (
               <span className="inline-flex items-center gap-2" key={tier}>
                 <svg height="6" width="22">
                   <line
@@ -226,9 +222,8 @@ function ComparePage() {
               The line is the median
             </h3>
             <p className="text-sm leading-6 text-muted-foreground">
-              Each tier's solid line is the p50 of unified token cost
-              consumed before a rate-limit hit, smoothed with a 5-sample
-              window. The shaded band is the p25–p75 spread.
+              Each tier's solid line is the p50 API-equivalent cost before a
+              rate-limit hit. The shaded band is the p25–p75 spread.
             </p>
           </article>
           <article className="surface-card p-5">

@@ -4,46 +4,39 @@
 // (chart, KPIs, breakdown, mix, cost) renders against the same snapshot.
 
 import type { Harness } from "@web/Harness";
-import type { LimitType } from "@web/LimitType";
 import type { Model } from "@web/Model";
-import type { Region } from "@web/Region";
 import type { Tier } from "@web/Tier";
 import type { TokenType } from "@web/TokenType";
 
 import {
-  ANTHROPIC_MODELS,
-  OPENAI_MODELS,
-  unifiedWeight,
-} from "@/lib/model-catalog";
+  CATALOG,
+  HARNESS_VALUES,
+  LIMIT_TYPE_VALUES,
+  REGION_VALUES,
+  TIER_VALUES,
+} from "@/lib/catalog";
 import { mulberry32 } from "@/lib/rng";
 import type {
   BucketCell,
   BucketEnvelope,
   Manifest,
-  ModelCell,
-  PercentileEncoding,
+  ModelTokenMix,
   Percentiles,
-  RepresentativeMixCell,
   StatusJson,
   Tier as ResTier,
-  TokenTypeCell,
+  TokenTypeTotals,
 } from "@/lib/r2";
-
-const TOKEN_TYPES: readonly TokenType[] = [
-  "input",
-  "output",
-  "cached_read",
-  "cached_write",
-];
-const REGIONS: readonly Region[] = ["NA", "EU", "AS", "SA", "OC"];
-const TIERS: readonly Tier[] = ["pro", "max5", "max20"];
-const HARNESSES: readonly Harness[] = ["claude-code", "codex"];
-const LIMIT_TYPES: readonly LimitType[] = ["5h", "weekly"];
 
 const TIER_BASELINE_TOKENS: Record<Tier, number> = {
   pro: 220_000,
   max5: 720_000,
   max20: 2_400_000,
+};
+
+const TIER_BASELINE_USD: Record<Tier, number> = {
+  pro: 0.85,
+  max5: 2.8,
+  max20: 8.6,
 };
 
 type MixSeed = { model: Model; tokenType: TokenType; share: number };
@@ -93,68 +86,54 @@ function pcts(center: number, spread: number): Percentiles {
   };
 }
 
-function bin(p: Percentiles): PercentileEncoding {
-  return { Bin: p };
-}
+const MODELS_BY_HARNESS: Record<Harness, readonly Model[]> = (() => {
+  const out = {} as Record<Harness, readonly Model[]>;
+  for (const harness of HARNESS_VALUES) {
+    const providers = new Set(
+      CATALOG.plans
+        .filter((plan) => plan.harnesses.includes(harness))
+        .map((plan) => plan.provider),
+    );
+    out[harness] = CATALOG.models
+      .filter((model) => providers.has(model.provider))
+      .map((model) => model.model);
+  }
+  return out;
+})();
 
-function modelsForHarness(harness: Harness): readonly Model[] {
-  return harness === "claude-code" ? ANTHROPIC_MODELS : OPENAI_MODELS;
-}
-
-function buildMixCells(
-  harness: Harness,
-  rng: () => number,
-): RepresentativeMixCell[] {
-  return HARNESS_MIX[harness].map((seed) => {
-    const jitter = 0.85 + rng() * 0.3;
-    const center = seed.share * jitter;
-    return {
-      model: seed.model,
-      token_type: seed.tokenType,
-      share: bin(pcts(center, center * 0.35)),
-    };
-  });
-}
-
-function buildModelCells(
+function buildTypicalMix(
   harness: Harness,
   tier: Tier,
   rng: () => number,
-): ModelCell[] {
+): ModelTokenMix[] {
   const baseline = TIER_BASELINE_TOKENS[tier];
   const mix = HARNESS_MIX[harness];
-  const totals = new Map<Model, number>();
-  for (const m of mix) totals.set(m.model, (totals.get(m.model) ?? 0) + m.share);
 
-  return modelsForHarness(harness).map((model) => {
-    const share = totals.get(model) ?? 0.02;
-    const center = baseline / Math.max(0.05, share);
-    const spread = center * (0.45 + rng() * 0.2);
-    const tokens: TokenTypeCell[] = TOKEN_TYPES.map((tt) => {
-      const w = unifiedWeight(model, tt);
-      const tokenCenter = center / Math.max(0.05, w);
-      const tokenSpread = tokenCenter * (0.4 + rng() * 0.25);
-      const typeShareCenter =
-        (mix.find((m) => m.model === model && m.tokenType === tt)?.share ?? 0) /
-        Math.max(0.0001, share);
-      return {
-        token_type: tt,
-        n_with_type: Math.round(40 + rng() * 80),
-        tokens_to_limit_if_only: bin(pcts(tokenCenter, tokenSpread)),
-        share: bin(
-          pcts(typeShareCenter, Math.max(0.02, typeShareCenter * 0.3)),
-        ),
-      };
-    });
+  return MODELS_BY_HARNESS[harness].map((model) => {
+    const tokens: TokenTypeTotals = {
+      input: tokensFor(model, "input", mix, baseline, rng),
+      output: tokensFor(model, "output", mix, baseline, rng),
+      cached_read: tokensFor(model, "cached_read", mix, baseline, rng),
+      cached_write: tokensFor(model, "cached_write", mix, baseline, rng),
+    };
     return {
       model,
-      n_with_model: Math.max(5, Math.round(40 + share * 200 + rng() * 30)),
-      weights: TOKEN_TYPES.map((tt) => unifiedWeight(model, tt)),
-      weight_source: "cohort",
-      tokens_to_limit_if_only: bin(pcts(center, spread)),
       tokens,
     };
   });
+}
+
+function tokensFor(
+  model: Model,
+  tokenType: TokenType,
+  mix: readonly MixSeed[],
+  baseline: number,
+  rng: () => number,
+): number {
+  const share =
+    mix.find((entry) => entry.model === model && entry.tokenType === tokenType)
+      ?.share ?? 0;
+  return Math.round(baseline * share * (0.8 + rng() * 0.4));
 }
 
 // Diurnal/weekly shape so chart curves are visibly different per timestamp
@@ -176,14 +155,14 @@ function activityWeight(timestampMs: number, resolution: ResTier): number {
   return 0.45 + activity * 0.55;
 }
 
-function buildUnifiedCost(
+function buildApiCostUsd(
   tier: Tier,
   weight: number,
   rng: () => number,
-): PercentileEncoding {
-  const center = TIER_BASELINE_TOKENS[tier] * 0.42 * weight;
+): Percentiles {
+  const center = TIER_BASELINE_USD[tier] * weight;
   const spread = center * (0.35 + rng() * 0.2);
-  return bin(pcts(center, spread));
+  return pcts(center, spread);
 }
 
 function buildCells(
@@ -192,10 +171,10 @@ function buildCells(
   resolution: ResTier,
 ): BucketCell[] {
   const cells: BucketCell[] = [];
-  for (const tier of TIERS) {
-    for (const harness of HARNESSES) {
-      for (const region of REGIONS) {
-        for (const limitType of LIMIT_TYPES) {
+  for (const tier of TIER_VALUES) {
+    for (const harness of HARNESS_VALUES) {
+      for (const region of REGION_VALUES) {
+        for (const limitType of LIMIT_TYPE_VALUES) {
           const seed =
             bucketSeed +
             tier.length * 13 +
@@ -207,20 +186,22 @@ function buildCells(
           // Boost submissions on h1 (largest bucket) so daily-mode panels
           // hit k≥5 across most cells.
           const baseN = resolution === "d1" ? 220 : resolution === "h1" ? 80 : 22;
+          const retained = insufficient
+            ? 3
+            : Math.round(baseN + rng() * baseN * 1.2);
+          const dropped = insufficient ? 0 : Math.floor(rng() * 4);
           cells.push({
-            tier,
+            subscription_tier: tier,
             harness,
             region,
             limit_type: limitType,
-            n_submissions: insufficient
-              ? 1
-              : Math.round(baseN + rng() * baseN * 1.2),
-            trim_rate: rng() * 0.04,
-            trim_rate_alert: false,
-            unified_cost: insufficient ? null : buildUnifiedCost(tier, weight, rng),
-            models: insufficient ? [] : buildModelCells(harness, tier, rng),
+            api_cost_usd: insufficient
+              ? null
+              : buildApiCostUsd(tier, weight, rng),
+            n_dropped: dropped,
+            n_retained: retained,
+            typical_mix: insufficient ? [] : buildTypicalMix(harness, tier, rng),
             insufficient_data: insufficient,
-            representative_mix: insufficient ? undefined : buildMixCells(harness, rng),
           });
         }
       }
@@ -322,16 +303,6 @@ function buildBucket(spec: BucketSpec): BucketEnvelope {
     schema_version: "v1",
     bucket_ts: spec.date.toISOString(),
     tier_resolution: spec.resolution,
-    bin_edges: [
-      0,
-      1024,
-      4096,
-      16_384,
-      65_536,
-      262_144,
-      1_048_576,
-      Number.MAX_SAFE_INTEGER,
-    ],
     cells: buildCells(spec.seed, weight, spec.resolution),
   };
 }

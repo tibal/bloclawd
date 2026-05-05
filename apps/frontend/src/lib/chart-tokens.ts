@@ -1,5 +1,7 @@
 // Shared symbolic indices into the local AlignedData rows so chart and
 // dashboard don't pass raw 1..5 magic numbers around.
+import type { Tier } from "@web/Tier";
+
 export const PERCENTILE_INDEX = {
   p10: 1,
   p25: 2,
@@ -8,7 +10,7 @@ export const PERCENTILE_INDEX = {
   p90: 5,
 } as const;
 
-export type TierName = "pro" | "max5" | "max20";
+export type TierName = Tier;
 
 export const TIER_COLOR_VAR: Record<TierName, string> = {
   pro: "var(--chart-1)",

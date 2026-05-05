@@ -17,3 +17,12 @@ export function formatTokens(
   }
   return formatInteger(value);
 }
+
+export function formatUsd(value: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: value < 1 ? 3 : 2,
+    maximumFractionDigits: value < 1 ? 3 : 2,
+  }).format(value);
+}

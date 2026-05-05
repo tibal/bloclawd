@@ -2,9 +2,9 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::cron::{aggregate::Cell, health::StatusJson};
-use bloclawd_schema::LOG_BIN_EDGES;
-use serde::{Deserialize, Serialize};
+use bloclawd_schema::{
+    BucketCell as Cell, BucketEnvelope, Manifest, ManifestTiers, ReportResolution, StatusJson,
+};
 use worker::{Bucket, Env, HttpMetadata, Result};
 
 const SCHEMA_VERSION: &str = "v1";
@@ -15,51 +15,6 @@ const STATUS_CACHE_CONTROL: &str = "public, max-age=300, must-revalidate";
 const MANIFEST_CACHE_CONTROL: &str = "public, max-age=60, must-revalidate";
 const STATUS_KEY: &str = "reports/v1/_status.json";
 const MANIFEST_KEY: &str = "reports/v1/manifest.json";
-
-#[derive(Debug, Serialize)]
-pub struct BucketEnvelope<'a> {
-    pub schema_version: &'static str,
-    pub bucket_ts: String,
-    pub tier_resolution: &'a str,
-    pub bin_edges: &'static [u64],
-    pub cells: &'a [Cell],
-}
-
-impl<'a> BucketEnvelope<'a> {
-    fn new(tier: &'a str, bucket_ts: SystemTime, cells: &'a [Cell]) -> Self {
-        Self {
-            schema_version: SCHEMA_VERSION,
-            bucket_ts: format_rfc3339(bucket_ts),
-            tier_resolution: tier,
-            bin_edges: &LOG_BIN_EDGES,
-            cells,
-        }
-    }
-}
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ManifestTiers {
-    pub q15: Vec<String>,
-    pub h1: Vec<String>,
-    pub d1: Vec<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct Manifest {
-    pub schema_version: String,
-    pub last_updated_ts: String,
-    pub tiers: ManifestTiers,
-}
-
-impl Manifest {
-    pub fn new(last_updated_ts: String, tiers: ManifestTiers) -> Self {
-        Self {
-            schema_version: SCHEMA_VERSION.to_string(),
-            last_updated_ts,
-            tiers,
-        }
-    }
-}
 
 pub fn bucket_path(tier: &str, bucket_ts: SystemTime) -> String {
     let secs = bucket_ts
@@ -86,7 +41,15 @@ pub async fn write_bucket_file(
     bucket_ts: SystemTime,
     cells: &[Cell],
 ) -> Result<()> {
-    let envelope = BucketEnvelope::new(tier, bucket_ts, cells);
+    let tier_resolution = tier
+        .parse::<ReportResolution>()
+        .map_err(worker::Error::RustError)?;
+    let envelope = BucketEnvelope {
+        schema_version: SCHEMA_VERSION.to_string(),
+        bucket_ts: format_rfc3339(bucket_ts),
+        tier_resolution,
+        cells: cells.to_vec(),
+    };
     let body = serde_json::to_vec_pretty(&envelope)?;
     let key = bucket_path(tier, bucket_ts);
     put_json(bucket, &key, body, BUCKET_CACHE_CONTROL).await
@@ -113,7 +76,11 @@ pub async fn rewrite_manifest(
         h1: list_tier_keys(bucket, "h1").await?,
         d1: list_tier_keys(bucket, "d1").await?,
     };
-    let manifest = Manifest::new(format_rfc3339(last_updated_ts), tiers);
+    let manifest = Manifest {
+        schema_version: SCHEMA_VERSION.to_string(),
+        last_updated_ts: format_rfc3339(last_updated_ts),
+        tiers,
+    };
     write_manifest(bucket, &manifest).await
 }
 
@@ -212,8 +179,9 @@ mod tests {
     use std::path::PathBuf;
     use std::time::{Duration, UNIX_EPOCH};
 
-    use crate::cron::aggregate::{Cell, ModelCell};
-    use crate::cron::percentile::PercentileEncoding;
+    use bloclawd_schema::{
+        Harness, LimitType, Model, ModelTokenMix, Percentiles, Region, Tier, TokenTypeTotals,
+    };
 
     const FIXTURE_NAME: &str = "r2_v1_schema.json";
     const KNOWN_BUCKET_SECS: u64 = 1_746_195_300;
@@ -243,10 +211,13 @@ mod tests {
     }
 
     #[test]
-    fn cell_serialization_excludes_internal_samples() {
+    fn cell_serialization_uses_public_api_cost_fields() {
         let json = serde_json::to_string(&sample_full_cell()).unwrap();
 
-        assert!(!json.contains("trimmed_unified_costs"));
+        assert!(json.contains("\"api_cost_usd\""));
+        assert!(json.contains("\"typical_mix\""));
+        assert!(!json.contains("unified_cost"));
+        assert!(!json.contains("weights"));
     }
 
     #[test]
@@ -259,13 +230,12 @@ mod tests {
     }
 
     #[test]
-    fn top_level_envelope_includes_schema_version_and_bin_edges() {
+    fn top_level_envelope_includes_schema_version() {
         let cells = sample_cells();
-        let envelope = BucketEnvelope::new("q15", known_bucket_time(), &cells);
+        let envelope = sample_envelope("q15", known_bucket_time(), &cells);
         let json = serde_json::to_string(&envelope).unwrap();
 
         assert!(json.contains("\"schema_version\":\"v1\""));
-        assert!(json.contains("\"bin_edges\":[1024,2048"));
     }
 
     #[test]
@@ -284,19 +254,13 @@ mod tests {
         assert_eq!(parsed_committed, parsed_expected);
     }
 
-    #[test]
-    fn log_bin_edges_are_fixture_source() {
-        assert_eq!(LOG_BIN_EDGES[0], 1024);
-        assert_eq!(LOG_BIN_EDGES[18], 268_435_456);
-    }
-
     fn known_bucket_time() -> SystemTime {
         UNIX_EPOCH + Duration::from_secs(KNOWN_BUCKET_SECS)
     }
 
     fn fixture_json() -> String {
         let cells = sample_cells();
-        let envelope = BucketEnvelope::new("q15", known_bucket_time(), &cells);
+        let envelope = sample_envelope("q15", known_bucket_time(), &cells);
         let mut json = serde_json::to_string_pretty(&envelope).unwrap();
         json.push('\n');
         json
@@ -317,33 +281,27 @@ mod tests {
 
     fn sample_full_cell() -> Cell {
         Cell {
-            tier: "pro".to_string(),
-            harness: "cc".to_string(),
-            region: "NA".to_string(),
-            limit_type: "5h".to_string(),
-            n_submissions: 21,
-            trim_rate: 0.0,
-            trim_rate_alert: false,
-            trimmed_unified_costs: vec![100.0, 200.0, 300.0],
-            unified_cost: Some(PercentileEncoding::Mean {
-                p10: 100.0,
-                p25: 150.0,
-                p50: 200.0,
-                p75: 250.0,
-                p90: 300.0,
+            subscription_tier: Tier::Pro,
+            harness: Harness::ClaudeCode,
+            region: Region::Na,
+            limit_type: LimitType::FiveH,
+            api_cost_usd: Some(Percentiles {
+                p10: 1.10,
+                p25: 1.50,
+                p50: 2.00,
+                p75: 2.50,
+                p90: 3.00,
             }),
-            models: vec![ModelCell {
-                model: "claude-sonnet-4-5".to_string(),
-                n_with_model: 21,
-                weights: [0.125; 8],
-                weight_source: "prior".to_string(),
-                tokens_to_limit_if_only: Some(PercentileEncoding::Bin {
-                    p10: 0,
-                    p25: 1,
-                    p50: 2,
-                    p75: 3,
-                    p90: 4,
-                }),
+            n_dropped: 2,
+            n_retained: 21,
+            typical_mix: vec![ModelTokenMix {
+                model: Model::ClaudeSonnet45,
+                tokens: TokenTypeTotals {
+                    input: 1200.0,
+                    output: 450.0,
+                    cached_read: 8000.0,
+                    cached_write: 100.0,
+                },
             }],
             insufficient_data: false,
         }
@@ -351,17 +309,24 @@ mod tests {
 
     fn sample_insufficient_cell() -> Cell {
         Cell {
-            tier: "max5".to_string(),
-            harness: "codex".to_string(),
-            region: "EU".to_string(),
-            limit_type: "weekly".to_string(),
-            n_submissions: 3,
-            trim_rate: 0.0,
-            trim_rate_alert: false,
-            trimmed_unified_costs: vec![42.0],
-            unified_cost: None,
-            models: Vec::new(),
+            subscription_tier: Tier::Max5,
+            harness: Harness::Codex,
+            region: Region::Eu,
+            limit_type: LimitType::Weekly,
+            api_cost_usd: None,
+            n_dropped: 0,
+            n_retained: 3,
+            typical_mix: Vec::new(),
             insufficient_data: true,
+        }
+    }
+
+    fn sample_envelope(tier: &str, bucket_ts: SystemTime, cells: &[Cell]) -> BucketEnvelope {
+        BucketEnvelope {
+            schema_version: SCHEMA_VERSION.to_string(),
+            bucket_ts: format_rfc3339(bucket_ts),
+            tier_resolution: tier.parse().unwrap(),
+            cells: cells.to_vec(),
         }
     }
 

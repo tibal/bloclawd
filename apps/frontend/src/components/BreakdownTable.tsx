@@ -2,27 +2,26 @@ import type { Model } from "@web/Model";
 
 import { MODEL_COLOR, TONE_VAR, type Tone } from "@/lib/model-catalog";
 import { formatTokens } from "@/lib/format";
-import { decodePercentiles, type BucketCell, type Percentiles } from "@/lib/r2";
+import type { BucketCell } from "@/lib/r2";
 
 interface BreakdownTableProps {
   cell: BucketCell;
-  primary: keyof Percentiles;
 }
 
-export function BreakdownTable({ cell, primary }: BreakdownTableProps) {
-  const totalSubs = Math.max(
+export function BreakdownTable({ cell }: BreakdownTableProps) {
+  const totalTokens = Math.max(
     1,
-    cell.models.reduce((sum, m) => sum + m.n_with_model, 0),
+    cell.typical_mix.reduce((sum, m) => sum + tokenTotal(m.tokens), 0),
   );
-  const rows = [...cell.models]
-    .sort((a, b) => b.n_with_model - a.n_with_model)
+  const rows = [...cell.typical_mix]
+    .sort((a, b) => tokenTotal(b.tokens) - tokenTotal(a.tokens))
     .map((m) => {
-      const pcts = decodePercentiles(m.tokens_to_limit_if_only);
+      const total = tokenTotal(m.tokens);
       return {
         model: m.model as Model,
-        share: m.n_with_model / totalSubs,
-        primaryValue: pcts?.[primary] ?? null,
-        p90: pcts?.p90 ?? null,
+        share: total / totalTokens,
+        total,
+        cached: m.tokens.cached_read + m.tokens.cached_write,
       };
     });
 
@@ -32,7 +31,7 @@ export function BreakdownTable({ cell, primary }: BreakdownTableProps) {
         <div>
           <div className="text-sm font-medium text-foreground">By model · current filters</div>
           <div className="font-mono text-[11.5px] text-muted-foreground">
-            share of submissions · {primary} tokens-to-limit-if-only · contribution-estimated
+            average retained submission · model share by token volume
           </div>
         </div>
       </div>
@@ -42,8 +41,8 @@ export function BreakdownTable({ cell, primary }: BreakdownTableProps) {
             <tr>
               <th className="px-3 py-2.5 text-left text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground border-b border-border w-[36%]">Model</th>
               <th className="px-3 py-2.5 text-left text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground border-b border-border">Share</th>
-              <th className="px-3 py-2.5 text-left text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground border-b border-border">{primary} if-only</th>
-              <th className="px-3 py-2.5 text-left text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground border-b border-border">p90</th>
+              <th className="px-3 py-2.5 text-left text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground border-b border-border">Avg tokens</th>
+              <th className="px-3 py-2.5 text-left text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground border-b border-border">Cached</th>
             </tr>
           </thead>
           <tbody>
@@ -62,10 +61,10 @@ export function BreakdownTable({ cell, primary }: BreakdownTableProps) {
                   </div>
                 </td>
                 <td className="px-3 py-3 font-mono tabular-nums text-foreground/80 border-b border-border/60">
-                  {row.primaryValue == null ? "—" : formatTokens(row.primaryValue)}
+                  {formatTokens(row.total)}
                 </td>
                 <td className="px-3 py-3 font-mono tabular-nums text-muted-foreground border-b border-border/60">
-                  {row.p90 == null ? "—" : formatTokens(row.p90)}
+                  {formatTokens(row.cached)}
                 </td>
               </tr>
             ))}
@@ -74,6 +73,10 @@ export function BreakdownTable({ cell, primary }: BreakdownTableProps) {
       </div>
     </div>
   );
+}
+
+function tokenTotal(tokens: BucketCell["typical_mix"][number]["tokens"]): number {
+  return tokens.input + tokens.output + tokens.cached_read + tokens.cached_write;
 }
 
 function ColorDot({ tone }: { tone: Tone }) {

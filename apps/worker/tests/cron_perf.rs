@@ -9,7 +9,7 @@
 
 use std::time::Instant;
 
-use bloclawd_schema::{EventPayload, Harness, LOG_BIN_EDGES, Model, Region, Tier, TokenCounts};
+use bloclawd_schema::{EventPayload, Harness, Model, Region, Tier, TokenCounts};
 use uuid::Uuid;
 
 #[allow(dead_code)]
@@ -17,7 +17,6 @@ use uuid::Uuid;
 mod cron;
 
 use cron::aggregate::{EventRow, compute_cells};
-use cron::percentile::encode_cell;
 use cron::r2_emit::BucketEnvelope;
 
 fn synth_event_rows(cohorts: usize, submissions_per_cohort: usize) -> Vec<EventRow> {
@@ -69,7 +68,7 @@ fn synth_event_rows(cohorts: usize, submissions_per_cohort: usize) -> Vec<EventR
                         },
                     },
                     model: wire_name(model),
-                    tier: wire_name(tier),
+                    subscription_tier: wire_name(tier),
                     harness: wire_name(harness),
                     region: wire_name(region),
                     limit_type: (*limit_type).to_string(),
@@ -95,16 +94,12 @@ fn wire_name<T: serde::Serialize>(value: T) -> String {
 fn synthetic_volume_under_25s() {
     let rows = synth_event_rows(14, 30);
     let start = Instant::now();
-    let mut cells = compute_cells(&rows);
-    for cell in &mut cells {
-        encode_cell(cell, &LOG_BIN_EDGES);
-    }
+    let cells = compute_cells(&rows);
 
     let envelope = BucketEnvelope {
         schema_version: "v1",
         bucket_ts: "2026-05-02T14:15:00Z".to_string(),
         tier_resolution: "q15",
-        bin_edges: &LOG_BIN_EDGES,
         cells: &cells,
     };
     let _json = serde_json::to_vec(&envelope).unwrap();

@@ -7,7 +7,7 @@
 use std::str::FromStr;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use serde::{Deserialize, Serialize};
+use bloclawd_schema::{IngestHealth, StatusJson};
 use tokio_postgres::config::Config as PgConfig;
 use tokio_postgres::tls::NoTls;
 use worker::{Env, Hyperdrive, Result, console_log};
@@ -17,17 +17,6 @@ const CONTRIBUTOR_WINDOW_DAYS: u32 = 30;
 
 pub const COUNT_LIFETIME_EVENTS_SQL: &str = "SELECT COUNT(*)::bigint FROM events";
 pub const COUNT_DISTINCT_CONTRIBUTORS_30D_SQL: &str = "SELECT COUNT(DISTINCT submission_group_id)::bigint FROM events WHERE received_at >= now() - interval '30 days'";
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub struct StatusJson {
-    pub schema_version: &'static str,
-    pub last_cron_success_ts: String,
-    pub last_cron_attempted_ts: String,
-    pub ingest_health: &'static str,
-    pub total_events_lifetime: u64,
-    pub approximate_contributors_30d: u64,
-    pub approximate_contributors_window_days: u32,
-}
 
 /// Round `n` to 1 significant digit.
 pub fn fuzzy_round(n: u64) -> u64 {
@@ -39,14 +28,14 @@ pub fn fuzzy_round(n: u64) -> u64 {
     ((n + factor / 2) / factor) * factor
 }
 
-pub fn classify_health(now_ms: i64, last_success_ms: i64, cron_interval_ms: i64) -> &'static str {
+pub fn classify_health(now_ms: i64, last_success_ms: i64, cron_interval_ms: i64) -> IngestHealth {
     let delta = now_ms.saturating_sub(last_success_ms);
     if delta < cron_interval_ms * 3 / 2 {
-        "healthy"
+        IngestHealth::Healthy
     } else if delta < cron_interval_ms * 3 {
-        "degraded"
+        IngestHealth::Degraded
     } else {
-        "down"
+        IngestHealth::Down
     }
 }
 
@@ -103,7 +92,7 @@ pub async fn build_status_json(
     let ingest_health = classify_health(now_ms, last_success_ms, cron_interval_ms);
 
     Ok(StatusJson {
-        schema_version: SCHEMA_VERSION,
+        schema_version: SCHEMA_VERSION.to_string(),
         last_cron_success_ts: rfc3339(last_success_ts),
         last_cron_attempted_ts: rfc3339(last_attempted_ts),
         ingest_health,
@@ -190,23 +179,23 @@ mod tests {
 
     #[test]
     fn classify_health_healthy_below_1_5x() {
-        assert_eq!(classify_health(1000, 900, 200), "healthy");
+        assert_eq!(classify_health(1000, 900, 200), IngestHealth::Healthy);
     }
 
     #[test]
     fn classify_health_degraded_between_1_5x_and_3x() {
-        assert_eq!(classify_health(1499, 900, 200), "degraded");
+        assert_eq!(classify_health(1499, 900, 200), IngestHealth::Degraded);
     }
 
     #[test]
     fn classify_health_down_at_or_above_3x() {
-        assert_eq!(classify_health(1500, 900, 200), "down");
-        assert_eq!(classify_health(2000, 900, 200), "down");
+        assert_eq!(classify_health(1500, 900, 200), IngestHealth::Down);
+        assert_eq!(classify_health(2000, 900, 200), IngestHealth::Down);
     }
 
     #[test]
     fn classify_health_saturates_when_success_is_in_future() {
-        assert_eq!(classify_health(900, 1000, 200), "healthy");
+        assert_eq!(classify_health(900, 1000, 200), IngestHealth::Healthy);
     }
 
     #[test]
@@ -233,10 +222,10 @@ mod tests {
     #[test]
     fn status_json_serializes_frontend_field_order() {
         let status = StatusJson {
-            schema_version: "v1",
+            schema_version: "v1".to_string(),
             last_cron_success_ts: "2026-05-02T14:15:00Z".to_string(),
             last_cron_attempted_ts: "2026-05-02T14:15:00Z".to_string(),
-            ingest_health: "healthy",
+            ingest_health: IngestHealth::Healthy,
             total_events_lifetime: 12_345,
             approximate_contributors_30d: 230,
             approximate_contributors_window_days: 30,
