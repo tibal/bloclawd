@@ -1,21 +1,43 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, type ReactNode } from "react";
-import { z } from "zod";
 
+import { BreakdownTable } from "@/components/BreakdownTable";
 import { Chart } from "@/components/Chart";
 import { Chrome } from "@/components/Chrome";
-import { DataTable, type DataTableRow } from "@/components/DataTable";
-import { EmptyState } from "@/components/EmptyState";
-import { EnvelopeToggle } from "@/components/EnvelopeToggle";
-import { Filters } from "@/components/Filters";
-import { neighborBand, PercentilePicker } from "@/components/PercentilePicker";
-import { TierToggle } from "@/components/TierToggle";
-import { BreakdownTable } from "@/components/BreakdownTable";
-import { TokenMixPanel } from "@/components/TokenMixPanel";
+import { CompareRows } from "@/components/CompareRows";
 import { CostEquivalentPanel } from "@/components/CostEquivalentPanel";
-import { Brush } from "@/components/Brush";
+import { DataTable, type DataTableRow } from "@/components/DataTable";
+import { DateRangePicker } from "@/components/DateRangePicker";
+import { DistributionPicker } from "@/components/DistributionPicker";
+import { EmptyState } from "@/components/EmptyState";
+import { Filters } from "@/components/Filters";
+import { PercentilePicker } from "@/components/PercentilePicker";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useChartData, useDelayedLoading } from "@/lib/dashboard-data";
+import { Toggle } from "@/components/ui/toggle";
+import { TokenMixPanel } from "@/components/TokenMixPanel";
+import { resolveRow, type ResolvedRow } from "@/lib/catalog";
+import {
+  EMPTY_ALIGNED_DATA,
+  alignedDataHasValues,
+  type AlignedData,
+  type ChartMeta,
+  type Series,
+} from "@/lib/chart-data";
+import { PERCENTILE_INDEX } from "@/lib/chart-tokens";
+import {
+  alignedHasValues,
+  rowLabel,
+  useChartData,
+  useDelayedLoading,
+  type CurveResult,
+} from "@/lib/dashboard-data";
+import {
+  dashboardSearchSchema,
+  primaryRowFromSearch,
+  rangeWindow,
+  type DashboardSearch,
+} from "@/lib/dashboard-search";
+import { formatUsd } from "@/lib/format";
 import {
   isR2NotFound,
   useBucket,
@@ -25,55 +47,12 @@ import {
   type BucketEnvelope,
   type StatusJson,
 } from "@/lib/r2";
-import {
-  PERCENTILE_INDEX,
-  TIER_COLOR_VAR,
-  TIER_DASH,
-  type TierName,
-} from "@/lib/chart-tokens";
-import {
-  EMPTY_ALIGNED_DATA,
-  alignedDataHasValues,
-  sliceByBrush,
-  sliceMetaByBrush,
-  type AlignedData,
-  type ChartMeta,
-  type Series,
-} from "@/lib/chart-data";
-import { formatUsd } from "@/lib/format";
 import { routeHead } from "@/lib/route-head";
-import {
-  DASHBOARD_HARNESS_VALUES,
-  LIMIT_TYPE_VALUES,
-  MODEL_VALUES,
-  PLAN_VALUES,
-  PROVIDER_VALUES,
-  REGION_VALUES,
-  TIER_VALUES,
-} from "@/lib/catalog";
+
+export type { DashboardSearch };
+export { dashboardSearchSchema };
 
 const STALE_AFTER_MS = 24 * 60 * 60 * 1000;
-
-export const dashboardSearchSchema = z.object({
-  model: z.enum(MODEL_VALUES).optional(),
-  region: z.enum(REGION_VALUES).optional(),
-  harness: z
-    .enum(DASHBOARD_HARNESS_VALUES)
-    .default("claude-code")
-    .transform((value) => (value === "cc" ? "claude-code" : value)),
-  tier: z.enum(TIER_VALUES).optional(),
-  provider: z.enum(PROVIDER_VALUES).optional(),
-  plan: z.enum(PLAN_VALUES).optional(),
-  limit_type: z.enum(LIMIT_TYPE_VALUES).default("5h"),
-  window: z.enum(["24h", "7d", "30d", "90d"]).default("7d"),
-  primary: z.enum(["p10", "p25", "p50", "p75", "p90"]).default("p50"),
-  envelope: z.enum(["off", "neighbors", "wide"]).default("neighbors"),
-  brush_start: z.number().min(0).max(1).default(0),
-  brush_end: z.number().min(0).max(1).default(1),
-  compare: z.boolean().default(false),
-});
-
-export type DashboardSearch = z.infer<typeof dashboardSearchSchema>;
 
 export const Route = createFileRoute("/dashboard")({
   validateSearch: (search) => dashboardSearchSchema.parse(search),
@@ -83,10 +62,10 @@ export const Route = createFileRoute("/dashboard")({
 
 function DashboardPage() {
   const search = Route.useSearch();
+  const navigate = Route.useNavigate();
   const status = useStatus();
   const {
-    data,
-    compareData,
+    curves,
     meta,
     loading,
     error,
@@ -95,32 +74,18 @@ function DashboardPage() {
   } = useChartData(search);
   const delayedLoading = useDelayedLoading(loading);
   const statusNotice = status.data ? statusNoticeFor(status.data) : null;
-  const chartData = primaryChartData(data, compareData);
-  const hasChartData = search.compare
-    ? compareDataHasValues(compareData)
-    : alignedDataHasValues(data);
+  const primaryCurve = curves[0];
+  const hasChartData = curves.some((c) => alignedHasValues(c.data));
   const bucketPartial =
     !loading && bucketsLoaded > 0 && bucketsLoaded < bucketsTotal;
-  const brush = useMemo(
-    () => ({ start: search.brush_start, end: search.brush_end }),
-    [search.brush_start, search.brush_end],
-  );
-  const brushedData = useMemo(
-    () => sliceByBrush(chartData, brush),
-    [chartData, brush],
-  );
-  const brushedMeta = useMemo(
-    () => sliceMetaByBrush(meta ?? undefined, chartData[0]?.length ?? 0, brush),
-    [meta, chartData, brush],
-  );
   const kpis = useMemo(
-    () => computeKpis(brushedData, brushedMeta),
-    [brushedData, brushedMeta],
+    () => computeKpis(primaryCurve?.data ?? EMPTY_ALIGNED_DATA, meta ?? undefined),
+    [primaryCurve?.data, meta],
   );
-  const compareModeProp = useMemo(
-    () =>
-      search.compare && compareData ? { tiers: compareData } : undefined,
-    [search.compare, compareData],
+
+  const { startMs, endMs } = useMemo(
+    () => rangeWindow(search, Date.now()),
+    [search],
   );
 
   return (
@@ -132,13 +97,12 @@ function DashboardPage() {
             <span className="tag">v1</span>
           </div>
           <h1 className="text-3xl font-semibold leading-tight tracking-tight text-foreground sm:text-4xl">
-            API-equivalent cost · {limitTypeLabel(search.limit_type)}
+            API-equivalent cost · {primaryCurve ? primaryCurve.filters.limit_type : ""}
           </h1>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
-            Where your tier's limits actually fire. Pick Pro, Max5, or Max20
-            for the live API-cost envelope, or toggle Compare for tier-to-tier
-            drift. Cells with fewer than 5 contributors are suppressed for
-            anonymity.
+            Where your tier&apos;s limits actually fire. Pick a tier for the
+            live API-cost envelope, or open Compare to overlay other cohorts.
+            Cells with fewer than 5 contributors are suppressed for anonymity.
           </p>
           <Chrome />
           {statusNotice?.kind === "degraded" ? (
@@ -152,24 +116,41 @@ function DashboardPage() {
       <KpiRow kpis={kpis} hasData={hasChartData} />
 
       <div className="surface-card overflow-hidden">
-        <div className="border-b border-border/60 px-5 py-4">
+        <div className="flex flex-col gap-3 border-b border-border/60 px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
           <Filters />
+          <div className="flex items-center gap-2">
+            <Toggle
+              aria-label="Toggle compare mode"
+              pressed={search.compare}
+              onPressedChange={(pressed) =>
+                void navigate({
+                  search: (prev) => ({ ...prev, compare: pressed }),
+                })
+              }
+              variant="outline"
+              className="h-9 rounded-full px-3.5 text-[12.5px]"
+            >
+              {search.compare ? "Comparing" : "Compare"}
+            </Toggle>
+            <DateRangePicker />
+          </div>
         </div>
+
+        <CompareRows />
 
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
           <div>
             <div className="text-sm font-medium text-foreground">
-              API cost · {windowLabel(search.window)}
+              API cost · {formatRangeLabel(startMs, endMs)}
             </div>
             <div className="font-mono text-[11.5px] text-muted-foreground">
-              {resolutionLabel(search.window)} bins · k ≥ 5 cells only ·{" "}
-              {kpis.submissionsLabel} submissions
+              {meta?.resolution ? resolutionLabelFor(meta.resolution) : "—"}{" "}
+              bins · k ≥ 5 cells only · {kpis.submissionsLabel} submissions
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <PercentilePicker />
-            <EnvelopeToggle />
-            <TierToggle />
+            {!search.compare ? <DistributionPicker /> : null}
           </div>
         </div>
 
@@ -187,10 +168,8 @@ function DashboardPage() {
 
         <div className="px-5 pb-5">
           <ChartArea
-            brush={brush}
             bucketPartial={bucketPartial}
-            chartData={chartData}
-            compareMode={compareModeProp}
+            curves={curves}
             delayedLoading={delayedLoading}
             error={error}
             hasChartData={hasChartData}
@@ -205,36 +184,41 @@ function DashboardPage() {
   );
 }
 
-// Cohort panels are pinned to the latest h1 bucket — they answer "what does
-// the typical user look like right now", not "what did this slice of the
-// timeline look like". The brush only shapes the chart and KPIs; cohort
-// composition stays globally current so panels still mean something when
-// the user zooms into a sparse window.
 function CohortPanels({ search }: { search: DashboardSearch }) {
+  // Cohort cards mirror the primary filter row and pin to the latest bucket
+  // inside the user's selected range, so changing range/filters refreshes
+  // the panels alongside the chart.
   const manifest = useManifest();
-  const latestPath = manifest.data?.tiers.h1.at(-1);
-  const bucketQuery = useBucket("h1", latestPath ?? "");
+  const nowMs = Date.now();
+  const { startMs, endMs } = rangeWindow(search, nowMs);
+  const tierPaths = manifest.data?.tiers ?? null;
+  const latestPath = pickLatestPathInRange(tierPaths, startMs, endMs);
+  const bucketQuery = useBucket(latestPath?.tier ?? "h1", latestPath?.path ?? "");
   const bucket = latestPath ? bucketQuery.data : undefined;
 
+  const resolved: ResolvedRow = useMemo(
+    () => resolveRow(primaryRowFromSearch(search)),
+    [search],
+  );
   const cell = useMemo(
     () =>
       bucket
         ? pickCellFromBucket(bucket, {
-            subscription_tier: search.tier ?? "max20",
-            harness: search.harness,
-            region: search.region ?? "NA",
-            limit_type: search.limit_type,
+            subscription_tier: resolved.tier,
+            harness: resolved.harness,
+            limit_type: resolved.limit_type,
+            region: resolved.region,
           })
         : null,
-    [bucket, search.tier, search.harness, search.region, search.limit_type],
+    [bucket, resolved],
   );
   const filterCell = useMemo(
     () => ({
-      harness: search.harness,
-      limit_type: search.limit_type,
-      region: search.region,
+      harness: resolved.harness,
+      limit_type: resolved.limit_type,
+      region: resolved.region,
     }),
-    [search.harness, search.limit_type, search.region],
+    [resolved],
   );
 
   if (!bucket || !cell) return null;
@@ -250,6 +234,47 @@ function CohortPanels({ search }: { search: DashboardSearch }) {
       />
     </div>
   );
+}
+
+function pickLatestPathInRange(
+  tiers: { q15: string[]; h1: string[]; d1: string[] } | null,
+  startMs: number,
+  endMs: number,
+): { tier: "q15" | "h1" | "d1"; path: string } | null {
+  if (!tiers) return null;
+  // Prefer the finest resolution available for the chosen range.
+  for (const tier of ["q15", "h1", "d1"] as const) {
+    const candidates = tiers[tier];
+    if (!candidates.length) continue;
+    let best: { ts: number; path: string } | null = null;
+    for (const path of candidates) {
+      const ts = parsePathTimestampMs(path, tier);
+      if (ts == null) continue;
+      if (ts < startMs || ts > endMs) continue;
+      if (!best || ts > best.ts) best = { ts, path };
+    }
+    if (best) return { tier, path: best.path };
+  }
+  // Fallback: most recent of any resolution.
+  for (const tier of ["h1", "d1", "q15"] as const) {
+    const last = tiers[tier].at(-1);
+    if (last) return { tier, path: last };
+  }
+  return null;
+}
+
+function parsePathTimestampMs(
+  path: string,
+  tier: "q15" | "h1" | "d1",
+): number | null {
+  const parts = path.replace(/\.json$/, "").replace(/^\/+/, "").split("/");
+  const relative = parts[0] === tier ? parts.slice(1) : parts;
+  const [year, month, day, time] = relative;
+  const y = Number(year), m = Number(month), d = Number(day);
+  if (!y || !m || !d) return null;
+  if (tier === "d1") return Date.UTC(y, m - 1, d);
+  const [h = "0", mi = "0"] = (time ?? "").split("-");
+  return Date.UTC(y, m - 1, d, Number(h), Number(mi));
 }
 
 function pickCellFromBucket(
@@ -274,10 +299,8 @@ function pickCellFromBucket(
 }
 
 interface ChartAreaProps {
-  brush: { start: number; end: number };
   bucketPartial: boolean;
-  chartData: AlignedData;
-  compareMode: { tiers: { tier: TierName; data: AlignedData }[] } | undefined;
+  curves: CurveResult[];
   delayedLoading: boolean;
   error: Error | null;
   hasChartData: boolean;
@@ -286,10 +309,8 @@ interface ChartAreaProps {
 }
 
 function ChartArea({
-  brush,
   bucketPartial,
-  chartData,
-  compareMode,
+  curves,
   delayedLoading,
   error,
   hasChartData,
@@ -312,15 +333,9 @@ function ChartArea({
 
   if (delayedLoading) {
     return (
-      <Skeleton aria-label="Loading aggregates..." className="h-[360px] w-full" />
-    );
-  }
-
-  if (!search.tier && !search.compare) {
-    return (
-      <EmptyState
-        heading="Pick a tier"
-        subhead="Start with your own — Pro, Max5, or Max20. Or toggle Compare to see all three side-by-side and spot tier-to-tier drift."
+      <Skeleton
+        aria-label="Loading aggregates..."
+        className="h-[360px] w-full"
       />
     );
   }
@@ -329,10 +344,12 @@ function ChartArea({
     return (
       <EmptyState
         heading="Not enough data yet"
-        subhead="Fewer than 5 contributors in this slice, so percentiles are suppressed for anonymity. Widen the window, drop a filter, or check back tomorrow — the next aggregate runs at 03:00 UTC."
+        subhead="Fewer than 5 contributors in this slice, so percentiles are suppressed for anonymity. Widen the range, drop a filter, or check back tomorrow — the next aggregate runs at 03:00 UTC."
       />
     );
   }
+
+  const primary = curves[0];
 
   return (
     <div className="space-y-4">
@@ -341,7 +358,7 @@ function ChartArea({
           className="rounded-md border border-warning/40 bg-warning/10 px-4 py-3 text-sm"
           role="status"
         >
-          <p className="font-semibold">One time slice didn't load</p>
+          <p className="font-semibold">One time slice didn&apos;t load</p>
           <p className="text-muted-foreground">
             Refreshing usually fixes this. The rest of the chart is up to date.
           </p>
@@ -351,36 +368,26 @@ function ChartArea({
       <Chart
         ariaLabel={chartAriaLabel(search)}
         primary={search.primary}
-        envelope={search.envelope}
-        compareMode={compareMode}
-        data={chartData}
-        brush={brush}
+        dist={search.dist}
+        curves={curves}
         meta={meta ?? undefined}
       />
 
-      <Brush
-        data={chartData}
-        start={search.brush_start}
-        end={search.brush_end}
-      />
+      <ChartLegend curves={curves} compare={search.compare} />
 
-      <ChartLegend
-        primary={search.primary}
-        envelope={search.envelope}
-        compare={search.compare}
-      />
-
-      <details className="group rounded-xl border border-border bg-[var(--bg-1)]/60">
-        <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-[var(--bg-1)]">
-          Show percentile values per timestamp
-        </summary>
-        <div className="border-t border-border px-4 py-3">
-          <DataTable
-            ariaLabel="Percentile values per timestamp"
-            rows={alignedDataToRows(chartData)}
-          />
-        </div>
-      </details>
+      {primary ? (
+        <details className="group rounded-xl border border-border bg-[var(--bg-1)]/60">
+          <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-[var(--bg-1)]">
+            Show percentile values per timestamp
+          </summary>
+          <div className="border-t border-border px-4 py-3">
+            <DataTable
+              ariaLabel="Percentile values per timestamp"
+              rows={alignedDataToRows(primary.data)}
+            />
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }
@@ -430,31 +437,29 @@ function KpiRow({ kpis, hasData }: { kpis: ComputedKpis; hasData: boolean }) {
 }
 
 function ChartLegend({
-  primary,
-  envelope,
+  curves,
   compare,
 }: {
-  primary: DashboardSearch["primary"];
-  envelope: DashboardSearch["envelope"];
+  curves: CurveResult[];
   compare: boolean;
 }) {
-  if (compare) {
+  const palette = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--violet)", "var(--coral)", "var(--amber)"];
+  if (compare && curves.length > 1) {
     return (
       <div className="flex flex-wrap items-center gap-4 text-[11.5px] text-muted-foreground">
-        {TIER_VALUES.map((tier) => (
-          <LegendDot
-            color={TIER_COLOR_VAR[tier]}
-            dash={TIER_DASH[tier]?.join(" ")}
-            key={tier}
-            label={tier}
-          />
+        {curves.map((curve, i) => (
+          <span key={curve.key} className="inline-flex items-center gap-2">
+            <span
+              className="block h-[2px] w-4 rounded"
+              style={{ background: palette[i % palette.length] }}
+            />
+            <span className="font-mono">{curve.label}</span>
+          </span>
         ))}
       </div>
     );
   }
-
-  const [lo, hi] = neighborBand(primary);
-
+  const c = curves[0];
   return (
     <div className="flex flex-wrap items-center gap-4 text-[11.5px] text-muted-foreground">
       <span className="inline-flex items-center gap-2">
@@ -462,55 +467,9 @@ function ChartLegend({
           className="block h-[2px] w-4 rounded"
           style={{ background: "var(--chart-1)" }}
         />
-        {primary} line
+        {c ? rowLabel(c.filters) : "primary"}
       </span>
-      {envelope === "neighbors" ? (
-        <span className="inline-flex items-center gap-2">
-          <span
-            className="block h-2 w-3.5 rounded-sm"
-            style={{ background: "color-mix(in oklch, var(--chart-1) 32%, transparent)" }}
-          />
-          {lo} — {hi}
-        </span>
-      ) : null}
-      {envelope === "wide" ? (
-        <span className="inline-flex items-center gap-2">
-          <span
-            className="block h-2 w-3.5 rounded-sm"
-            style={{ background: "color-mix(in oklch, var(--chart-1) 14%, transparent)" }}
-          />
-          p10 — p90
-        </span>
-      ) : null}
     </div>
-  );
-}
-
-function LegendDot({
-  color,
-  dash,
-  label,
-}: {
-  color: string;
-  dash?: string;
-  label: string;
-}) {
-  return (
-    <span className="inline-flex items-center gap-2">
-      <svg height="6" width="22">
-        <line
-          stroke={color}
-          strokeDasharray={dash}
-          strokeLinecap="round"
-          strokeWidth="2"
-          x1="0"
-          x2="22"
-          y1="3"
-          y2="3"
-        />
-      </svg>
-      <span className="font-mono">{label}</span>
-    </span>
   );
 }
 
@@ -568,13 +527,10 @@ function computeKpis(
 
 function computeDriftPct(p50: number[]): number | null {
   if (p50.length < 4) return null;
-
   const mid = Math.floor(p50.length / 2);
   const firstHalf = mean(p50.slice(0, mid));
   const secondHalf = mean(p50.slice(mid));
-
   if (firstHalf === 0) return null;
-
   return ((secondHalf - firstHalf) / firstHalf) * 100;
 }
 
@@ -600,26 +556,21 @@ function mean(values: number[]): number {
   return values.reduce((sum, v) => sum + v, 0) / values.length;
 }
 
-export function limitTypeLabel(limitType: DashboardSearch["limit_type"]): string {
+export function limitTypeLabel(limitType: string): string {
   return limitType === "5h" ? "5-hour limit" : "Weekly limit";
 }
 
-function windowLabel(window: DashboardSearch["window"]): string {
-  return ({
-    "24h": "last 24h",
-    "7d": "last 7d",
-    "30d": "last 30d",
-    "90d": "last 90d",
-  } as const)[window];
+function resolutionLabelFor(resolution: ChartMeta["resolution"]): string {
+  return resolution === "q15"
+    ? "15 min"
+    : resolution === "h1"
+      ? "1 hour"
+      : "1 day";
 }
 
-function resolutionLabel(window: DashboardSearch["window"]): string {
-  return ({
-    "24h": "15 min",
-    "7d": "1 hour",
-    "30d": "1 day",
-    "90d": "1 week",
-  } as const)[window];
+function formatRangeLabel(startMs: number, endMs: number): string {
+  const fmt = (ms: number) => new Date(ms).toISOString().slice(0, 10);
+  return `${fmt(startMs)} → ${fmt(endMs)}`;
 }
 
 function statusNoticeFor(
@@ -627,43 +578,17 @@ function statusNoticeFor(
 ): { kind: "stale" | "degraded"; relative: string } | null {
   const ageMs = Date.now() - new Date(status.last_cron_success_ts).getTime();
   const relative = formatRelative(status.last_cron_success_ts);
-
   if (status.ingest_health === "down" || ageMs > STALE_AFTER_MS) {
     return { kind: "stale", relative };
   }
-
   if (status.ingest_health === "degraded") {
     return { kind: "degraded", relative };
   }
-
   return null;
-}
-
-function primaryChartData(
-  data: AlignedData | null,
-  compareData: { data: AlignedData }[] | null,
-): AlignedData {
-  if (data) {
-    return data;
-  }
-
-  return (
-    compareData?.find(({ data: tierData }) => alignedDataHasValues(tierData))
-      ?.data ??
-    compareData?.[0]?.data ??
-    EMPTY_ALIGNED_DATA
-  );
-}
-
-function compareDataHasValues(
-  compareData: { data: AlignedData }[] | null,
-): boolean {
-  return compareData?.some(({ data }) => alignedDataHasValues(data)) ?? false;
 }
 
 function alignedDataToRows(data: AlignedData): DataTableRow[] {
   const [xs, p10, p25, p50, p75, p90] = data;
-
   return Array.from(xs).map((ts, index) => ({
     ts: new Date(ts * 1000).toISOString(),
     p10: numericValue(p10?.[index]),
@@ -679,12 +604,9 @@ function numericValue(value: number | null | undefined): number | null {
 }
 
 function chartAriaLabel(search: DashboardSearch): string {
-  if (search.compare) {
-    return `Compare tiers for ${limitTypeLabel(search.limit_type)}`;
-  }
-
+  if (search.compare) return "Compare cohorts API-cost percentiles";
   return `${search.tier ?? "selected tier"} ${limitTypeLabel(
-    search.limit_type,
+    search.limit_type ?? "5h",
   )} percentiles`;
 }
 
@@ -693,10 +615,9 @@ function formatRelative(timestamp: string): string {
     0,
     Math.floor((Date.now() - new Date(timestamp).getTime()) / 60_000),
   );
-
-  if (minutes < 60) {
-    return `${minutes}m ago`;
-  }
-
+  if (minutes < 60) return `${minutes}m ago`;
   return `${Math.floor(minutes / 60)}h ago`;
 }
+
+// Keep export for callers that imported it from this module.
+export { alignedDataHasValues };

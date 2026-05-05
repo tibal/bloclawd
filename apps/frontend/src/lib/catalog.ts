@@ -64,6 +64,7 @@ export type CatalogFilters = {
   model?: Model;
   tier?: Tier;
   harness?: Harness;
+  region?: Region;
   limit_type?: LimitType;
 };
 
@@ -313,14 +314,44 @@ export function planOptions(filters: CatalogFilters): Options<Plan> {
 }
 
 export function modelOptions(filters: CatalogFilters): Options<Model> {
-  let models: readonly ModelInfo[] = CATALOG.models;
-  if (filters.plan) {
-    const allowed = new Set(modelsForPlan(filters.plan));
-    models = CATALOG.models.filter((m) => allowed.has(m.model));
-  } else if (filters.provider) {
-    models = modelsForProvider(filters.provider);
+  const allowed = allowedModels(filters);
+  return CATALOG.models
+    .filter((m) => allowed.has(m.model))
+    .map((m) => ({ value: m.model, label: m.display_name }));
+}
+
+function allowedModels(filters: CatalogFilters): Set<Model> {
+  // Intersect: models available under each currently-set filter.
+  let set: Set<Model> | null = null;
+  const intersect = (next: Iterable<Model>) => {
+    const incoming = new Set(next);
+    set = set
+      ? new Set(Array.from(set).filter((m) => incoming.has(m)))
+      : incoming;
+  };
+
+  if (filters.plan) intersect(modelsForPlan(filters.plan));
+  if (filters.provider) {
+    intersect(modelsForProvider(filters.provider).map((m) => m.model));
   }
-  return models.map((m) => ({ value: m.model, label: m.display_name }));
+  if (filters.tier) {
+    const tierModels = new Set<Model>();
+    for (const plan of plansForTier(filters.tier)) {
+      for (const model of plan.models) tierModels.add(model);
+    }
+    intersect(tierModels);
+  }
+  if (filters.harness) {
+    // A model is reachable via a harness if any plan exposes both.
+    const harnessModels = new Set<Model>();
+    for (const plan of CATALOG.plans) {
+      if (!plan.harnesses.includes(filters.harness)) continue;
+      for (const model of plan.models) harnessModels.add(model);
+    }
+    intersect(harnessModels);
+  }
+
+  return set ?? new Set(CATALOG.models.map((m) => m.model));
 }
 
 export function harnessOptions(filters: CatalogFilters): Options<Harness> {
@@ -328,6 +359,53 @@ export function harnessOptions(filters: CatalogFilters): Options<Harness> {
     ? harnessesForProvider(filters.provider)
     : CATALOG.harnesses;
   return harnesses.map((h) => ({ value: h, label: h }));
+}
+
+export function harnessForProvider(provider: Provider): Harness {
+  const harnesses = harnessesForProvider(provider);
+  if (harnesses.length === 0) {
+    throw new Error(`provider ${provider} has no harness in catalog`);
+  }
+  return harnesses[0]!;
+}
+
+export function providerHarnessLabel(
+  provider: Provider,
+  harness: Harness,
+): string {
+  return `${providerLabel(provider)} · ${harness}`;
+}
+
+export type ProviderHarness = { provider: Provider; harness: Harness };
+
+export function providerHarnessOptions(): Options<string> {
+  // Encoded as `${provider}:${harness}`. The catalog is already strict 1:1
+  // today; we still enumerate every (provider, harness) pair so the field
+  // stays correct if a provider gains a second harness.
+  const out: { value: string; label: string }[] = [];
+  for (const provider of CATALOG.providers) {
+    for (const harness of harnessesForProvider(provider)) {
+      out.push({
+        value: encodeProviderHarness(provider, harness),
+        label: providerHarnessLabel(provider, harness),
+      });
+    }
+  }
+  return out;
+}
+
+export function encodeProviderHarness(
+  provider: Provider,
+  harness: Harness,
+): string {
+  return `${provider}:${harness}`;
+}
+
+export function decodeProviderHarness(value: string): ProviderHarness | null {
+  const [provider, harness] = value.split(":") as [string, string];
+  if (!CATALOG.providers.includes(provider as Provider)) return null;
+  if (!CATALOG.harnesses.includes(harness as Harness)) return null;
+  return { provider: provider as Provider, harness: harness as Harness };
 }
 
 export function tierOptions(): Options<Tier> {
@@ -351,8 +429,8 @@ export function windowOptions(): Options<Window> {
 
 export function limitTypeOptions(filters: CatalogFilters): Options<LimitType> {
   // A limit type is selectable when at least one currently-visible plan
-  // exposes it. Without filters, this is just every limit type in the
-  // catalog. With a plan picked, narrow to that plan's limit_types.
+  // exposes it. Plan picks the narrowest set; otherwise we intersect the
+  // plans matching the active provider/tier/harness filters.
   if (filters.plan) {
     return planInfo(filters.plan).limit_types.map((lt) => ({
       value: lt,
@@ -360,15 +438,118 @@ export function limitTypeOptions(filters: CatalogFilters): Options<LimitType> {
     }));
   }
   const seen = new Set<LimitType>();
-  const candidatePlans = filters.provider
-    ? plansForProvider(filters.provider)
-    : CATALOG.plans;
-  for (const plan of candidatePlans) {
+  for (const plan of candidatePlansFor(filters)) {
     for (const lt of plan.limit_types) {
       seen.add(lt);
     }
   }
   return Array.from(seen).map((lt) => ({ value: lt, label: lt }));
+}
+
+function candidatePlansFor(filters: CatalogFilters): readonly PlanInfo[] {
+  return CATALOG.plans.filter((plan) => {
+    if (filters.provider && plan.provider !== filters.provider) return false;
+    if (filters.tier && plan.tier_alias !== filters.tier) return false;
+    if (filters.harness && !plan.harnesses.includes(filters.harness)) {
+      return false;
+    }
+    return true;
+  });
+}
+
+// First non-aggregable value still valid under `filters`. Used to keep
+// tier / harness / limit_type pinned to a single non-`all` value (and
+// auto-pick a fresh one when a sibling change invalidates the current
+// choice).
+export function firstAvailableTier(filters: CatalogFilters): Tier | null {
+  for (const tier of CATALOG.tiers) {
+    if (tierIsAvailable(tier, filters)) return tier;
+  }
+  return CATALOG.tiers[0] ?? null;
+}
+
+export function tierIsAvailable(tier: Tier, filters: CatalogFilters): boolean {
+  return candidatePlansFor({ ...filters, tier }).length > 0;
+}
+
+export function firstAvailableHarness(
+  filters: CatalogFilters,
+): Harness | null {
+  const provider = filters.provider;
+  const candidates = provider ? harnessesForProvider(provider) : CATALOG.harnesses;
+  for (const harness of candidates) {
+    if (harnessIsAvailable(harness, filters)) return harness;
+  }
+  return candidates[0] ?? null;
+}
+
+export function harnessIsAvailable(
+  harness: Harness,
+  filters: CatalogFilters,
+): boolean {
+  return candidatePlansFor({ ...filters, harness }).length > 0;
+}
+
+export function firstAvailableLimitType(
+  filters: CatalogFilters,
+): LimitType | null {
+  const opts = limitTypeOptions(filters);
+  return opts[0]?.value ?? null;
+}
+
+export function limitTypeIsAvailable(
+  limitType: LimitType,
+  filters: CatalogFilters,
+): boolean {
+  return limitTypeOptions(filters).some((o) => o.value === limitType);
+}
+
+// Resolve a partial filter row to one with non-aggregable fields filled in.
+// Provider+harness move together (1:1 today); when only one is set we pin
+// the other from the catalog. Tier and limit_type fall back to the first
+// catalog value still valid under the row's other filters. Aggregable
+// fields (plan, model, region) pass through untouched.
+export type ResolvedRow = CatalogFilters & {
+  provider: Provider;
+  harness: Harness;
+  tier: Tier;
+  limit_type: LimitType;
+};
+
+export function resolveRow(filters: CatalogFilters): ResolvedRow {
+  let next: CatalogFilters = { ...filters };
+
+  if (next.provider && !next.harness) {
+    next = { ...next, harness: harnessForProvider(next.provider) };
+  }
+
+  const provider = next.provider ?? CATALOG.providers[0]!;
+  const harness =
+    next.harness && harnessIsAvailable(next.harness, { ...next, provider })
+      ? next.harness
+      : harnessForProvider(provider);
+
+  next = { ...next, provider, harness };
+
+  let tier =
+    next.tier && tierIsAvailable(next.tier, next)
+      ? next.tier
+      : firstAvailableTier(next);
+  if (!tier) {
+    tier = CATALOG.tiers[0]!;
+  }
+  next = { ...next, tier };
+
+  let limit_type =
+    next.limit_type && limitTypeIsAvailable(next.limit_type, next)
+      ? next.limit_type
+      : firstAvailableLimitType(next);
+  if (!limit_type) {
+    limit_type = CATALOG.limit_types[0]!;
+  }
+  next = { ...next, limit_type };
+
+  return next as ResolvedRow;
 }
 
 function providerLabel(provider: Provider): string {

@@ -71,9 +71,15 @@ export function HomeTimelinePreview() {
       </div>
       <Chart
         ariaLabel="24-hour envelope preview"
-        data={data}
+        curves={[
+          {
+            key: "preview",
+            label: "Claude Code · max20 · all regions",
+            data,
+          },
+        ]}
         primary="p50"
-        envelope="neighbors"
+        dist={["p10-p90", "p25-p75"]}
         meta={realData ? { resolution: "h1" } : undefined}
       />
     </section>

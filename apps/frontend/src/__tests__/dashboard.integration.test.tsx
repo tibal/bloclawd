@@ -8,7 +8,8 @@ import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { routeTree } from "@/routeTree.gen";
-import { useChartData } from "@/lib/dashboard-data";
+import type { ChartCurve } from "@/components/Chart";
+import { useChartData, type CurveResult } from "@/lib/dashboard-data";
 import {
   useBucket,
   useManifest,
@@ -18,10 +19,14 @@ import {
 } from "@/lib/r2";
 import type { AlignedData } from "@/lib/chart-data";
 
-vi.mock("@/lib/dashboard-data", () => ({
-  useChartData: vi.fn(),
-  useDelayedLoading: (loading: boolean) => loading,
-}));
+vi.mock("@/lib/dashboard-data", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/dashboard-data")>();
+  return {
+    ...actual,
+    useChartData: vi.fn(),
+    useDelayedLoading: (loading: boolean) => loading,
+  };
+});
 
 vi.mock("@/lib/r2", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/r2")>();
@@ -37,14 +42,14 @@ vi.mock("@/components/Chart", () => ({
   Chart: vi.fn(
     ({
       ariaLabel,
-      compareMode,
+      curves,
     }: {
       ariaLabel: string;
-      compareMode?: { tiers: unknown[] };
+      curves: ChartCurve[];
     }) => (
       <div
         aria-label={ariaLabel}
-        data-compare-count={compareMode?.tiers.length ?? 0}
+        data-curve-count={curves.length}
         role="img"
       >
         chart
@@ -62,17 +67,24 @@ const SAMPLE_DATA: AlignedData = [
   [40],
   [50],
 ];
-const COMPARE_DATA = (["pro", "max5", "max20"] as const).map((tier, idx) => ({
-  tier,
-  data: [
-    SAMPLE_DATA[0],
-    [10 + idx],
-    [20 + idx],
-    [30 + idx],
-    [40 + idx],
-    [50 + idx],
-  ] satisfies AlignedData,
-}));
+
+function makeCurve(
+  key: string,
+  data: AlignedData,
+  tier: "pro" | "max5" | "max20" = "max20",
+): CurveResult {
+  return {
+    key,
+    label: `${tier} cohort`,
+    filters: {
+      provider: "anthropic",
+      harness: "claude-code",
+      tier,
+      limit_type: "5h",
+    },
+    data,
+  };
+}
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -80,23 +92,9 @@ afterEach(() => {
 });
 
 describe("/dashboard assembly", () => {
-  it("nudges users to pick a tier before rendering a single-tier chart", async () => {
+  it("renders chart and data table for the primary curve", async () => {
     mockStatus();
-    mockChartData({ data: SAMPLE_DATA });
-
-    const { container, cleanup } = await renderDashboard("/dashboard");
-
-    try {
-      expect(container.textContent).toContain("Pick a tier");
-      expect(container.querySelector('[role="img"]')).toBeNull();
-    } finally {
-      cleanup();
-    }
-  });
-
-  it("renders chart and data table for a selected tier", async () => {
-    mockStatus();
-    mockChartData({ data: SAMPLE_DATA });
+    mockChartData({ curves: [makeCurve("primary", SAMPLE_DATA)] });
 
     const { container, cleanup } = await renderDashboard(
       "/dashboard?tier=max20&region=EU",
@@ -115,37 +113,45 @@ describe("/dashboard assembly", () => {
     }
   });
 
-  it("passes all three tier series to Chart in compare mode", async () => {
+  it("passes one curve per row to Chart in compare mode", async () => {
     mockStatus();
-    mockChartData({ compareData: COMPARE_DATA });
+    mockChartData({
+      curves: [
+        makeCurve("primary", SAMPLE_DATA, "pro"),
+        makeCurve("row-0", SAMPLE_DATA, "max5"),
+        makeCurve("row-1", SAMPLE_DATA, "max20"),
+      ],
+    });
 
     const { container, cleanup } = await renderDashboard(
       "/dashboard?compare=true",
     );
 
     try {
-      expect(container.querySelector('[role="img"]')?.getAttribute(
-        "data-compare-count",
-      )).toBe("3");
+      expect(
+        container.querySelector('[role="img"]')?.getAttribute(
+          "data-curve-count",
+        ),
+      ).toBe("3");
     } finally {
       cleanup();
     }
   });
 
   it("renders stale alerts for down status and stale healthy status", async () => {
-    mockChartData({ data: SAMPLE_DATA });
+    mockChartData({ curves: [makeCurve("primary", SAMPLE_DATA)] });
     mockStatus({ ingest_health: "down" });
     const downRender = await renderDashboard("/dashboard?tier=max20");
 
     try {
-      expect(downRender.container.querySelector('[role="alert"]')?.textContent).toContain(
-        "Public data is stale",
-      );
+      expect(
+        downRender.container.querySelector('[role="alert"]')?.textContent,
+      ).toContain("Public data is stale");
     } finally {
       downRender.cleanup();
     }
 
-    mockChartData({ data: SAMPLE_DATA });
+    mockChartData({ curves: [makeCurve("primary", SAMPLE_DATA)] });
     mockStatus({
       ingest_health: "healthy",
       last_cron_success_ts: new Date(NOW - 25 * 60 * 60 * 1000).toISOString(),
@@ -153,19 +159,21 @@ describe("/dashboard assembly", () => {
     const staleRender = await renderDashboard("/dashboard?tier=max20");
 
     try {
-      expect(staleRender.container.querySelector('[role="alert"]')?.textContent).toContain(
-        "Public data is stale",
-      );
+      expect(
+        staleRender.container.querySelector('[role="alert"]')?.textContent,
+      ).toContain("Public data is stale");
     } finally {
       staleRender.cleanup();
     }
   });
 
   it("renders degraded status as an inline notice without top-level alert", async () => {
-    mockChartData({ data: SAMPLE_DATA });
+    mockChartData({ curves: [makeCurve("primary", SAMPLE_DATA)] });
     mockStatus({ ingest_health: "degraded" });
 
-    const { container, cleanup } = await renderDashboard("/dashboard?tier=max20");
+    const { container, cleanup } = await renderDashboard(
+      "/dashboard?tier=max20",
+    );
 
     try {
       expect(container.querySelector('[role="alert"]')).toBeNull();
@@ -201,23 +209,20 @@ async function renderDashboard(path: string) {
 }
 
 function mockChartData({
-  compareData = null,
-  data = null,
+  curves = [],
   error = null,
   loading = false,
   meta = null,
 }: Partial<ReturnType<typeof useChartData>> = {}) {
   vi.mocked(useChartData).mockReturnValue({
-    data,
-    compareData,
+    curves,
     meta,
     loading,
     error,
-    bucketsLoaded: data || compareData ? 1 : 0,
+    bucketsLoaded: curves.length > 0 ? 1 : 0,
     bucketsTotal: 1,
+    resolution: "h1",
   });
-  // Cohort panels read manifest+bucket; default them to empty so /dashboard
-  // tests don't have to care unless they explicitly check cohort UI.
   vi.mocked(useManifest).mockReturnValue({
     data: {
       schema_version: "v1",

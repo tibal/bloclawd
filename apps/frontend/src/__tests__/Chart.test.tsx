@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
-import { Chart } from "@/components/Chart";
+import { Chart, type ChartCurve } from "@/components/Chart";
 import type { AlignedData } from "@/lib/chart-data";
 
 function sampleData(): AlignedData {
@@ -15,6 +15,10 @@ function sampleData(): AlignedData {
     xs.map((_, idx) => 180 + idx),
     xs.map((_, idx) => 220 + idx),
   ];
+}
+
+function curve(label: string, data: AlignedData, key = label): ChartCurve {
+  return { key, label, data };
 }
 
 function render(node: React.ReactNode) {
@@ -32,12 +36,12 @@ function render(node: React.ReactNode) {
 }
 
 describe("Chart", () => {
-  it("renders an accessible SVG envelope chart with the median series", () => {
+  it("renders an accessible SVG envelope chart with the inner band", () => {
     const { container, cleanup } = render(
       <Chart
         ariaLabel="Unified cost p50 with percentile band"
-        envelope="neighbors"
-        data={sampleData()}
+        curves={[curve("primary", sampleData())]}
+        dist={["p25-p75"]}
       />,
     );
 
@@ -48,18 +52,18 @@ describe("Chart", () => {
       );
       expect(chart?.querySelector("svg")).not.toBeNull();
       expect(chart?.querySelector('[data-band="p25-p75"]')).not.toBeNull();
-      expect(chart?.querySelector('[data-series="p50"]')).not.toBeNull();
+      expect(chart?.querySelector('[data-curve="primary"]')).not.toBeNull();
     } finally {
       cleanup();
     }
   });
 
-  it("renders the outer p10–p90 band when wide-band mode is selected", () => {
+  it("renders the outer p10–p90 band when selected in dist", () => {
     const { container, cleanup } = render(
       <Chart
         ariaLabel="Unified cost wide band"
-        envelope="wide"
-        data={sampleData()}
+        curves={[curve("primary", sampleData())]}
+        dist={["p10-p90"]}
       />,
     );
 
@@ -72,31 +76,31 @@ describe("Chart", () => {
     }
   });
 
-  it("applies tier stroke patterns in compare mode", () => {
+  it("draws one line per curve in compare mode and skips bands", () => {
     const data = sampleData();
     const { container, cleanup } = render(
       <Chart
         ariaLabel="Compare tiers"
-        envelope="neighbors"
-        compareMode={{
-          tiers: [
-            { tier: "pro", data },
-            { tier: "max5", data },
-            { tier: "max20", data },
-          ],
-        }}
-        data={data}
+        curves={[
+          curve("Pro", data, "pro"),
+          curve("Max5", data, "max5"),
+          curve("Max20", data, "max20"),
+        ]}
+        dist={["p25-p75"]}
       />,
     );
 
     try {
-      const dashes = Array.from(
-        container.querySelectorAll<SVGPathElement>("path[data-tier]"),
-      ).map((path) => path.getAttribute("stroke-dasharray"));
-
-      expect(dashes).toContain("8 4");
-      expect(dashes).toContain("2 4");
-      expect(dashes).toContain(null);
+      const paths = Array.from(
+        container.querySelectorAll<SVGPathElement>("path[data-curve]"),
+      );
+      expect(paths.map((p) => p.getAttribute("data-curve"))).toEqual([
+        "pro",
+        "max5",
+        "max20",
+      ]);
+      // No envelope rendered in compare mode.
+      expect(container.querySelector('[data-band="p25-p75"]')).toBeNull();
     } finally {
       cleanup();
     }

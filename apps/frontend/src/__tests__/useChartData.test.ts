@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Model } from "@web/Model";
 import type { Tier } from "@web/Tier";
 
-import type { DashboardSearch } from "@/routes/dashboard";
+import type { DashboardSearch } from "@/lib/dashboard-search";
 import {
   useBuckets,
   useManifest,
@@ -32,12 +32,11 @@ const OLD_H1_PATH = "2026/04/20/00.json";
 const BASE_FILTERS: DashboardSearch = {
   harness: "claude-code",
   limit_type: "5h",
-  window: "7d",
+  range: "1w",
   primary: "p50",
-  envelope: "neighbors",
-  brush_start: 0,
-  brush_end: 1,
+  dist: ["p10-p90", "p25-p75"],
   compare: false,
+  rows: [],
 };
 
 afterEach(() => {
@@ -46,7 +45,7 @@ afterEach(() => {
 });
 
 describe("useChartData", () => {
-  it("picks h1 buckets for the 7d window and returns single-tier aligned data", () => {
+  it("picks h1 buckets for the 1w range and returns one curve", () => {
     mockManifest();
     vi.mocked(useBuckets).mockReturnValue([
       bucketResult(
@@ -69,7 +68,8 @@ describe("useChartData", () => {
     expect(result.error).toBeNull();
     expect(result.bucketsLoaded).toBe(1);
     expect(result.bucketsTotal).toBe(1);
-    expect(result.data).toEqual([
+    expect(result.curves).toHaveLength(1);
+    expect(result.curves[0]?.data).toEqual([
       [Date.UTC(2026, 4, 2, 21, 0, 0) / 1000],
       [10],
       [20],
@@ -85,7 +85,7 @@ describe("useChartData", () => {
       bucketResult(
         bucket([
           cell("max20", {
-            model: "gpt-5",
+            model: "claude-sonnet-4-5",
             apiCost: [10, 20, 30, 40, 50],
           }),
         ]),
@@ -94,15 +94,15 @@ describe("useChartData", () => {
 
     const result = renderHookResult({
       ...BASE_FILTERS,
-      model: "gpt-5",
+      model: "claude-sonnet-4-5",
       region: "EU",
       tier: "max20",
     });
 
-    expect(result.data?.[3]).toEqual([30]);
+    expect(result.curves[0]?.data[3]).toEqual([30]);
   });
 
-  it("emits three aligned tier series in compare mode", () => {
+  it("returns one curve per row when compare is enabled", () => {
     mockManifest();
     vi.mocked(useBuckets).mockReturnValue([
       bucketResult(
@@ -116,18 +116,21 @@ describe("useChartData", () => {
 
     const result = renderHookResult({
       ...BASE_FILTERS,
+      tier: "pro",
       compare: true,
+      rows: [
+        { harness: "claude-code", tier: "max5", limit_type: "5h" },
+        { harness: "claude-code", tier: "max20", limit_type: "5h" },
+      ],
     });
 
-    expect(result.data).toBeNull();
-    expect(result.compareData?.map(({ tier }) => tier)).toEqual([
+    expect(result.curves).toHaveLength(3);
+    expect(result.curves.map((c) => c.filters.tier)).toEqual([
       "pro",
       "max5",
       "max20",
     ]);
-    expect(result.compareData?.map(({ data }) => data[3][0])).toEqual([
-      3, 30, 300,
-    ]);
+    expect(result.curves.map((c) => c.data[3][0])).toEqual([3, 30, 300]);
   });
 });
 
