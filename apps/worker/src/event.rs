@@ -154,10 +154,6 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
         return IngestError::from_verify(e).into_response();
     }
 
-    let model_str = enum_to_wire(&payload.model);
-    let tier_str = enum_to_wire(&payload.tier);
-    let harness_str = enum_to_wire(&payload.harness);
-    let region_str = enum_to_wire(&payload.region);
     let limit_type_str = enum_to_wire(&wire.limit_type);
 
     let bucket_ts = match insert_event(
@@ -166,10 +162,6 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
             event_id,
             submission_group_id,
             payload: &payload_value,
-            model: &model_str,
-            tier: &tier_str,
-            harness: &harness_str,
-            region: &region_str,
             limit_type: &limit_type_str,
         },
     )
@@ -186,10 +178,10 @@ pub async fn handle_event(mut req: Request, ctx: RouteContext<()>) -> Result<Res
 }
 
 const INSERT_EVENT_SQL: &str = r#"
-            INSERT INTO events (event_id, submission_group_id, bucket_ts, payload, model, tier, harness, region, limit_type)
+            INSERT INTO events (event_id, submission_group_id, bucket_ts, payload, limit_type)
             VALUES
                 ($1::uuid, $2::uuid, date_bin('15 minutes', now(), '1970-01-01 00:00:00+00'::timestamptz),
-                 $3::jsonb, $4::text, $5::text, $6::text, $7::text, $8::text)
+                 $3::jsonb, $4::text)
             ON CONFLICT (event_id) DO UPDATE SET event_id = events.event_id
             RETURNING bucket_ts
             "#;
@@ -198,11 +190,7 @@ struct InsertEvent<'a> {
     event_id: Uuid,
     submission_group_id: Uuid,
     payload: &'a serde_json::Value,
-    model: &'a str,
-    tier: &'a str,
-    harness: &'a str,
-    region: &'a str,
-    pub limit_type: &'a str,
+    limit_type: &'a str,
 }
 
 async fn insert_event(
@@ -227,10 +215,6 @@ async fn insert_event(
                 (&event.event_id, Type::UUID),
                 (&event.submission_group_id, Type::UUID),
                 (&event.payload, Type::JSONB),
-                (&event.model, Type::TEXT),
-                (&event.tier, Type::TEXT),
-                (&event.harness, Type::TEXT),
-                (&event.region, Type::TEXT),
                 (&event.limit_type, Type::TEXT),
             ],
         )
@@ -537,6 +521,14 @@ mod tests {
     #[test]
     fn insert_sql_persists_limit_type_as_typed_text() {
         assert!(INSERT_EVENT_SQL.contains("limit_type"));
-        assert!(INSERT_EVENT_SQL.contains("$8::text"));
+        assert!(INSERT_EVENT_SQL.contains("$4::text"));
+    }
+
+    #[test]
+    fn insert_sql_does_not_persist_payload_dimensions_twice() {
+        assert!(!INSERT_EVENT_SQL.contains(", model,"));
+        assert!(!INSERT_EVENT_SQL.contains(", tier,"));
+        assert!(!INSERT_EVENT_SQL.contains(", harness,"));
+        assert!(!INSERT_EVENT_SQL.contains(", region,"));
     }
 }

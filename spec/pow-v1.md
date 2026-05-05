@@ -53,20 +53,20 @@ Byte order is fixed: index 0..32 = `challenge_id`, index 32..64 = `payload_hash`
 
 ## 3. Verification (`POST /event` server side)
 
-The Worker receives `{ challenge_id, sig, payload, nonce, event_id }` (all base64url-decoded as needed; `payload` is the JSON object). It performs the following checks in this order and rejects with the listed status code on first failure:
+The Worker receives `{ challenge_id, sig, payload, nonce, event_id, submission_group_id, limit_type }` (all base64url-decoded as needed; `payload` is the JSON object). It performs the following checks in this order and rejects with the listed status code on first failure:
 
 1. **HMAC signature** (400 if invalid). Recompute `sig_prime = HMAC-SHA256(WORKER_SECRET, challenge_id_bytes)`. Reject if `constant_time_eq(sig_prime, sig_bytes) == false`.
 2. **Expiry** (400 if expired). Decode `unix_ms_be` from the first 8 bytes of `challenge_id_bytes`. Reject if `now_ms - unix_ms_be > 60_000` or `unix_ms_be > now_ms + 5_000` (5s clock-skew tolerance).
 3. **Payload-hash binding** (400 if mismatched). Recompute `payload_hash_prime = SHA-256(JCS(payload))` per `spec/payload-canonical.md`. The server reconstructs the 72-byte PoW input from server-side `challenge_id_bytes`, server-side `payload_hash_prime`, and client-supplied `nonce_bytes`; it never trusts a client-supplied `payload_hash`.
 4. **PoW** (400 if invalid). Compute `hash = SHA-256(challenge_id_bytes || payload_hash_prime || nonce_bytes)`. Reject if `leading_zero_bits(hash) < 22`.
-5. **DB insert.** Decode the top-level `event_id` from 16 raw UUIDv4 bytes into a canonical Postgres `uuid`, then `INSERT ... ON CONFLICT (event_id) DO NOTHING` into `events` keyed on `event_id UUID PRIMARY KEY` (silently dedupes replays of the same `event_id`). Server assigns `bucket_ts` as the current Postgres timestamp floored to the 15-minute bucket (for example with `date_bin('15 minutes', now(), '1970-01-01 00:00:00+00'::timestamptz)`).
+5. **DB insert.** Decode top-level `event_id` and `submission_group_id` from 16 raw UUIDv4 bytes into canonical Postgres `uuid`s, then insert `event_id`, `submission_group_id`, server-assigned `bucket_ts`, `payload JSONB`, and `limit_type` into `events`. The row is keyed on `event_id UUID PRIMARY KEY`; duplicate `event_id` requests use a no-op conflict update so the Worker can return the original `bucket_ts`. Server assigns `bucket_ts` as the current Postgres timestamp floored to the 15-minute bucket (for example with `date_bin('15 minutes', now(), '1970-01-01 00:00:00+00'::timestamptz)`).
 
 Verification ordering is: HMAC -> expiry -> payload-hash -> PoW -> DB insert.
 
 ## 4. Replay defense layers (in order)
 
 1. **Cryptographic** - PoW input binds `payload_hash`. A solved challenge cannot be reused with a different payload because the PoW would need to be re-solved.
-2. **Database** - `event_id UUID PRIMARY KEY` with `INSERT ... ON CONFLICT (event_id) DO NOTHING`. A replay of the exact same request is silently absorbed.
+2. **Database** - `event_id UUID PRIMARY KEY` with an `ON CONFLICT (event_id)` no-op update that returns the original `bucket_ts`. A replay of the exact same request is silently absorbed.
 3. **Temporal** - 60s expiry on `challenge_id`. The replay window is bounded.
 
 There is no challenge persistence layer in this design. The original draft's consume-on-use layer is removed.

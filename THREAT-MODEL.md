@@ -95,10 +95,10 @@ Operational consequences enforced in the codebase:
 The PoW gate is **stateless HMAC-signed** (no KV, no shared mutable state):
 60-second `expires_in` per `spec/pow-v1.md` §1; `payload_hash` binding is
 the primary replay defense; `event_id UUID PRIMARY KEY` with
-`INSERT ... ON CONFLICT (event_id) DO NOTHING` is a layered defense
-(`spec/pow-v1.md` §4). `K = 22` initial target (~1 second on a mid-2024
-dev laptop) per `spec/pow-v1.md` §5; tunable via Worker env var
-`POW_DIFFICULTY_K`.
+an `ON CONFLICT (event_id)` no-op update is a layered defense
+(`spec/pow-v1.md` §4). `K = 22` initial target (~1 second on a
+mid-2024 dev laptop) per `spec/pow-v1.md` §5; tunable via Worker env
+var `POW_DIFFICULTY_K`.
 
 Canonical payload form is **RFC 8785 JSON Canonicalization Scheme (JCS)**
 per `spec/payload-canonical.md` §1 — byte-exact across CLI and Worker,
@@ -150,9 +150,10 @@ validated, idempotent, and gates server work behind cheap checks first.
   > per-event timing — INGE-11 boundary.
 
 - **PostgreSQL `event_id UUID PRIMARY KEY` idempotency.** Replay of the
-  same `event_id` short-circuits silently via
-  `INSERT ... ON CONFLICT (event_id) DO NOTHING`
-  (`spec/pow-v1.md` §3 step 5; §4 layer 2). No double-counting.
+  same `event_id` short-circuits silently via an
+  `ON CONFLICT (event_id)` no-op update that returns the original
+  `bucket_ts` (`spec/pow-v1.md` §3 step 5; §4 layer 2). No
+  double-counting.
 
 **Distribution-channel integrity** (Phase 5 DIST-03 / D-119 / D-122):
 
