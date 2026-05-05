@@ -99,9 +99,9 @@ function HomePage() {
             variants={heroItem}
           >
             See where Claude Code &amp; Codex limits actually fire — for
-            everyone, not just you. Compare your last bonked window to the
-            live cohort. Watch the envelope drift week to week. One CLI
-            command, anonymous by construction.
+            everyone, not just you. Paste your last bonked window into a rank
+            card, compare it to the live cohort, and watch the envelope drift
+            week to week. One CLI command, anonymous by construction.
           </m.p>
 
           <m.div
@@ -116,6 +116,14 @@ function HomePage() {
               className="whitespace-nowrap"
               size="lg"
               variant="outline"
+            >
+              <a href="/rank">Rank your bonk</a>
+            </Button>
+            <Button
+              asChild
+              className="whitespace-nowrap"
+              size="lg"
+              variant="ghost"
             >
               <a href="/methodology">Read the methodology</a>
             </Button>
@@ -152,8 +160,8 @@ function HomePage() {
             d: "Daily aggregates over 24h / 7d / 30d / 90d. Limits tightening? Loosening? You'll see the envelope shift before any changelog admits it.",
           },
           {
-            t: "Catch silent A/B buckets",
-            d: "Compare Pro / Max5 / Max20 side-by-side. If one tier or region suddenly tightens vs another, the chart shows it — even when no one announces it.",
+            t: "Turn bonks into share cards",
+            d: "Paste the CLI dry-run and get a profile: cache stacker, output spender, context hauler, or premium model loyalist. The URL carries the full card.",
           },
         ].map((p, i) => (
           <m.article
@@ -320,4 +328,3 @@ function InstallPreview() {
     </div>
   );
 }
-

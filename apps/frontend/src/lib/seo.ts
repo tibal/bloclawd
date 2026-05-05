@@ -75,7 +75,7 @@ export const ROUTES: RouteSeo[] = [
     description: SITE_DESCRIPTION,
     jsonLd: SITE_JSON_LD,
     noscript:
-      "bloclawd shows where Claude Code and Codex rate limits actually fire — for everyone, not just you. Compare your last bonked window to the live cohort, watch the envelope drift week to week, and contribute your own with one CLI command. Anonymous by construction, k ≥ 5.",
+      "bloclawd shows where Claude Code and Codex rate limits actually fire — for everyone, not just you. Rank your last bonked window against the live cohort, watch the envelope drift week to week, and contribute your own with one CLI command. Anonymous by construction, k ≥ 5.",
   },
   {
     path: "/dashboard",
@@ -160,60 +160,32 @@ export const ROUTES: RouteSeo[] = [
       "Data contract: the exact wire payload your CLI submits, the canonical ordering applied before signing, redacted fields, and the diff a dry-run shows you before any network call.",
   },
   {
-    path: "/compare",
-    title: "Pro vs Max5 vs Max20 · live tier comparison",
+    path: "/rank",
+    title: "Rank your AI rate-limit hit · shareable CLI card",
     description:
-      "Side-by-side percentile envelope of API-equivalent cost before Claude Code and Codex rate limits trigger, broken down by Pro, Max5, and Max20. Real bonks from real users, anonymized.",
-    jsonLd: [
-      {
-        "@context": "https://schema.org",
-        "@type": "WebPage",
-        name: "Pro vs Max5 vs Max20 · live tier comparison",
-        url: `${SITE_URL}/compare`,
-        description:
-          "Side-by-side percentile envelope of API-equivalent cost before Claude Code and Codex rate limits trigger, broken down by Pro, Max5, and Max20.",
-      },
-      {
-        "@context": "https://schema.org",
-        "@type": "FAQPage",
-        mainEntity: [
-          {
-            "@type": "Question",
-            name: "Does $200/mo Max20 really give you 20× the headroom of Pro?",
-            acceptedAnswer: {
-              "@type": "Answer",
-              text: "Compare the p50 envelope side-by-side over a 30-day window. The relationship between sticker-price ratio and observed headroom is rarely linear and shifts week to week.",
-            },
-          },
-          {
-            "@type": "Question",
-            name: "Why does my tier look tighter than the cohort?",
-            acceptedAnswer: {
-              "@type": "Answer",
-              text: "Either you've hit a heavier model mix, or you may be in a cohort the provider is silently A/B testing. The drift chart shows shifts before any official changelog mentions them.",
-            },
-          },
-          {
-            "@type": "Question",
-            name: "How is API-equivalent cost defined across tiers?",
-            acceptedAnswer: {
-              "@type": "Answer",
-              text: "Each submission is priced with the published API price for its model and token type. Public percentiles are computed after trimming submissions outside plus or minus 2σ of the cohort mean.",
-            },
-          },
-          {
-            "@type": "Question",
-            name: "Why are some cells suppressed?",
-            acceptedAnswer: {
-              "@type": "Answer",
-              text: "Any cell with fewer than 5 distinct contributors is suppressed for anonymity. Widen the window or relax a filter if you see gaps.",
-            },
-          },
-        ],
-      },
-    ],
+      "Paste bloclawd CLI output and get a shareable rank card: API-equivalent cost, cohort segment, token profile, model mix, and workflow recommendations.",
+    jsonLd: {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "bloclawd Rank",
+      url: `${SITE_URL}/rank`,
+      applicationCategory: "DeveloperApplication",
+      operatingSystem: "Any",
+      description:
+        "Client-side tool that turns bloclawd CLI dry-run output into a shareable cohort card with API-equivalent cost, token mix, model mix, and recommendations.",
+      offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+    },
     noscript:
-      "Pro vs Max5 vs Max20: live percentile envelope of API-equivalent cost before Claude Code and Codex rate limits trigger, broken down by subscription tier. Real bonks from real users, anonymized at k ≥ 5.",
+      "Rank your AI rate-limit hit: paste bloclawd CLI dry-run output and get a shareable card with API-equivalent cost, cohort segment, token profile, model mix, and workflow recommendations.",
+  },
+  {
+    path: "/compare",
+    title: "Compare moved to Rank",
+    description:
+      "The old tier comparison page now redirects to bloclawd Rank, the shareable CLI rate-limit card.",
+    index: false,
+    noscript:
+      "Compare moved to Rank. Open /rank to paste bloclawd CLI output and generate a shareable rate-limit card.",
   },
 ];
 

@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as RankRouteImport } from './routes/rank'
 import { Route as MethodologyRouteImport } from './routes/methodology'
 import { Route as InstallRouteImport } from './routes/install'
 import { Route as DataRouteImport } from './routes/data'
@@ -17,6 +18,11 @@ import { Route as CompareRouteImport } from './routes/compare'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as MethodologyChangelogRouteImport } from './routes/methodology.changelog'
 
+const RankRoute = RankRouteImport.update({
+  id: '/rank',
+  path: '/rank',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MethodologyRoute = MethodologyRouteImport.update({
   id: '/methodology',
   path: '/methodology',
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/data': typeof DataRoute
   '/install': typeof InstallRoute
   '/methodology': typeof MethodologyRouteWithChildren
+  '/rank': typeof RankRoute
   '/methodology/changelog': typeof MethodologyChangelogRoute
 }
 export interface FileRoutesByTo {
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/data': typeof DataRoute
   '/install': typeof InstallRoute
   '/methodology': typeof MethodologyRouteWithChildren
+  '/rank': typeof RankRoute
   '/methodology/changelog': typeof MethodologyChangelogRoute
 }
 export interface FileRoutesById {
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/data': typeof DataRoute
   '/install': typeof InstallRoute
   '/methodology': typeof MethodologyRouteWithChildren
+  '/rank': typeof RankRoute
   '/methodology/changelog': typeof MethodologyChangelogRoute
 }
 export interface FileRouteTypes {
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/data'
     | '/install'
     | '/methodology'
+    | '/rank'
     | '/methodology/changelog'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/data'
     | '/install'
     | '/methodology'
+    | '/rank'
     | '/methodology/changelog'
   id:
     | '__root__'
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/data'
     | '/install'
     | '/methodology'
+    | '/rank'
     | '/methodology/changelog'
   fileRoutesById: FileRoutesById
 }
@@ -118,10 +130,18 @@ export interface RootRouteChildren {
   DataRoute: typeof DataRoute
   InstallRoute: typeof InstallRoute
   MethodologyRoute: typeof MethodologyRouteWithChildren
+  RankRoute: typeof RankRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/rank': {
+      id: '/rank'
+      path: '/rank'
+      fullPath: '/rank'
+      preLoaderRoute: typeof RankRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/methodology': {
       id: '/methodology'
       path: '/methodology'
@@ -193,6 +213,7 @@ const rootRouteChildren: RootRouteChildren = {
   DataRoute: DataRoute,
   InstallRoute: InstallRoute,
   MethodologyRoute: MethodologyRouteWithChildren,
+  RankRoute: RankRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
