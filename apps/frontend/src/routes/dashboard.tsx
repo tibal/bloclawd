@@ -101,7 +101,8 @@ function DashboardPage() {
           </h1>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
             Where your tier&apos;s limits actually fire. Pick a tier for the
-            live API-cost envelope, or open Compare to overlay other cohorts.
+            live API-cost envelope, or open Rank to turn a CLI dry-run into a
+            shareable cohort card.
             Cells with fewer than 5 contributors are suppressed for anonymity.
           </p>
           <Chrome />

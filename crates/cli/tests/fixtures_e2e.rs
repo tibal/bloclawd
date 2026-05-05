@@ -207,30 +207,6 @@ fn run_to_string(
     Ok((code, String::from_utf8(stdout).expect("stdout utf8")))
 }
 
-fn event_blocks(rendered: &str) -> Vec<Value> {
-    let mut out = Vec::new();
-    let mut current: Option<String> = None;
-    for line in rendered.lines() {
-        if line.starts_with("--- event ") {
-            if let Some(block) = current.take() {
-                out.push(serde_json::from_str(&block).expect("event JSON block parses"));
-            }
-            current = Some(String::new());
-            continue;
-        }
-        if let Some(block) = current.as_mut() {
-            if !block.is_empty() {
-                block.push('\n');
-            }
-            block.push_str(line);
-        }
-    }
-    if let Some(block) = current {
-        out.push(serde_json::from_str(&block).expect("event JSON block parses"));
-    }
-    out
-}
-
 #[test]
 fn cc_fixture_parses_cleanly_with_zero_failures() {
     let (events, failures) = cc_events_from_fixture();
@@ -497,15 +473,17 @@ fn dry_run_returns_before_probe_or_network_and_event_id_is_uuidv4() {
             "2026-01-01T06:00:00",
             "--5h",
             "--dry-run",
+            "--json",
         ]),
         Uuid::parse_str("10000000-0000-4000-8000-000000000009").unwrap(),
         vec![Uuid::parse_str("20000000-0000-4000-8000-000000000009").unwrap()],
     )
     .expect("dry-run succeeds without contacting BLOCLAWD_API_URL");
 
-    let blocks = event_blocks(&output);
-    assert_eq!(blocks.len(), 1);
-    let event_id = blocks[0]["event_id"].as_str().expect("event id string");
+    let parsed: Value = serde_json::from_str(&output).expect("json dry-run parses");
+    let requests = parsed["requests"].as_array().expect("requests array");
+    assert_eq!(requests.len(), 1);
+    let event_id = requests[0]["event_id"].as_str().expect("event id string");
     let event_uuid_bytes = URL_SAFE_NO_PAD.decode(event_id).expect("event id base64");
     let event_uuid = Uuid::from_slice(&event_uuid_bytes).expect("event id uuid");
     assert_eq!(event_uuid.get_version(), Some(Version::Random));

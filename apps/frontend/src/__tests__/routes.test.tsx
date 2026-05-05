@@ -3,6 +3,7 @@ import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 
+import { encodeRankReport } from "@/lib/rank-report";
 import { routeTree } from "@/routeTree.gen";
 
 vi.mock("@/lib/dashboard-data", async (importOriginal) => {
@@ -83,7 +84,8 @@ describe("frontend routes", () => {
   it.each([
     ["/", "When do AI subscription users actually hit limits?"],
     ["/dashboard", "API-equivalent cost"],
-    ["/compare", "Pro vs Max5 vs Max20"],
+    ["/rank", "Your rate limit has a stat profile"],
+    ["/compare", "Compare is now Rank"],
     ["/methodology", "How bloclawd computes what you see"],
     ["/methodology/changelog", "Methodology changelog"],
     ["/data", "What your CLI submits"],
@@ -92,6 +94,40 @@ describe("frontend routes", () => {
 
     try {
       expect(container.textContent).toContain(heading);
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("accepts numeric-looking rank share params", async () => {
+    const snapshot = encodeRankReport({
+      bloclawd_rank_v: 1,
+      harness: "claude-code",
+      limit_type: "5h",
+      models: [
+        {
+          model: "claude-opus-4-7",
+          tokens: {
+            cache_read_input_tokens: 47_152_690,
+            ephemeral_1h_input_tokens: 856_730,
+            ephemeral_5m_input_tokens: 525_513,
+            input_tokens: 464,
+            output_tokens: 183_769,
+            cached_input_tokens: 0,
+            reasoning_output_tokens: 0,
+          },
+        },
+      ],
+      region: "EU",
+      tier: "max20",
+    });
+    const { container, cleanup } = await renderPath(
+      `/rank?s=${snapshot}&profile=Cache%20Stacker&ratio=8.2&cost=18.75&seg=top`,
+    );
+
+    try {
+      expect(container.textContent).toContain("Your rate limit has a stat profile");
+      expect(container.textContent).toContain("Cache Stacker");
     } finally {
       cleanup();
     }

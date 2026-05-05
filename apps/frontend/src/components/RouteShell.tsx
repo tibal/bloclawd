@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 const headerLinks = [
   { label: "Home", href: "/" },
   { label: "Dashboard", href: "/dashboard" },
-  { label: "Compare", href: "/compare" },
+  { label: "Rank", href: "/rank" },
   { label: "Install", href: "/install" },
   { label: "Methodology", href: "/methodology" },
   { label: "Data", href: "/data" },

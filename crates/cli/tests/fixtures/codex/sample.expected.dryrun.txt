@@ -1,30 +1,32 @@
-bloclawd dry-run - group 10000000... - 1 events
+bloclawd dry-run - group 10000000... - 1 model
 
+Limit card: codex / max20 / NA / 5h
+Paste the block below into https://bloclawd.com/rank
+
+Model token mix
 +------------------------+--------------+---------------+-------------------------+---------------------------+---------------------------+---------------------+-------------------------+
 | model                  | input_tokens | output_tokens | cache_read_input_tokens | ephemeral_5m_input_tokens | ephemeral_1h_input_tokens | cached_input_tokens | reasoning_output_tokens |
 +------------------------+--------------+---------------+-------------------------+---------------------------+---------------------------+---------------------+-------------------------+
 | gpt-5.5                |          500 |            75 |                       0 |                         0 |                         0 |                  48 |                      15 |
 +------------------------+--------------+---------------+-------------------------+---------------------------+---------------------------+---------------------+-------------------------+
 
---- event 1/1 ---
+--- bloclawd rank input ---
 {
-    "challenge_id": "",
-    "event_id": "IAAAAAAAQACAAAAAAAAAAg",
+    "bloclawd_rank_v": 1,
+    "harness": "codex",
     "limit_type": "5h",
-    "nonce": "",
-    "payload": {
-        "harness": "codex",
-        "model": "gpt-5.5",
-        "region": "NA",
-        "tier": "max20",
-        "tokens": {
-            "cached_input_tokens": 48,
-            "input_tokens": 500,
-            "output_tokens": 75,
-            "reasoning_output_tokens": 15
-        },
-        "v": 1
-    },
-    "sig": "",
-    "submission_group_id": "EAAAAAAAQACAAAAAAAAAAg"
+    "models": [
+        {
+            "model": "gpt-5.5",
+            "tokens": {
+                "cached_input_tokens": 48,
+                "input_tokens": 500,
+                "output_tokens": 75,
+                "reasoning_output_tokens": 15
+            }
+        }
+    ],
+    "region": "NA",
+    "tier": "max20"
 }
+--- end bloclawd rank input ---
