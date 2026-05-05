@@ -10,9 +10,8 @@
 --
 -- DO NOT use a Postgres ENUM type for `state` — Hyperdrive's pooler has
 -- historically tripped on per-OID lookups during prepared-statement setup.
--- TEXT + CHECK matches the existing model/tier/harness/region columns in
--- 0001_events.sql, which are also TEXT + serde-side closed-enum validation in
--- apps/worker/src/event.rs.
+-- TEXT + CHECK keeps prepared-statement setup simple while still rejecting
+-- invalid worker-queue states at the database boundary.
 --
 -- Strict CREATE TABLE / CREATE INDEX only: re-running this script must fail
 -- loud, forcing the operator to think.

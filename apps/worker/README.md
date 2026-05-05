@@ -17,7 +17,7 @@ Both envs share one PlanetScale Postgres database with separate staging and prod
 
 ### 1. Apply schema to each branch
 
-The schema in `sql/0001_events.sql` is strict: re-running fails loud. Apply once per branch when bootstrapping a new database. To re-apply after a schema change, drop the old table first via a separate migration script.
+The SQL files in `sql/` are strict: re-running fails loud. Apply each migration once per branch, in order. To re-apply after a schema change, use the next numbered migration script.
 
 ```bash
 # Get branch URLs from PlanetScale dashboard:
@@ -59,6 +59,17 @@ psql "$PLANETSCALE_MAIN_URL" < apps/worker/sql/0004_add_limit_type.sql
 Operator notes:
 - `0004` is `NOT NULL` without `DEFAULT`. On staging, run `TRUNCATE TABLE events;` immediately before applying 0004 if smoke-test rows exist. Production has no rows before initial rollout.
 - `0003_cron_state.sql` uses `TEXT + CHECK` for `state`, NOT a Postgres ENUM type - see file header for rationale (Hyperdrive prepared-statement pitfall avoidance).
+
+### 0005 - Postgres schema cleanup
+
+Apply per-branch after `0004_add_limit_type.sql`:
+
+```bash
+psql "$PLANETSCALE_STAGING_URL" < apps/worker/sql/0005_postgres_schema_cleanup.sql
+psql "$PLANETSCALE_MAIN_URL"    < apps/worker/sql/0005_postgres_schema_cleanup.sql
+```
+
+This migration drops unused denormalized event columns (`event_type`, `model`, `tier`, `harness`, `region`), replaces `events_dim_idx` with indexes matching cron/status query shapes, and adds DB-side checks for `events.limit_type` and `cron_state.tier`.
 
 ### R2 bucket provisioning (one-time, before first cron deploy)
 
@@ -126,7 +137,7 @@ The test:
 - `GET /challenge` to fetch a fresh HMAC-signed challenge.
 - Builds a sample EventPayload, canonicalizes via `event_schema::canonical_bytes`, computes payload_hash via SHA-256.
 - Solves PoW (K=22, ~1s on dev hardware) via `pow::solve`.
-- `POST /event` with the solved nonce + UUIDv4 event_id.
+- `POST /event` with the solved nonce, UUIDv4 `event_id`, UUIDv4 `submission_group_id`, and `limit_type`.
 - Asserts `200 {"ok": true, "bucket_ts": "<rfc3339>"}`.
 - SELECTs the row from PlanetScale staging via direct `tokio-postgres` (NOT Hyperdrive; Hyperdrive is Worker-only) to confirm persistence.
 - Re-POSTs the same `event_id` to verify idempotency: the duplicate must return `200 {"ok": true, "bucket_ts": "<same as first POST>"}` (no 409, no new row, no shape change). This validates the `ON CONFLICT DO UPDATE SET event_id = events.event_id RETURNING bucket_ts` idiom.
@@ -155,6 +166,7 @@ export STAGING_R2_BASE_URL='https://pub-<r2-dev-url-hash>.r2.dev'
 
 psql "$PLANETSCALE_STAGING_URL" < apps/worker/sql/0003_cron_state.sql
 psql "$PLANETSCALE_STAGING_URL" < apps/worker/sql/0004_add_limit_type.sql
+psql "$PLANETSCALE_STAGING_URL" < apps/worker/sql/0005_postgres_schema_cleanup.sql
 
 cd apps/worker
 wrangler deploy --env staging

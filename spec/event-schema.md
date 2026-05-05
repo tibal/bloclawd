@@ -79,6 +79,7 @@ The DB row also contains, populated by the Worker:
 
 - `bucket_ts TIMESTAMPTZ` - server-assigned and floored to the 15-minute bucket, for example with `date_bin('15 minutes', now(), '1970-01-01 00:00:00+00'::timestamptz)`. Client-supplied timestamps are never trusted.
 - `received_at TIMESTAMPTZ` - `now()` at insert.
+- The private row stores `payload JSONB` plus transport fields (`event_id`, `submission_group_id`, `limit_type`). It does not duplicate `payload.model`, `payload.tier`, `payload.harness`, or `payload.region` into separate dimension columns.
 
 These fields are never on the wire payload.
 

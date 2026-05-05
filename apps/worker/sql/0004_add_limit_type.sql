@@ -16,7 +16,7 @@
 -- ADD ... NULL, backfill, ALTER ... SET NOT NULL.
 --
 -- Allowed values are enforced application-side by crates/event-schema's
--- LimitType closed enum. DB-side this is plain TEXT (matches the existing
--- model/tier/harness/region pattern in 0001_events.sql).
+-- LimitType closed enum. DB-side this starts as plain TEXT; 0005 adds the
+-- CHECK constraint after the column exists on both branches.
 
 ALTER TABLE events ADD COLUMN limit_type TEXT NOT NULL;

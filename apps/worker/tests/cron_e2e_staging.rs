@@ -98,10 +98,6 @@ async fn cron_e2e_staging() {
                     submission_group_id,
                     bucket_ts,
                     payload,
-                    model,
-                    tier,
-                    harness,
-                    region,
                     limit_type
                 )
                 VALUES (
@@ -109,10 +105,6 @@ async fn cron_e2e_staging() {
                     $2::uuid,
                     date_bin('15 minutes', now() - interval '1 hour', '1970-01-01 00:00:00+00'::timestamptz),
                     $3::text::jsonb,
-                    'claude-sonnet-4-5',
-                    'max20',
-                    'claude-code',
-                    'EU',
                     '5h'
                 )
                 "#,

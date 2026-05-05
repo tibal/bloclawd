@@ -22,7 +22,6 @@ const EVENT_SELECT_SQL: &str = r#"
     FROM events
     WHERE bucket_ts >= $1::timestamptz
       AND bucket_ts < $1::timestamptz + $2::interval
-    ORDER BY submission_group_id
 "#;
 
 const LAST_SUCCESS_SQL: &str = "SELECT MAX(finished_at) FROM cron_state WHERE state = 'processed'";
