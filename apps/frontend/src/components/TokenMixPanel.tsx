@@ -1,5 +1,4 @@
 import { useMemo } from "react";
-import type { TokenType } from "@web/TokenType";
 
 import {
   TOKEN_TYPE_COLOR,
@@ -8,41 +7,30 @@ import {
   TONE_VAR,
   type Tone,
 } from "@/lib/model-catalog";
-import { decodePercentiles, type BucketCell, type Percentiles } from "@/lib/r2";
-
-const TOKEN_TYPES: readonly TokenType[] = [
-  "output",
-  "input",
-  "cached_read",
-  "cached_write",
-];
+import { formatTokens } from "@/lib/format";
+import type { BucketCell } from "@/lib/r2";
+import { TOKEN_TYPE_VALUES } from "@/lib/catalog";
 
 interface TokenMixPanelProps {
   cell: BucketCell;
-  primary: keyof Percentiles;
 }
 
-export function TokenMixPanel({ cell, primary }: TokenMixPanelProps) {
+export function TokenMixPanel({ cell }: TokenMixPanelProps) {
   const { totals, sumPrimary } = useMemo(() => {
-    const mix = cell.representative_mix ?? [];
-    const aggregated = TOKEN_TYPES.map((tt) => {
-      let p10 = 0, pPrimary = 0, p90 = 0;
+    const mix = cell.typical_mix;
+    const aggregated = TOKEN_TYPE_VALUES.map((tt) => {
+      let value = 0;
       for (const entry of mix) {
-        if (entry.token_type !== tt) continue;
-        const pcts = decodePercentiles(entry.share);
-        if (!pcts) continue;
-        p10 += pcts.p10;
-        pPrimary += pcts[primary];
-        p90 += pcts.p90;
+        value += entry.tokens[tt];
       }
-      return { tokenType: tt, p10, pPrimary, p90 };
+      return { tokenType: tt, value };
     });
     const sum = Math.max(
       0.0001,
-      aggregated.reduce((s, t) => s + t.pPrimary, 0),
+      aggregated.reduce((s, t) => s + t.value, 0),
     );
     return { totals: aggregated, sumPrimary: sum };
-  }, [cell, primary]);
+  }, [cell]);
 
   return (
     <div className="surface-card">
@@ -50,7 +38,7 @@ export function TokenMixPanel({ cell, primary }: TokenMixPanelProps) {
         <div>
           <div className="text-sm font-medium text-foreground">Typical token mix</div>
           <div className="font-mono text-[11.5px] text-muted-foreground">
-            {primary} · current filters · share of total spend
+            average retained submission · share of token volume
           </div>
         </div>
         <span className="tag">cohort</span>
@@ -58,14 +46,12 @@ export function TokenMixPanel({ cell, primary }: TokenMixPanelProps) {
       <div className="px-5 pb-5 flex flex-col gap-4">
         <StackedBar entries={totals.map((t) => ({
           color: TOKEN_TYPE_COLOR[t.tokenType],
-          weight: t.pPrimary / sumPrimary,
+          weight: t.value / sumPrimary,
         }))} />
 
         <div className="flex flex-col gap-3">
           {totals.map((t) => {
-            const sharePct = (t.pPrimary / sumPrimary) * 100;
-            const lo = (t.p10 / sumPrimary) * 100;
-            const hi = (t.p90 / sumPrimary) * 100;
+            const sharePct = (t.value / sumPrimary) * 100;
             return (
               <div key={t.tokenType}>
                 <div className="flex items-center justify-between text-[12.5px]">
@@ -75,11 +61,14 @@ export function TokenMixPanel({ cell, primary }: TokenMixPanelProps) {
                   <span className="font-mono tabular-nums text-foreground">
                     {sharePct.toFixed(0)}%
                     <span className="ml-2 text-muted-foreground text-[11px]">
-                      p10 {lo.toFixed(0)}% · p90 {hi.toFixed(0)}%
+                      {formatTokens(t.value)}
                     </span>
                   </span>
                 </div>
-                <SpreadTrack lo={lo} primary={sharePct} hi={hi} tone={TOKEN_TYPE_COLOR[t.tokenType]} />
+                <ShareTrack
+                  value={sharePct}
+                  tone={TOKEN_TYPE_COLOR[t.tokenType]}
+                />
               </div>
             );
           })}
@@ -106,33 +95,16 @@ function StackedBar({
   );
 }
 
-function SpreadTrack({
-  lo,
-  primary,
-  hi,
-  tone,
-}: {
-  lo: number;
-  primary: number;
-  hi: number;
-  tone: Tone;
-}) {
-  const max = Math.max(hi, primary, 1);
-  const pct = (n: number) => `${Math.min(100, (n / max) * 100)}%`;
+function ShareTrack({ value, tone }: { value: number; tone: Tone }) {
   const color = TONE_VAR[tone];
   return (
     <div className="relative mt-1.5 h-1.5 rounded-full bg-[var(--bg-1)]">
       <span
-        className="absolute inset-y-0 rounded-full opacity-40"
+        className="absolute inset-y-0 left-0 rounded-full"
         style={{
-          left: pct(lo),
-          width: `calc(${pct(hi)} - ${pct(lo)})`,
+          width: `${Math.min(100, value)}%`,
           background: color,
         }}
-      />
-      <span
-        className="absolute inset-y-0 w-[2px] rounded"
-        style={{ left: pct(primary), background: color }}
       />
     </div>
   );

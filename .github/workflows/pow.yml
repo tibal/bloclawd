@@ -74,10 +74,18 @@ jobs:
         run: cargo build -p xtask --locked
       - name: Run xtask gen-fixtures --check
         run: cargo run -p xtask --quiet --locked -- gen-fixtures --check
+      - name: Run xtask gen-catalog --check
+        run: cargo run -p xtask --quiet --locked -- gen-catalog --check
       - name: Verify spec/pow-fixtures.json is unchanged in working tree
         run: |
           if ! git diff --exit-code -- spec/pow-fixtures.json; then
             echo "::error file=spec/pow-fixtures.json::Fixture file drifted from xtask output. Re-run cargo run -p xtask -- gen-fixtures and commit the result."
+            exit 1
+          fi
+      - name: Verify generated catalog is unchanged in working tree
+        run: |
+          if ! git diff --exit-code -- apps/web/src/generated/catalog.json; then
+            echo "::error file=apps/web/src/generated/catalog.json::Catalog drifted from xtask output. Re-run cargo run -p xtask -- gen-catalog and commit the result."
             exit 1
           fi
 

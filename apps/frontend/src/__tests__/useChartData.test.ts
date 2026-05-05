@@ -2,6 +2,8 @@ import React from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { Model } from "@web/Model";
+import type { Tier } from "@web/Tier";
 
 import type { DashboardSearch } from "@/routes/dashboard";
 import {
@@ -50,7 +52,7 @@ describe("useChartData", () => {
       bucketResult(
         bucket([
           cell("max20", {
-            unified: [10, 20, 30, 40, 50],
+            apiCost: [10, 20, 30, 40, 50],
           }),
         ]),
       ),
@@ -77,15 +79,14 @@ describe("useChartData", () => {
     ] satisfies AlignedData);
   });
 
-  it("uses model drill-down percentiles when the model filter is set", () => {
+  it("keeps API-cost percentiles when the model filter matches typical mix", () => {
     mockManifest();
     vi.mocked(useBuckets).mockReturnValue([
       bucketResult(
         bucket([
           cell("max20", {
             model: "gpt-5",
-            modelValues: [100, 200, 300, 400, 500],
-            unified: [10, 20, 30, 40, 50],
+            apiCost: [10, 20, 30, 40, 50],
           }),
         ]),
       ),
@@ -98,7 +99,7 @@ describe("useChartData", () => {
       tier: "max20",
     });
 
-    expect(result.data?.[3]).toEqual([300]);
+    expect(result.data?.[3]).toEqual([30]);
   });
 
   it("emits three aligned tier series in compare mode", () => {
@@ -106,9 +107,9 @@ describe("useChartData", () => {
     vi.mocked(useBuckets).mockReturnValue([
       bucketResult(
         bucket([
-          cell("pro", { unified: [1, 2, 3, 4, 5] }),
-          cell("max5", { unified: [10, 20, 30, 40, 50] }),
-          cell("max20", { unified: [100, 200, 300, 400, 500] }),
+          cell("pro", { apiCost: [1, 2, 3, 4, 5] }),
+          cell("max5", { apiCost: [10, 20, 30, 40, 50] }),
+          cell("max20", { apiCost: [100, 200, 300, 400, 500] }),
         ]),
       ),
     ]);
@@ -179,43 +180,39 @@ function bucket(cells: BucketEnvelope["cells"]): BucketEnvelope {
     schema_version: "v1",
     bucket_ts: "2026-05-02T21:00:00Z",
     tier_resolution: "h1",
-    bin_edges: [],
     cells,
   };
 }
 
 function cell(
-  tier: "pro" | "max5" | "max20",
+  tier: Tier,
   {
     model,
-    modelValues,
-    unified,
+    apiCost,
   }: {
-    model?: string;
-    modelValues?: [number, number, number, number, number];
-    unified: [number, number, number, number, number];
+    model?: Model;
+    apiCost: [number, number, number, number, number];
   },
 ): BucketEnvelope["cells"][number] {
   return {
-    tier,
+    subscription_tier: tier,
     harness: "claude-code",
     region: "EU",
     limit_type: "5h",
-    n_submissions: 12,
-    trim_rate: 0,
-    trim_rate_alert: false,
+    n_dropped: 0,
+    n_retained: 12,
     insufficient_data: false,
-    unified_cost: percentiles(unified),
-    models: model
+    api_cost_usd: percentiles(apiCost),
+    typical_mix: model
       ? [
           {
             model,
-            n_with_model: 12,
-            weights: [],
-            weight_source: "cohort",
-            tokens_to_limit_if_only: modelValues
-              ? percentiles(modelValues)
-              : null,
+            tokens: {
+              input: 100,
+              output: 50,
+              cached_read: 250,
+              cached_write: 10,
+            },
           },
         ]
       : [],
@@ -224,12 +221,10 @@ function cell(
 
 function percentiles(values: [number, number, number, number, number]) {
   return {
-    Mean: {
-      p10: values[0],
-      p25: values[1],
-      p50: values[2],
-      p75: values[3],
-      p90: values[4],
-    },
+    p10: values[0],
+    p25: values[1],
+    p50: values[2],
+    p75: values[3],
+    p90: values[4],
   };
 }

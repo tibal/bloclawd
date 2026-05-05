@@ -3,7 +3,8 @@
 use std::str::FromStr;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use bloclawd_schema::{EventPayload, LOG_BIN_EDGES};
+use bloclawd_schema::{EventPayload, LimitType};
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 use tokio_postgres::config::Config as PgConfig;
 use tokio_postgres::tls::NoTls;
@@ -11,13 +12,13 @@ use tokio_postgres::types::Type;
 use uuid::Uuid;
 use worker::{Env, Hyperdrive, Result, console_log};
 
-use crate::cron::{aggregate, health, percentile, r2_emit, state};
+use crate::cron::{aggregate, health, r2_emit, state};
 
 pub const CRON_INTERVAL_MS_PROD: i64 = 86_400_000;
 pub const CRON_INTERVAL_MS_STAGING: i64 = 900_000;
 
 const EVENT_SELECT_SQL: &str = r#"
-    SELECT submission_group_id, payload, model, tier, harness, region, limit_type
+    SELECT submission_group_id, payload, limit_type
     FROM events
     WHERE bucket_ts >= $1::timestamptz
       AND bucket_ts < $1::timestamptz + $2::interval
@@ -94,25 +95,27 @@ async fn process_one(env: &Env, tier: &str, bucket_ts: SystemTime) -> Result<()>
         let payload_value: Value = row.get(1);
         let payload: EventPayload = serde_json::from_value(payload_value)
             .map_err(|e| worker::Error::RustError(format!("payload json: {e}")))?;
+        let limit_type_text: String = row.get(2);
         event_rows.push(aggregate::EventRow {
             submission_group_id: row.get::<_, Uuid>(0),
             payload,
-            model: row.get(2),
-            tier: row.get(3),
-            harness: row.get(4),
-            region: row.get(5),
-            limit_type: row.get(6),
+            limit_type: parse_wire_enum::<LimitType>("limit_type", &limit_type_text)?,
         });
     }
     drop(client);
 
-    let mut cells = aggregate::compute_cells(&event_rows);
-    for cell in &mut cells {
-        percentile::encode_cell(cell, &LOG_BIN_EDGES);
-    }
+    let cells = aggregate::compute_cells(&event_rows);
 
     let bucket = env.bucket("BUCKET")?;
     r2_emit::write_bucket_file(&bucket, tier, bucket_ts, &cells).await
+}
+
+fn parse_wire_enum<T>(field: &str, value: &str) -> Result<T>
+where
+    T: DeserializeOwned,
+{
+    serde_json::from_value(Value::String(value.to_string()))
+        .map_err(|e| worker::Error::RustError(format!("{field}: {e}")))
 }
 
 async fn write_status_then_manifest(

@@ -54,7 +54,7 @@ const SENT = [
   "Provider · model IDs",
   "Tier (pro / max5 / max20)",
   "Coarse region (you confirm)",
-  "Token counts, binned",
+  "Token counts for API-cost aggregation",
   "Window length (5h or week)",
 ];
 

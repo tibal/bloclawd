@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import type { Tier } from "@web/Tier";
 
 import type { DashboardSearch } from "@/routes/dashboard";
 import {
-  decodePercentiles,
   useBuckets,
   useManifest,
   type BucketCell,
@@ -10,13 +10,14 @@ import {
   type Percentiles,
 } from "@/lib/r2";
 import { pickTier, type Tier as BucketTier } from "@/lib/tier-picker";
+import { TIER_VALUES } from "@/lib/catalog";
 import {
   EMPTY_ALIGNED_DATA,
   type AlignedData,
   type ChartMeta,
 } from "@/lib/chart-data";
 
-type SubscriptionTier = "pro" | "max5" | "max20";
+type SubscriptionTier = Tier;
 type WindowParam = DashboardSearch["window"];
 
 export type ChartDataResult = {
@@ -29,7 +30,7 @@ export type ChartDataResult = {
   bucketsTotal: number;
 };
 
-const COMPARE_TIERS = ["pro", "max5", "max20"] as const;
+const COMPARE_TIERS: readonly SubscriptionTier[] = TIER_VALUES;
 const EMPTY_PATHS: string[] = [];
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const WINDOW_DAYS: Record<WindowParam, number> = {
@@ -130,7 +131,7 @@ function buildMeta(
       if (cell.harness !== filters.harness) continue;
       if (cell.limit_type !== filters.limit_type) continue;
       if (filters.region && cell.region !== filters.region) continue;
-      total += cell.n_submissions;
+      total += cell.n_retained;
     }
     counts.set(bucketTimestampSeconds(bucket), total);
   }
@@ -220,7 +221,7 @@ function matchesCell(
   tier: SubscriptionTier,
 ): boolean {
   return (
-    cell.tier === tier &&
+    cell.subscription_tier === tier &&
     cell.harness === filters.harness &&
     cell.limit_type === filters.limit_type &&
     !cell.insufficient_data &&
@@ -232,21 +233,22 @@ function extractCellPercentiles(
   cell: BucketCell,
   filters: DashboardSearch,
 ): { weight: number; percentiles: Percentiles } | null {
-  if (!filters.model) {
-    const percentiles = decodePercentiles(cell.unified_cost);
-    return percentiles
-      ? { weight: Math.max(1, cell.n_submissions), percentiles }
-      : null;
+  const percentiles = cell.api_cost_usd ?? null;
+  if (!percentiles) return null;
+
+  if (filters.model) {
+    const hasModel = cell.typical_mix.some(
+      (entry) =>
+        entry.model === filters.model &&
+        (entry.tokens.input > 0 ||
+          entry.tokens.output > 0 ||
+          entry.tokens.cached_read > 0 ||
+          entry.tokens.cached_write > 0),
+    );
+    if (!hasModel) return null;
   }
 
-  const model = cell.models.find((entry) => entry.model === filters.model);
-  const percentiles = decodePercentiles(
-    model?.tokens_to_limit_if_only ?? null,
-  );
-
-  return percentiles && model
-    ? { weight: Math.max(1, model.n_with_model), percentiles }
-    : null;
+  return { weight: Math.max(1, cell.n_retained), percentiles };
 }
 
 function weightedAverage(

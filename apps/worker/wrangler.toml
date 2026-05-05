@@ -14,7 +14,7 @@ command = "cargo install -q worker-build@0.8.1 --locked && worker-build --releas
 mode = "smart"
 
 # Cron triggers require the Workers Paid subscription ($5/mo).
-# Free tier caps cron CPU at 10ms - insufficient for ridge fits + R2 writes.
+# Free tier caps cron CPU at 10ms - insufficient for aggregation + R2 writes.
 # See apps/worker/README.md "Cloudflare Workers Paid subscription requirement".
 [triggers]
 crons = ["0 3 * * *"]   # daily 03:00 UTC for `wrangler dev` defaults (matches production cadence)

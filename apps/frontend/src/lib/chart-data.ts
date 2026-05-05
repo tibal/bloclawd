@@ -19,8 +19,7 @@ export type AlignedData = readonly [
 export const EMPTY_ALIGNED_DATA: AlignedData = [[], [], [], [], [], []];
 
 export type ChartMeta = {
-  // Per-bucket submission counts, parallel to `data[0]`. Optional — older
-  // callers that don't yet wire the bucket-cell `n_submissions` can omit.
+  // Per-bucket retained-submission counts, parallel to `data[0]`.
   submissions?: ReadonlyArray<number | null>;
   // Resolution of each bucket: drives x-axis tooltip range labelling.
   resolution?: "q15" | "h1" | "d1";

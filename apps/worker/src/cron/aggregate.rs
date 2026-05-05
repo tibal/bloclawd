@@ -1,89 +1,71 @@
-//! Cron aggregation numerics for unified-cost cells.
+//! Cron aggregation for public API-cost cells.
 //!
-//! W14 pinned the ridge target to `y_s = 1.0`: each submission represents one
-//! observed limit hit, so the learned weights map a submission's token vector to
-//! normalized "fraction of limit" cost. Priors from published model prices are
-//! rescaled to the cohort's typical token vector before fitting. The per-model
-//! "if only" projection is `unified_cost / mean(model_weights[0..8])`; this
-//! layer leaves the raw sorted unified costs available behind `#[serde(skip)]`.
-#![allow(dead_code)]
+//! Each public cell is a cohort keyed by subscription tier, harness, region,
+//! and limit type. Rows sharing one `submission_group_id` are treated as one
+//! submission. The main metric is the API list-price equivalent of that
+//! submission, computed from the catalog-backed per-model token prices.
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, HashMap};
 
 use bloclawd_schema::{
-    EventPayload, Model, TokenCounts, TokenType, Window, model_price_lookup as price_lookup,
+    BucketCell as Cell, EventPayload, Harness, LimitType, Model, ModelTokenMix, Percentiles,
+    Region, Tier, TokenCounts, TokenType, TokenTypeTotals, Window,
 };
-use serde::Serialize;
 use uuid::Uuid;
 
-use crate::cron::percentile::PercentileEncoding;
-use crate::cron::ridge;
-
-pub const N_FIT: usize = 50;
-const TOKEN_FIELDS_PER_MODEL: usize = 8;
+const K_ANON: usize = 5;
 
 #[derive(Debug, Clone)]
 pub struct EventRow {
     pub submission_group_id: Uuid,
     pub payload: EventPayload,
-    pub model: String,
-    pub tier: String,
-    pub harness: String,
-    pub region: String,
-    pub limit_type: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct Cell {
-    pub tier: String,
-    pub harness: String,
-    pub region: String,
-    pub limit_type: String,
-    pub n_submissions: u32,
-    pub trim_rate: f64,
-    pub trim_rate_alert: bool,
-    #[serde(skip)]
-    pub trimmed_unified_costs: Vec<f64>,
-    pub unified_cost: Option<PercentileEncoding>,
-    pub models: Vec<ModelCell>,
-    pub insufficient_data: bool,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct ModelCell {
-    pub model: String,
-    pub n_with_model: u32,
-    pub weights: [f64; TOKEN_FIELDS_PER_MODEL],
-    pub weight_source: String,
-    pub tokens_to_limit_if_only: Option<PercentileEncoding>,
+    pub limit_type: LimitType,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct CellKey {
-    tier: String,
-    harness: String,
-    region: String,
-    limit_type: String,
+    subscription_tier: Tier,
+    harness: Harness,
+    region: Region,
+    limit_type: LimitType,
 }
 
 #[derive(Debug, Clone)]
-struct FitOutcome {
-    weights: Vec<f64>,
-    trimmed_unified_costs: Vec<f64>,
-    trim_rate: f64,
-    n_trimmed: usize,
-    weight_source: String,
+struct SubmissionAggregate {
+    api_cost_usd: f64,
+    tokens_by_model: BTreeMap<Model, TokenTypeTotals>,
 }
 
-pub fn two_sigma_trim(values: &[f64]) -> (Vec<f64>, f64) {
+pub fn compute_cells(rows: &[EventRow]) -> Vec<Cell> {
+    let mut by_cell: BTreeMap<CellKey, Vec<&EventRow>> = BTreeMap::new();
+    for row in rows {
+        by_cell
+            .entry(CellKey {
+                subscription_tier: row.payload.tier,
+                harness: row.payload.harness,
+                region: row.payload.region,
+                limit_type: row.limit_type,
+            })
+            .or_default()
+            .push(row);
+    }
+
+    by_cell
+        .into_iter()
+        .map(|(key, cell_rows)| compute_cell(key, &cell_rows))
+        .collect()
+}
+
+#[cfg(test)]
+pub fn two_sigma_trim(values: &[f64]) -> (Vec<f64>, usize) {
     if values.is_empty() {
-        return (Vec::new(), 0.0);
+        return (Vec::new(), 0);
     }
 
     let Some((lo, hi)) = two_sigma_bounds(values) else {
         let mut sorted = values.to_vec();
         sorted.sort_by(f64::total_cmp);
-        return (sorted, 0.0);
+        return (sorted, 0);
     };
 
     let mut trimmed: Vec<f64> = values
@@ -92,360 +74,162 @@ pub fn two_sigma_trim(values: &[f64]) -> (Vec<f64>, f64) {
         .filter(|v| *v >= lo && *v <= hi)
         .collect();
     trimmed.sort_by(f64::total_cmp);
-    let trim_rate = (values.len() - trimmed.len()) as f64 / values.len() as f64;
-    (trimmed, trim_rate)
+    let dropped = values.len() - trimmed.len();
+    (trimmed, dropped)
 }
 
-pub fn compute_cells(rows: &[EventRow]) -> Vec<Cell> {
-    let mut by_cell: BTreeMap<CellKey, Vec<&EventRow>> = BTreeMap::new();
-    for row in rows {
-        by_cell
-            .entry(CellKey {
-                tier: row.tier.clone(),
-                harness: row.harness.clone(),
-                region: row.region.clone(),
-                limit_type: row.limit_type.clone(),
-            })
-            .or_default()
-            .push(row);
+fn compute_cell(key: CellKey, cell_rows: &[&EventRow]) -> Cell {
+    let submissions = aggregate_submissions(cell_rows);
+    let submission_count = submissions.len();
+    if submission_count < K_ANON {
+        return insufficient_cell(key, 0, submission_count as u32);
     }
 
-    by_cell
-        .into_iter()
-        .map(|(key, cell_rows)| compute_cell(rows, key, &cell_rows))
-        .collect()
-}
-
-fn compute_cell(all_rows: &[EventRow], key: CellKey, cell_rows: &[&EventRow]) -> Cell {
-    let submissions_map = group_by_submission_refs(cell_rows);
-    let submissions = ordered_submissions(submissions_map);
-    let n_submissions = submissions.len();
-
-    if n_submissions < 5 {
-        return Cell {
-            tier: key.tier,
-            harness: key.harness,
-            region: key.region,
-            limit_type: key.limit_type,
-            n_submissions: n_submissions as u32,
-            trim_rate: 0.0,
-            trim_rate_alert: false,
-            trimmed_unified_costs: Vec::new(),
-            unified_cost: None,
-            models: Vec::new(),
-            insufficient_data: true,
-        };
-    }
-
-    let models_in_cell = models_in_submissions(&submissions);
-    let fit = select_fit(all_rows, &key, &submissions, &models_in_cell);
-    if fit.trim_rate > 0.05 {
-        log_trim_rate(fit.trim_rate);
-    }
-
-    let n_by_model = n_with_model_by_name(&submissions, &models_in_cell);
-    let models = models_in_cell
+    let costs: Vec<f64> = submissions.iter().map(|s| s.api_cost_usd).collect();
+    let keep_mask = two_sigma_keep_mask(&costs);
+    let retained: Vec<&SubmissionAggregate> = submissions
         .iter()
-        .enumerate()
-        .map(|(model_idx, model)| {
-            let start = model_idx * TOKEN_FIELDS_PER_MODEL;
-            let mut weights = [0.0; TOKEN_FIELDS_PER_MODEL];
-            weights.copy_from_slice(&fit.weights[start..start + TOKEN_FIELDS_PER_MODEL]);
-            let n_with_model = *n_by_model.get(model).unwrap_or(&0) as u32;
-            let model_avg_weight = weights.iter().sum::<f64>() / TOKEN_FIELDS_PER_MODEL as f64;
-            let _tokens_to_limit_if_only =
-                tokens_to_limit_if_only_projection(&fit.trimmed_unified_costs, model_avg_weight);
-
-            ModelCell {
-                model: model.clone(),
-                n_with_model,
-                weights,
-                weight_source: fit_weight_source(&fit),
-                tokens_to_limit_if_only: None,
-            }
-        })
+        .zip(keep_mask.iter())
+        .filter_map(|(submission, keep)| keep.then_some(submission))
         .collect();
+    let n_dropped = submission_count - retained.len();
+
+    if retained.len() < K_ANON {
+        return insufficient_cell(key, n_dropped as u32, retained.len() as u32);
+    }
+
+    let mut retained_costs: Vec<f64> = retained.iter().map(|s| s.api_cost_usd).collect();
+    retained_costs.sort_by(f64::total_cmp);
 
     Cell {
-        tier: key.tier,
+        subscription_tier: key.subscription_tier,
         harness: key.harness,
         region: key.region,
         limit_type: key.limit_type,
-        n_submissions: n_submissions as u32,
-        trim_rate: fit.trim_rate,
-        trim_rate_alert: fit.trim_rate > 0.10,
-        trimmed_unified_costs: fit.trimmed_unified_costs,
-        unified_cost: None,
-        models,
+        api_cost_usd: Some(percentiles(&retained_costs)),
+        n_dropped: n_dropped as u32,
+        n_retained: retained.len() as u32,
+        typical_mix: average_mix(&retained),
         insufficient_data: false,
     }
 }
 
-fn select_fit(
-    all_rows: &[EventRow],
-    key: &CellKey,
-    submissions: &[Vec<&EventRow>],
-    models_in_cell: &[String],
-) -> FitOutcome {
-    if let Some(fit) = fit_if_enough(submissions, models_in_cell) {
-        return fit;
-    }
-
-    let tier_harness_rows: Vec<&EventRow> = all_rows
-        .iter()
-        .filter(|row| {
-            row.tier == key.tier && row.harness == key.harness && row.limit_type == key.limit_type
-        })
-        .collect();
-    let tier_harness_submissions =
-        ordered_submissions(group_by_submission_refs(&tier_harness_rows));
-    if let Some(fit) = fit_if_enough(&tier_harness_submissions, models_in_cell) {
-        return fit.with_source("tier+harness");
-    }
-
-    let tier_rows: Vec<&EventRow> = all_rows
-        .iter()
-        .filter(|row| row.tier == key.tier && row.limit_type == key.limit_type)
-        .collect();
-    let tier_submissions = ordered_submissions(group_by_submission_refs(&tier_rows));
-    if let Some(fit) = fit_if_enough(&tier_submissions, models_in_cell) {
-        return fit.with_source("tier");
-    }
-
-    let weights = priors_for_models(models_in_cell);
-    let costs = sorted_unified_costs(submissions, &weights, models_in_cell);
-    let (trimmed_unified_costs, trim_rate) = two_sigma_trim(&costs);
-    FitOutcome {
-        weights,
-        trimmed_unified_costs,
-        trim_rate,
-        n_trimmed: submissions.len(),
-        weight_source: "prior".to_string(),
-    }
-    .with_source("prior")
-}
-
-fn fit_if_enough(submissions: &[Vec<&EventRow>], models_in_cell: &[String]) -> Option<FitOutcome> {
-    if submissions.len() < N_FIT {
-        return None;
-    }
-    let fit = fit_with_trim(submissions, models_in_cell)?;
-    if fit.n_trimmed < N_FIT {
-        return None;
-    }
-    Some(fit.with_source("cohort"))
-}
-
-fn fit_with_trim(submissions: &[Vec<&EventRow>], models_in_cell: &[String]) -> Option<FitOutcome> {
-    let (x, _) = build_design_matrix(submissions, models_in_cell);
-    let y = vec![1.0; x.len()];
-    let prior = rescaled_priors(&x, models_in_cell);
-    let lambda = N_FIT as f64 / x.len().max(1) as f64;
-    let initial = ridge::fit_ridge(&x, &y, &prior, lambda);
-    if initial.residual_l2.is_infinite() {
-        return None;
-    }
-
-    let initial_costs = costs_from_matrix(&x, &initial.weights);
-    let keep_mask = two_sigma_keep_mask(&initial_costs);
-    let trimmed_submissions: Vec<Vec<&EventRow>> = submissions
-        .iter()
-        .zip(keep_mask.iter())
-        .filter_map(|(submission, keep)| keep.then_some(submission.clone()))
-        .collect();
-    let trim_rate =
-        (submissions.len() - trimmed_submissions.len()) as f64 / submissions.len() as f64;
-
-    let (x_trimmed, _) = build_design_matrix(&trimmed_submissions, models_in_cell);
-    let y_trimmed = vec![1.0; x_trimmed.len()];
-    let prior_trimmed = rescaled_priors(&x_trimmed, models_in_cell);
-    let final_fit = ridge::fit_ridge(&x_trimmed, &y_trimmed, &prior_trimmed, lambda);
-    if final_fit.residual_l2.is_infinite() {
-        return None;
-    }
-
-    let mut trimmed_unified_costs = costs_from_matrix(&x_trimmed, &final_fit.weights);
-    trimmed_unified_costs.sort_by(f64::total_cmp);
-    Some(FitOutcome {
-        weights: final_fit.weights,
-        trimmed_unified_costs,
-        trim_rate,
-        n_trimmed: trimmed_submissions.len(),
-        weight_source: String::new(),
-    })
-}
-
-impl FitOutcome {
-    fn with_source(mut self, source: &str) -> Self {
-        self.weight_source = source.to_string();
-        self
+fn insufficient_cell(key: CellKey, n_dropped: u32, n_retained: u32) -> Cell {
+    Cell {
+        subscription_tier: key.subscription_tier,
+        harness: key.harness,
+        region: key.region,
+        limit_type: key.limit_type,
+        api_cost_usd: None,
+        n_dropped,
+        n_retained,
+        typical_mix: Vec::new(),
+        insufficient_data: true,
     }
 }
 
-fn fit_weight_source(fit: &FitOutcome) -> String {
-    fit.weight_source.clone()
-}
-
-#[allow(dead_code)]
-fn group_by_submission(rows: &[EventRow]) -> HashMap<Uuid, Vec<&EventRow>> {
-    rows.iter().fold(HashMap::new(), |mut map, row| {
-        map.entry(row.submission_group_id).or_default().push(row);
-        map
-    })
-}
-
-fn group_by_submission_refs<'a>(rows: &[&'a EventRow]) -> HashMap<Uuid, Vec<&'a EventRow>> {
-    rows.iter().copied().fold(HashMap::new(), |mut map, row| {
-        map.entry(row.submission_group_id).or_default().push(row);
-        map
-    })
-}
-
-fn ordered_submissions(map: HashMap<Uuid, Vec<&EventRow>>) -> Vec<Vec<&EventRow>> {
-    let mut pairs: Vec<(Uuid, Vec<&EventRow>)> = map.into_iter().collect();
+fn aggregate_submissions(rows: &[&EventRow]) -> Vec<SubmissionAggregate> {
+    let grouped = group_by_submission_refs(rows);
+    let mut pairs: Vec<(Uuid, Vec<&EventRow>)> = grouped.into_iter().collect();
     pairs.sort_by_key(|(uuid, _)| *uuid);
-    pairs.into_iter().map(|(_, rows)| rows).collect()
-}
-
-fn build_design_matrix(
-    submissions: &[Vec<&EventRow>],
-    models_in_cell: &[String],
-) -> (Vec<Vec<f64>>, Vec<usize>) {
-    let mut x = Vec::with_capacity(submissions.len());
-    let mut n_models = Vec::with_capacity(submissions.len());
-    for submission in submissions {
-        let present: BTreeSet<&str> = submission.iter().map(|row| row.model.as_str()).collect();
-        n_models.push(present.len());
-        let mut row = Vec::with_capacity(models_in_cell.len() * TOKEN_FIELDS_PER_MODEL);
-        for model in models_in_cell {
-            let tokens = summed_tokens_for_model(submission, model);
-            row.extend(token_counts_to_vec(&tokens));
-        }
-        x.push(row);
-    }
-    (x, n_models)
-}
-
-fn priors_for_models(models_in_cell: &[String]) -> Vec<f64> {
-    let mut priors = Vec::with_capacity(models_in_cell.len() * TOKEN_FIELDS_PER_MODEL);
-    for model_name in models_in_cell {
-        let model = parse_model(model_name);
-        for (token_type, window) in token_field_order() {
-            priors.push(
-                model
-                    .and_then(|m| price_lookup(m, token_type, window))
-                    .unwrap_or(1e-9),
-            );
-        }
-    }
-    priors
-}
-
-fn unified_cost_with_weights(
-    submission_tokens: &Vec<&EventRow>,
-    weights: &[f64],
-    models_in_cell: &[String],
-) -> f64 {
-    let mut cost = 0.0;
-    for (model_idx, model) in models_in_cell.iter().enumerate() {
-        let tokens = summed_tokens_for_model(submission_tokens, model);
-        let token_values = token_counts_to_vec(&tokens);
-        let start = model_idx * TOKEN_FIELDS_PER_MODEL;
-        for (idx, token_count) in token_values.iter().enumerate() {
-            cost += token_count * weights[start + idx];
-        }
-    }
-    cost
-}
-
-fn models_in_submissions(submissions: &[Vec<&EventRow>]) -> Vec<String> {
-    submissions
-        .iter()
-        .flat_map(|submission| submission.iter().map(|row| row.model.clone()))
-        .collect::<BTreeSet<_>>()
+    pairs
         .into_iter()
+        .map(|(_, submission_rows)| aggregate_submission(&submission_rows))
         .collect()
 }
 
-fn n_with_model_by_name(
-    submissions: &[Vec<&EventRow>],
-    models_in_cell: &[String],
-) -> HashMap<String, usize> {
-    models_in_cell
-        .iter()
-        .map(|model| {
-            let n = submissions
-                .iter()
-                .filter(|submission| submission.iter().any(|row| row.model == *model))
-                .count();
-            (model.clone(), n)
+fn aggregate_submission(rows: &[&EventRow]) -> SubmissionAggregate {
+    let mut api_cost_usd = 0.0;
+    let mut tokens_by_model: BTreeMap<Model, TokenTypeTotals> = BTreeMap::new();
+
+    for row in rows {
+        api_cost_usd += api_cost_for_payload(&row.payload);
+        let totals = tokens_by_model.entry(row.payload.model).or_default();
+        add_counts(totals, &row.payload.tokens);
+    }
+
+    SubmissionAggregate {
+        api_cost_usd,
+        tokens_by_model,
+    }
+}
+
+fn api_cost_for_payload(payload: &EventPayload) -> f64 {
+    let model = payload.model;
+    let t = &payload.tokens;
+    cost_part(model, TokenType::Input, Window::FiveMin, t.input_5min)
+        + cost_part(model, TokenType::Output, Window::FiveMin, t.output_5min)
+        + cost_part(
+            model,
+            TokenType::CachedRead,
+            Window::FiveMin,
+            t.cached_read_5min,
+        )
+        + cost_part(
+            model,
+            TokenType::CachedWrite,
+            Window::FiveMin,
+            t.cached_write_5min,
+        )
+        + cost_part(model, TokenType::Input, Window::FiveH, t.input_5h)
+        + cost_part(model, TokenType::Output, Window::FiveH, t.output_5h)
+        + cost_part(
+            model,
+            TokenType::CachedRead,
+            Window::FiveH,
+            t.cached_read_5h,
+        )
+        + cost_part(
+            model,
+            TokenType::CachedWrite,
+            Window::FiveH,
+            t.cached_write_5h,
+        )
+}
+
+fn cost_part(model: Model, token_type: TokenType, window: Window, count: u64) -> f64 {
+    let price = model
+        .price(token_type, window)
+        .expect("catalog price table must cover every model/token/window tuple");
+    count as f64 * price
+}
+
+fn average_mix(retained: &[&SubmissionAggregate]) -> Vec<ModelTokenMix> {
+    let mut totals: BTreeMap<Model, TokenTypeTotals> = BTreeMap::new();
+    for submission in retained {
+        for (model, tokens) in &submission.tokens_by_model {
+            let entry = totals.entry(*model).or_default();
+            add_totals(entry, tokens);
+        }
+    }
+
+    let denom = retained.len().max(1) as f64;
+    totals
+        .into_iter()
+        .map(|(model, mut tokens)| {
+            scale_totals(&mut tokens, 1.0 / denom);
+            ModelTokenMix { model, tokens }
         })
+        .filter(|entry| !is_zero(&entry.tokens))
         .collect()
 }
 
-fn rescaled_priors(x: &[Vec<f64>], models_in_cell: &[String]) -> Vec<f64> {
-    let raw = priors_for_models(models_in_cell);
-    if x.is_empty() || raw.is_empty() {
-        return raw;
+fn percentiles(sorted_values: &[f64]) -> Percentiles {
+    Percentiles {
+        p10: percentile_value(sorted_values, 0.10),
+        p25: percentile_value(sorted_values, 0.25),
+        p50: percentile_value(sorted_values, 0.50),
+        p75: percentile_value(sorted_values, 0.75),
+        p90: percentile_value(sorted_values, 0.90),
     }
-    let typical = column_medians(x);
-    let dot: f64 = raw
-        .iter()
-        .zip(typical.iter())
-        .map(|(prior, token)| prior * token)
-        .sum();
-    if dot <= 0.0 || !dot.is_finite() {
-        return raw;
-    }
-    let alpha = 1.0 / dot;
-    raw.into_iter().map(|prior| prior * alpha).collect()
 }
 
-fn column_medians(x: &[Vec<f64>]) -> Vec<f64> {
-    let p = x.first().map_or(0, Vec::len);
-    let mut medians = Vec::with_capacity(p);
-    for col in 0..p {
-        let mut values: Vec<f64> = x.iter().map(|row| row[col]).collect();
-        values.sort_by(f64::total_cmp);
-        medians.push(median_sorted(&values));
-    }
-    medians
-}
-
-fn median_sorted(values: &[f64]) -> f64 {
-    let n = values.len();
-    if n == 0 {
+fn percentile_value(sorted_values: &[f64], percentile: f64) -> f64 {
+    if sorted_values.is_empty() {
         return 0.0;
     }
-    if n % 2 == 1 {
-        values[n / 2]
-    } else {
-        (values[n / 2 - 1] + values[n / 2]) / 2.0
-    }
-}
-
-fn sorted_unified_costs(
-    submissions: &[Vec<&EventRow>],
-    weights: &[f64],
-    models_in_cell: &[String],
-) -> Vec<f64> {
-    let mut costs: Vec<f64> = submissions
-        .iter()
-        .map(|submission| unified_cost_with_weights(submission, weights, models_in_cell))
-        .collect();
-    costs.sort_by(f64::total_cmp);
-    costs
-}
-
-fn costs_from_matrix(x: &[Vec<f64>], weights: &[f64]) -> Vec<f64> {
-    x.iter()
-        .map(|row| {
-            row.iter()
-                .zip(weights.iter())
-                .map(|(token, weight)| token * weight)
-                .sum()
-        })
-        .collect()
+    let idx = ((sorted_values.len() - 1) as f64 * percentile).round() as usize;
+    sorted_values[idx.min(sorted_values.len() - 1)]
 }
 
 fn two_sigma_keep_mask(values: &[f64]) -> Vec<bool> {
@@ -466,115 +250,44 @@ fn two_sigma_bounds(values: &[f64]) -> Option<(f64, f64)> {
     Some((mean - 2.0 * sd, mean + 2.0 * sd))
 }
 
-fn summed_tokens_for_model(submission: &[&EventRow], model: &str) -> TokenCounts {
-    submission
-        .iter()
-        .filter(|row| row.model == model)
-        .fold(zero_tokens(), |mut acc, row| {
-            add_tokens(&mut acc, &row.payload.tokens);
-            acc
-        })
+fn group_by_submission_refs<'a>(rows: &[&'a EventRow]) -> HashMap<Uuid, Vec<&'a EventRow>> {
+    rows.iter().copied().fold(HashMap::new(), |mut map, row| {
+        map.entry(row.submission_group_id).or_default().push(row);
+        map
+    })
 }
 
-fn zero_tokens() -> TokenCounts {
-    TokenCounts {
-        input_5min: 0,
-        output_5min: 0,
-        cached_read_5min: 0,
-        cached_write_5min: 0,
-        input_5h: 0,
-        output_5h: 0,
-        cached_read_5h: 0,
-        cached_write_5h: 0,
-    }
+fn add_counts(total: &mut TokenTypeTotals, tokens: &TokenCounts) {
+    total.input += (tokens.input_5min + tokens.input_5h) as f64;
+    total.output += (tokens.output_5min + tokens.output_5h) as f64;
+    total.cached_read += (tokens.cached_read_5min + tokens.cached_read_5h) as f64;
+    total.cached_write += (tokens.cached_write_5min + tokens.cached_write_5h) as f64;
 }
 
-fn add_tokens(acc: &mut TokenCounts, tokens: &TokenCounts) {
-    acc.input_5min += tokens.input_5min;
-    acc.output_5min += tokens.output_5min;
-    acc.cached_read_5min += tokens.cached_read_5min;
-    acc.cached_write_5min += tokens.cached_write_5min;
-    acc.input_5h += tokens.input_5h;
-    acc.output_5h += tokens.output_5h;
-    acc.cached_read_5h += tokens.cached_read_5h;
-    acc.cached_write_5h += tokens.cached_write_5h;
+fn add_totals(total: &mut TokenTypeTotals, other: &TokenTypeTotals) {
+    total.input += other.input;
+    total.output += other.output;
+    total.cached_read += other.cached_read;
+    total.cached_write += other.cached_write;
 }
 
-fn token_counts_to_vec(tokens: &TokenCounts) -> [f64; TOKEN_FIELDS_PER_MODEL] {
-    [
-        tokens.input_5min as f64,
-        tokens.output_5min as f64,
-        tokens.cached_read_5min as f64,
-        tokens.cached_write_5min as f64,
-        tokens.input_5h as f64,
-        tokens.output_5h as f64,
-        tokens.cached_read_5h as f64,
-        tokens.cached_write_5h as f64,
-    ]
+fn scale_totals(total: &mut TokenTypeTotals, factor: f64) {
+    total.input *= factor;
+    total.output *= factor;
+    total.cached_read *= factor;
+    total.cached_write *= factor;
 }
 
-fn token_field_order() -> [(TokenType, Window); TOKEN_FIELDS_PER_MODEL] {
-    [
-        (TokenType::Input, Window::FiveMin),
-        (TokenType::Output, Window::FiveMin),
-        (TokenType::CachedRead, Window::FiveMin),
-        (TokenType::CachedWrite, Window::FiveMin),
-        (TokenType::Input, Window::FiveH),
-        (TokenType::Output, Window::FiveH),
-        (TokenType::CachedRead, Window::FiveH),
-        (TokenType::CachedWrite, Window::FiveH),
-    ]
-}
-
-fn parse_model(model: &str) -> Option<Model> {
-    serde_json::from_str(&format!("\"{model}\"")).ok()
-}
-
-fn tokens_to_limit_if_only_projection(unified_costs: &[f64], model_avg_weight: f64) -> Vec<f64> {
-    if model_avg_weight <= 0.0 || !model_avg_weight.is_finite() {
-        return Vec::new();
-    }
-    unified_costs
-        .iter()
-        .map(|cost| cost / model_avg_weight)
-        .collect()
-}
-
-#[cfg(target_arch = "wasm32")]
-fn log_trim_rate(trim_rate: f64) {
-    worker::console_log!("cron::aggregate trim_rate={:.3}", trim_rate);
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-fn log_trim_rate(trim_rate: f64) {
-    let _ = trim_rate;
+fn is_zero(total: &TokenTypeTotals) -> bool {
+    total.input == 0.0
+        && total.output == 0.0
+        && total.cached_read == 0.0
+        && total.cached_write == 0.0
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bloclawd_schema::{EventPayload, Harness, Model, Region, Tier, TokenCounts};
-    use serde::Deserialize;
-    use uuid::Uuid;
-
-    #[derive(Debug, Deserialize)]
-    struct TrimFixture {
-        values: Vec<f64>,
-        expected_trimmed_sorted: Vec<f64>,
-        expected_trim_rate: f64,
-    }
-
-    #[derive(Debug, Deserialize)]
-    struct GoldenY1Fixture {
-        submission_count: usize,
-        model: String,
-        tier: String,
-        harness: String,
-        region: String,
-        limit_type: String,
-        tokens: TokenCounts,
-        expected_unified_cost_s: Vec<f64>,
-    }
 
     fn payload(
         model: Model,
@@ -608,33 +321,13 @@ mod tests {
         tier: Tier,
         harness: Harness,
         region: Region,
-        limit_type: &str,
+        limit_type: LimitType,
         input_5min: u64,
     ) -> EventRow {
         EventRow {
             submission_group_id: Uuid::from_u128(group_idx),
             payload: payload(model, tier, harness, region, input_5min),
-            model: serde_json::to_value(model)
-                .unwrap()
-                .as_str()
-                .unwrap()
-                .to_string(),
-            tier: serde_json::to_value(tier)
-                .unwrap()
-                .as_str()
-                .unwrap()
-                .to_string(),
-            harness: serde_json::to_value(harness)
-                .unwrap()
-                .as_str()
-                .unwrap()
-                .to_string(),
-            region: serde_json::to_value(region)
-                .unwrap()
-                .as_str()
-                .unwrap()
-                .to_string(),
-            limit_type: limit_type.to_string(),
+            limit_type,
         }
     }
 
@@ -649,7 +342,7 @@ mod tests {
                     Tier::Pro,
                     Harness::ClaudeCode,
                     Region::Na,
-                    "5h",
+                    LimitType::FiveH,
                     *input,
                 )
             })
@@ -657,91 +350,38 @@ mod tests {
     }
 
     #[test]
-    fn two_sigma_trim_matches_golden() {
-        let raw = include_str!("tests/fixtures/golden_two_sigma.json");
-        let fixture: TrimFixture = serde_json::from_str(raw).unwrap();
-        let (trimmed, trim_rate) = two_sigma_trim(&fixture.values);
-
-        assert_eq!(trimmed, fixture.expected_trimmed_sorted);
-        assert!((trim_rate - fixture.expected_trim_rate).abs() <= 1e-12);
-    }
-
-    #[test]
-    fn compute_cells_golden_ridge_y1_n50() {
-        let raw = include_str!("tests/fixtures/golden_ridge_y1_cohort_n50.json");
-        let fixture: GoldenY1Fixture = serde_json::from_str(raw).unwrap();
-        let model: Model = serde_json::from_str(&format!("\"{}\"", fixture.model)).unwrap();
-        let tier: Tier = serde_json::from_str(&format!("\"{}\"", fixture.tier)).unwrap();
-        let harness: Harness = serde_json::from_str(&format!("\"{}\"", fixture.harness)).unwrap();
-        let region: Region = serde_json::from_str(&format!("\"{}\"", fixture.region)).unwrap();
-        let rows: Vec<EventRow> = (0..fixture.submission_count)
-            .map(|idx| EventRow {
-                submission_group_id: Uuid::from_u128(idx as u128 + 1),
-                payload: EventPayload {
-                    v: 1,
-                    model,
-                    tier,
-                    harness,
-                    region,
-                    tokens: fixture.tokens.clone(),
-                },
-                model: fixture.model.clone(),
-                tier: fixture.tier.clone(),
-                harness: fixture.harness.clone(),
-                region: fixture.region.clone(),
-                limit_type: fixture.limit_type.clone(),
-            })
-            .collect();
-
-        let cells = compute_cells(&rows);
-        assert_eq!(cells.len(), 1);
-        let cell = &cells[0];
-        assert_eq!(cell.n_submissions, fixture.submission_count as u32);
-        assert_eq!(cell.models[0].weight_source, "cohort");
-        assert_eq!(
-            cell.trimmed_unified_costs.len(),
-            fixture.expected_unified_cost_s.len()
-        );
-        for (actual, expected) in cell
-            .trimmed_unified_costs
-            .iter()
-            .zip(fixture.expected_unified_cost_s.iter())
-        {
-            assert!((actual - expected).abs() <= 1e-4);
-        }
+    fn two_sigma_trim_drops_far_outlier() {
+        let values = [
+            10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 10.0, 1_000.0,
+        ];
+        let (trimmed, dropped) = two_sigma_trim(&values);
+        assert_eq!(trimmed, vec![10.0; 9]);
+        assert_eq!(dropped, 1);
     }
 
     #[test]
     fn two_sigma_preserves_n_lt_3() {
-        let (trimmed, trim_rate) = two_sigma_trim(&[5.0, 6.0]);
+        let (trimmed, dropped) = two_sigma_trim(&[5.0, 6.0]);
         assert_eq!(trimmed, vec![5.0, 6.0]);
-        assert_eq!(trim_rate, 0.0);
+        assert_eq!(dropped, 0);
     }
 
     #[test]
     fn compute_cells_groups_by_submission_group_id() {
-        let mut rows = rows_for_inputs(&[10, 20]);
+        let mut rows = rows_for_inputs(&[10, 20, 30, 40, 50]);
         rows.push(row(
             1,
             Model::ClaudeSonnet45,
             Tier::Pro,
             Harness::ClaudeCode,
             Region::Na,
-            "5h",
-            30,
-        ));
-        rows.push(row(
-            2,
-            Model::ClaudeSonnet45,
-            Tier::Pro,
-            Harness::ClaudeCode,
-            Region::Na,
-            "5h",
-            40,
+            LimitType::FiveH,
+            60,
         ));
 
         let cells = compute_cells(&rows);
-        assert_eq!(cells[0].n_submissions, 2);
+        assert_eq!(cells.len(), 1);
+        assert_eq!(cells[0].n_retained, 5);
     }
 
     #[test]
@@ -751,67 +391,71 @@ mod tests {
 
         assert_eq!(cells.len(), 1);
         assert!(cells[0].insufficient_data);
-        assert!(cells[0].trimmed_unified_costs.is_empty());
-        assert!(cells[0].models.is_empty());
+        assert!(cells[0].api_cost_usd.is_none());
+        assert!(cells[0].typical_mix.is_empty());
     }
 
     #[test]
-    fn compute_cells_per_model_k_anon_gate() {
-        let mut rows = rows_for_inputs(&[100, 100, 100, 100, 100, 100]);
-        for group_idx in 1..=3 {
-            rows.push(row(
-                group_idx,
-                Model::Gpt5,
-                Tier::Pro,
-                Harness::ClaudeCode,
-                Region::Na,
-                "5h",
-                100,
-            ));
-        }
-
+    fn compute_cells_emits_api_cost_percentiles() {
+        let rows = rows_for_inputs(&[10, 20, 30, 40, 50, 60, 70]);
         let cells = compute_cells(&rows);
-        let gpt = cells[0].models.iter().find(|m| m.model == "gpt-5").unwrap();
-        assert_eq!(gpt.n_with_model, 3);
-        assert!(gpt.tokens_to_limit_if_only.is_none());
+
+        let cost = cells[0].api_cost_usd.unwrap();
+        assert!(cost.p10 > 0.0);
+        assert!(cost.p10 <= cost.p50);
+        assert!(cost.p50 <= cost.p90);
+        assert_eq!(cells[0].n_dropped, 0);
+        assert_eq!(cells[0].n_retained, 7);
     }
 
     #[test]
-    fn compute_cells_uses_prior_when_n_small() {
-        let rows = rows_for_inputs(&[10, 20, 30, 40, 50, 60]);
-        let cells = compute_cells(&rows);
-
-        assert_eq!(cells[0].models[0].weight_source, "prior");
+    fn compute_cells_uses_catalog_prices() {
+        let rows = rows_for_inputs(&[1_000]);
+        let cost = api_cost_for_payload(&rows[0].payload);
+        let expected = 1_000.0
+            * Model::ClaudeSonnet45
+                .price(TokenType::Input, Window::FiveMin)
+                .unwrap();
+        assert_eq!(cost, expected);
     }
 
     #[test]
-    fn compute_cells_uses_cohort_fit_when_n_large() {
-        let rows = rows_for_inputs(&vec![100; 60]);
-        let cells = compute_cells(&rows);
+    fn compute_cells_emits_average_model_token_mix() {
+        let mut rows = rows_for_inputs(&[10, 20, 30, 40, 50]);
+        rows.push(row(
+            1,
+            Model::ClaudeOpus47,
+            Tier::Pro,
+            Harness::ClaudeCode,
+            Region::Na,
+            LimitType::FiveH,
+            100,
+        ));
 
-        assert_eq!(cells[0].models[0].weight_source, "cohort");
+        let cell = &compute_cells(&rows)[0];
+        let sonnet = cell
+            .typical_mix
+            .iter()
+            .find(|entry| entry.model == Model::ClaudeSonnet45)
+            .unwrap();
+        let opus = cell
+            .typical_mix
+            .iter()
+            .find(|entry| entry.model == Model::ClaudeOpus47)
+            .unwrap();
+
+        assert_eq!(sonnet.tokens.input, 30.0);
+        assert_eq!(opus.tokens.input, 20.0);
     }
 
     #[test]
-    fn compute_cells_emits_trim_rate() {
-        let mut inputs = vec![100; 19];
-        inputs.push(10_000);
-        let rows = rows_for_inputs(&inputs);
-        let cells = compute_cells(&rows);
+    fn compute_cells_keeps_bucket_dimensions() {
+        let rows = rows_for_inputs(&[10, 20, 30, 40, 50]);
+        let cell = &compute_cells(&rows)[0];
 
-        assert!(cells[0].trim_rate >= 0.05);
-        assert!(cells[0].trim_rate <= 0.15);
-        assert!(!cells[0].trim_rate_alert);
-    }
-
-    #[test]
-    fn compute_cells_emits_trim_rate_alert_above_10pct() {
-        let mut inputs = vec![100; 30];
-        inputs.extend([10_000; 5]);
-        let rows = rows_for_inputs(&inputs);
-        let cells = compute_cells(&rows);
-
-        assert!(cells[0].trim_rate > 0.10);
-        assert!(cells[0].trim_rate_alert);
+        assert_eq!(cell.subscription_tier, Tier::Pro);
+        assert_eq!(cell.harness, Harness::ClaudeCode);
+        assert_eq!(cell.region, Region::Na);
+        assert_eq!(cell.limit_type, LimitType::FiveH);
     }
 }

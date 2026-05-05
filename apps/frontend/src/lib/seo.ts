@@ -18,7 +18,7 @@ export const SITE_KEYWORDS = [
   "claude pro",
   "5 hour limit",
   "weekly limit",
-  "tokens to limit",
+  "api equivalent cost",
   "ai subscription tracker",
   "rate limit drift",
   "anthropic",
@@ -81,13 +81,13 @@ export const ROUTES: RouteSeo[] = [
     path: "/dashboard",
     title: "Dashboard · Claude Code & Codex limits by tier (Pro / Max5 / Max20)",
     description:
-      "Where your tier's limits actually fire. Live p10–p90 envelope of tokens consumed before Claude Code and Codex rate limits trigger, broken down by Pro, Max5, and Max20. Filter by harness, region, and model.",
+      "Where your tier's limits actually fire. Live p10–p90 envelope of API-equivalent cost before Claude Code and Codex rate limits trigger, broken down by Pro, Max5, and Max20.",
     jsonLd: {
       "@context": "https://schema.org",
       "@type": "Dataset",
       name: "bloclawd — AI subscription rate-limit dataset",
       description:
-        "Community-sourced, k-anonymized aggregates of Claude Code and Codex rate-limit events: tokens consumed, harness, tier, region, and model. Updated daily.",
+        "Community-sourced, k-anonymized aggregates of Claude Code and Codex rate-limit events: API-equivalent cost, token mix, harness, tier, region, and model. Updated daily.",
       url: `${SITE_URL}/dashboard`,
       keywords: SITE_KEYWORDS.join(", "),
       license: "https://creativecommons.org/licenses/by/4.0/",
@@ -105,11 +105,11 @@ export const ROUTES: RouteSeo[] = [
         },
       ],
       variableMeasured: [
-        "tokens_to_limit_p10",
-        "tokens_to_limit_p25",
-        "tokens_to_limit_p50",
-        "tokens_to_limit_p75",
-        "tokens_to_limit_p90",
+        "api_cost_usd_p10",
+        "api_cost_usd_p25",
+        "api_cost_usd_p50",
+        "api_cost_usd_p75",
+        "api_cost_usd_p90",
       ],
     },
     noscript:
@@ -119,17 +119,17 @@ export const ROUTES: RouteSeo[] = [
     path: "/methodology",
     title: "Methodology · how bloclawd computes what you see",
     description:
-      "How bloclawd derives public aggregates from local CLI submissions: canonicalization, k-anonymity, log-scale binning, weighting, and the cron pipeline.",
+      "How bloclawd derives public aggregates from local CLI submissions: canonicalization, k-anonymity, API-cost percentiles, outlier trimming, and the cron pipeline.",
     noscript:
-      "How bloclawd computes what you see: canonicalization of submissions, proof-of-work admission control, k-anonymity at n ≥ 5, log-scale binning, weighting, and the daily aggregation pipeline.",
+      "How bloclawd computes what you see: canonicalization of submissions, proof-of-work admission control, k-anonymity at n ≥ 5, API-cost percentiles, and the daily aggregation pipeline.",
   },
   {
     path: "/methodology/changelog",
     title: "Methodology changelog",
     description:
-      "Versioned record of changes to the bloclawd aggregation methodology, schema, and binning policy.",
+      "Versioned record of changes to the bloclawd aggregation methodology, schema, and public API-cost policy.",
     noscript:
-      "Methodology changelog: versioned record of every change to the bloclawd aggregation methodology, schema, and binning policy.",
+      "Methodology changelog: versioned record of every change to the bloclawd aggregation methodology, schema, and public API-cost policy.",
   },
   {
     path: "/install",
@@ -163,7 +163,7 @@ export const ROUTES: RouteSeo[] = [
     path: "/compare",
     title: "Pro vs Max5 vs Max20 · live tier comparison",
     description:
-      "Side-by-side percentile envelope of tokens consumed before Claude Code and Codex rate limits trigger, broken down by Pro, Max5, and Max20. Real bonks from real users, anonymized.",
+      "Side-by-side percentile envelope of API-equivalent cost before Claude Code and Codex rate limits trigger, broken down by Pro, Max5, and Max20. Real bonks from real users, anonymized.",
     jsonLd: [
       {
         "@context": "https://schema.org",
@@ -171,7 +171,7 @@ export const ROUTES: RouteSeo[] = [
         name: "Pro vs Max5 vs Max20 · live tier comparison",
         url: `${SITE_URL}/compare`,
         description:
-          "Side-by-side percentile envelope of tokens consumed before Claude Code and Codex rate limits trigger, broken down by Pro, Max5, and Max20.",
+          "Side-by-side percentile envelope of API-equivalent cost before Claude Code and Codex rate limits trigger, broken down by Pro, Max5, and Max20.",
       },
       {
         "@context": "https://schema.org",
@@ -195,10 +195,10 @@ export const ROUTES: RouteSeo[] = [
           },
           {
             "@type": "Question",
-            name: "How is 'tokens to limit' defined across tiers?",
+            name: "How is API-equivalent cost defined across tiers?",
             acceptedAnswer: {
               "@type": "Answer",
-              text: "It is the unified token cost summed over the 5-hour or weekly window leading into a rate-limit hit. Per-model token weights are fit with ridge regression toward published per-token prices.",
+              text: "Each submission is priced with the published API price for its model and token type. Public percentiles are computed after trimming submissions outside plus or minus 2σ of the cohort mean.",
             },
           },
           {
@@ -213,7 +213,7 @@ export const ROUTES: RouteSeo[] = [
       },
     ],
     noscript:
-      "Pro vs Max5 vs Max20: live percentile envelope of tokens consumed before Claude Code and Codex rate limits trigger, broken down by subscription tier. Real bonks from real users, anonymized at k ≥ 5.",
+      "Pro vs Max5 vs Max20: live percentile envelope of API-equivalent cost before Claude Code and Codex rate limits trigger, broken down by subscription tier. Real bonks from real users, anonymized at k ≥ 5.",
   },
 ];
 

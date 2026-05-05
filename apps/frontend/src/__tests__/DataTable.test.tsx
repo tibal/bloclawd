@@ -14,7 +14,7 @@ describe("DataTable", () => {
       flushSync(() => {
         root.render(
           <DataTable
-            ariaLabel="Unified cost table"
+            ariaLabel="API cost table"
             rows={[
               { ts: "2026-05-02T00:00:00Z", p10: 10, p25: 25, p50: 50, p75: 75, p90: 90 },
               { ts: "2026-05-02T01:00:00Z", p10: 11, p25: 26, p50: 51, p75: 76, p90: 91 },
@@ -25,7 +25,7 @@ describe("DataTable", () => {
       });
 
       const table = container.querySelector("table");
-      expect(table?.getAttribute("aria-label")).toBe("Unified cost table");
+      expect(table?.getAttribute("aria-label")).toBe("API cost table");
       for (const heading of ["Timestamp", "p10", "p25", "p50", "p75", "p90"]) {
         expect(table?.textContent).toContain(heading);
       }
@@ -44,7 +44,7 @@ describe("DataTable", () => {
 
     try {
       flushSync(() => {
-        root.render(<DataTable ariaLabel="Empty unified cost table" rows={[]} />);
+        root.render(<DataTable ariaLabel="Empty API cost table" rows={[]} />);
       });
 
       expect(container.textContent).toContain("No data");

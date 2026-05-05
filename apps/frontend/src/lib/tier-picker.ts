@@ -1,4 +1,6 @@
-export type Tier = "q15" | "h1" | "d1";
+import type { ReportResolution } from "@web/ReportResolution";
+
+export type Tier = ReportResolution;
 
 export function pickTier(windowDays: number): Tier {
   if (windowDays <= 1) return "q15";

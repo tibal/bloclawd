@@ -431,9 +431,35 @@
       ]
     }
   ],
+  "tiers": [
+    "pro",
+    "max5",
+    "max20"
+  ],
   "harnesses": [
     "claude-code",
     "codex"
+  ],
+  "regions": [
+    "NA",
+    "EU",
+    "AS",
+    "SA",
+    "OC",
+    "AF",
+    "AN"
+  ],
+  "limits": [
+    {
+      "limit_type": "5h",
+      "display_name": "5h",
+      "windows_per_month": 144.0
+    },
+    {
+      "limit_type": "weekly",
+      "display_name": "weekly",
+      "windows_per_month": 4.0
+    }
   ],
   "limit_types": [
     "5h",

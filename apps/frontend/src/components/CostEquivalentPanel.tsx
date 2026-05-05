@@ -1,16 +1,16 @@
 import type { Tier } from "@web/Tier";
 
 import {
-  ANCHOR_USD_PER_TOKEN,
-  TIER_LABEL,
-  TIER_PRICE_USD,
-  WINDOWS_PER_MONTH,
-} from "@/lib/model-catalog";
-import {
-  decodePercentiles,
-  type BucketCell,
-  type BucketEnvelope,
-  type Percentiles,
+  TIER_VALUES,
+  limitWindowsPerMonth,
+  tierLabel,
+  tierMonthlyCostUsd,
+} from "@/lib/catalog";
+import { formatUsd } from "@/lib/format";
+import type {
+  BucketCell,
+  BucketEnvelope,
+  Percentiles,
 } from "@/lib/r2";
 
 interface CostEquivalentPanelProps {
@@ -21,7 +21,7 @@ interface CostEquivalentPanelProps {
   };
 }
 
-const TIERS: readonly Tier[] = ["pro", "max5", "max20"];
+const TIERS: readonly Tier[] = TIER_VALUES;
 
 export function CostEquivalentPanel({
   bucket,
@@ -30,18 +30,18 @@ export function CostEquivalentPanel({
 }: CostEquivalentPanelProps) {
   const limitType = filterCell.limit_type;
   const subscriptionPerWindow = (tier: Tier) =>
-    TIER_PRICE_USD[tier] / WINDOWS_PER_MONTH[limitType];
+    tierMonthlyCostUsd(tier) / limitWindowsPerMonth(limitType);
 
   const rows = TIERS.map((tier) => {
     const cell = bucket.cells.find(
       (c) =>
-        c.tier === tier &&
+        c.subscription_tier === tier &&
         c.harness === filterCell.harness &&
         c.limit_type === filterCell.limit_type &&
         (filterCell.region == null || c.region === filterCell.region),
     );
-    const pcts = decodePercentiles(cell?.unified_cost);
-    const apiUsd = pcts ? pcts[primary] * ANCHOR_USD_PER_TOKEN : null;
+    const pcts = cell?.api_cost_usd ?? null;
+    const apiUsd = pcts ? pcts[primary] : null;
     const subUsd = subscriptionPerWindow(tier);
     return {
       tier,
@@ -61,7 +61,7 @@ export function CostEquivalentPanel({
             Cost-equivalent per window
           </div>
           <div className="font-mono text-[11.5px] text-muted-foreground">
-            {primary} unified cost · API list-price vs subscription slice
+            {primary} API list-price · retained submissions
           </div>
         </div>
         <span className="tag">USD</span>
@@ -70,11 +70,11 @@ export function CostEquivalentPanel({
         {rows.map((r) => (
           <div key={r.tier}>
             <div className="flex items-center justify-between text-[12.5px]">
-              <span className="text-foreground">{TIER_LABEL[r.tier]}</span>
+              <span className="text-foreground">{tierLabel(r.tier)}</span>
               <span className="font-mono tabular-nums text-foreground">
-                {r.apiUsd == null ? "—" : `$${r.apiUsd.toFixed(2)}`}
+                {r.apiUsd == null ? "—" : formatUsd(r.apiUsd)}
                 <span className="ml-2 text-muted-foreground text-[11px]">
-                  vs ${r.subUsd.toFixed(2)} / window
+                  vs {formatUsd(r.subUsd)} / window
                 </span>
               </span>
             </div>
@@ -99,8 +99,8 @@ export function CostEquivalentPanel({
           </div>
         ))}
         <div className="rounded-xl bg-[var(--bg-1)] px-3.5 py-2.5 text-[12px] leading-6 text-foreground/80">
-          A {primary} user with the typical token mix would burn the API list-price equivalent of the {primary} window above.
-          {" "}
+          The {primary} cost is computed directly from model and token-type API
+          prices, after outlier trimming.{" "}
           <span className="text-muted-foreground">
             Use your own pricing for a real comparison.
           </span>
@@ -109,4 +109,3 @@ export function CostEquivalentPanel({
     </div>
   );
 }
-

@@ -1,9 +1,8 @@
 //! Single source of truth for providers, plans, models, and per-model prices.
 //!
-//! All filter cascading on the dashboard, all per-token pricing priors used by
-//! the cron weight fit, and all "what does the UI show" lists derive from the
-//! data declared here. To add a new provider, plan, model, harness, or limit
-//! type:
+//! All filter cascading on the dashboard, all API-cost aggregation pricing,
+//! and all "what does the UI show" lists derive from the data declared here.
+//! To add a new provider, plan, model, harness, or limit type:
 //!
 //! 1. Add the variant to the relevant enum in this file (or in `enums.rs`).
 //! 2. Add or update the corresponding `ModelInfo` / `PlanInfo` entry below.
@@ -18,7 +17,7 @@
 use serde::Serialize;
 use ts_rs::TS;
 
-use crate::enums::{Harness, LimitType, Model, Tier, TokenType, Window};
+use crate::enums::{Harness, LimitType, Model, Region, Tier, TokenType, Window};
 
 /// Inference / hosting provider behind a model and plan.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, TS)]
@@ -85,6 +84,17 @@ pub struct PlanInfo {
     pub tier_alias: Option<Tier>,
 }
 
+/// Static description of a published limit cadence. `windows_per_month` lets
+/// UI cost comparisons convert subscription monthly pricing into a per-window
+/// reference without duplicating cadence math in TypeScript.
+#[derive(Debug, Clone, Copy, Serialize, TS)]
+#[ts(export)]
+pub struct LimitInfo {
+    pub limit_type: LimitType,
+    pub display_name: &'static str,
+    pub windows_per_month: f64,
+}
+
 // --- model price tables -----------------------------------------------------
 
 const fn full_window_prices(
@@ -137,9 +147,9 @@ const fn full_window_prices(
     ]
 }
 
-// Hand-curated per-model per-token pricing priors.
+// Hand-curated per-model per-token prices.
 // Source: anthropic.com/pricing + openai.com/api/pricing, captured 2026-05-02.
-// USD per token. Used as ridge-regression prior for weight fits.
+// USD per token. Used by cron to compute public API-equivalent costs.
 const OPUS47_PRICES: [PricePoint; 8] = full_window_prices(5e-6, 25e-6, 0.5e-6, 6.25e-6);
 const SONNET46_PRICES: [PricePoint; 8] = full_window_prices(3e-6, 15e-6, 0.3e-6, 3.75e-6);
 const SONNET45_PRICES: [PricePoint; 8] = full_window_prices(3e-6, 15e-6, 0.3e-6, 3.75e-6);
@@ -290,15 +300,40 @@ pub struct Catalog {
     pub providers: &'static [Provider],
     pub plans: &'static [PlanInfo],
     pub models: &'static [ModelInfo],
+    pub tiers: &'static [Tier],
     pub harnesses: &'static [Harness],
+    pub regions: &'static [Region],
+    pub limits: &'static [LimitInfo],
     pub limit_types: &'static [LimitType],
     pub token_types: &'static [TokenType],
     pub windows: &'static [Window],
 }
 
 const ALL_PROVIDERS: &[Provider] = &[Provider::Anthropic, Provider::OpenAI];
+const ALL_TIERS: &[Tier] = &[Tier::Pro, Tier::Max5, Tier::Max20];
 const ALL_HARNESSES: &[Harness] = &[Harness::ClaudeCode, Harness::Codex];
+const ALL_REGIONS: &[Region] = &[
+    Region::Na,
+    Region::Eu,
+    Region::As,
+    Region::Sa,
+    Region::Oc,
+    Region::Af,
+    Region::An,
+];
 const ALL_LIMIT_TYPES: &[LimitType] = &[LimitType::FiveH, LimitType::Weekly];
+pub const LIMITS: &[LimitInfo] = &[
+    LimitInfo {
+        limit_type: LimitType::FiveH,
+        display_name: "5h",
+        windows_per_month: (30.0 * 24.0) / 5.0,
+    },
+    LimitInfo {
+        limit_type: LimitType::Weekly,
+        display_name: "weekly",
+        windows_per_month: 4.0,
+    },
+];
 const ALL_TOKEN_TYPES: &[TokenType] = &[
     TokenType::Input,
     TokenType::Output,
@@ -311,7 +346,10 @@ pub const CATALOG: Catalog = Catalog {
     providers: ALL_PROVIDERS,
     plans: PLANS,
     models: MODELS,
+    tiers: ALL_TIERS,
     harnesses: ALL_HARNESSES,
+    regions: ALL_REGIONS,
+    limits: LIMITS,
     limit_types: ALL_LIMIT_TYPES,
     token_types: ALL_TOKEN_TYPES,
     windows: ALL_WINDOWS,
@@ -400,6 +438,15 @@ impl Harness {
     }
 }
 
+impl LimitType {
+    pub fn info(self) -> &'static LimitInfo {
+        LIMITS
+            .iter()
+            .find(|limit| limit.limit_type == self)
+            .expect("every LimitType variant has a LimitInfo entry; CATALOG must stay exhaustive")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -420,6 +467,17 @@ mod tests {
         Plan::OpenAIPlus,
         Plan::OpenAIPro,
     ];
+    const ALL_TIERS: &[Tier] = &[Tier::Pro, Tier::Max5, Tier::Max20];
+    const ALL_REGIONS: &[Region] = &[
+        Region::Na,
+        Region::Eu,
+        Region::As,
+        Region::Sa,
+        Region::Oc,
+        Region::Af,
+        Region::An,
+    ];
+    const ALL_LIMIT_TYPES: &[LimitType] = &[LimitType::FiveH, LimitType::Weekly];
 
     #[test]
     fn every_model_variant_has_a_model_info_row() {
@@ -440,6 +498,27 @@ mod tests {
             assert!(!info.harnesses.is_empty());
             assert!(!info.models.is_empty());
             assert!(!info.limit_types.is_empty());
+        }
+    }
+
+    #[test]
+    fn every_tier_variant_is_in_catalog() {
+        assert_eq!(CATALOG.tiers, ALL_TIERS);
+    }
+
+    #[test]
+    fn every_region_variant_is_in_catalog() {
+        assert_eq!(CATALOG.regions, ALL_REGIONS);
+    }
+
+    #[test]
+    fn every_limit_type_has_limit_info() {
+        for limit_type in ALL_LIMIT_TYPES {
+            let info = limit_type.info();
+            assert_eq!(info.limit_type, *limit_type);
+            assert!(!info.display_name.is_empty());
+            assert!(info.windows_per_month.is_finite());
+            assert!(info.windows_per_month > 0.0);
         }
     }
 
@@ -585,7 +664,10 @@ mod tests {
         assert!(json.contains(r#""anthropic-pro""#));
         assert!(json.contains(r#""claude-opus-4-7""#));
         assert!(json.contains(r#""gpt-5""#));
+        assert!(json.contains(r#""tiers""#));
+        assert!(json.contains(r#""regions""#));
         assert!(json.contains(r#""5h""#));
         assert!(json.contains(r#""weekly""#));
+        assert!(json.contains(r#""windows_per_month""#));
     }
 }

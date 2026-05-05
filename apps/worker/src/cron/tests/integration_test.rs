@@ -1,13 +1,12 @@
 use std::path::PathBuf;
 
-use bloclawd_schema::{EventPayload, Harness, LOG_BIN_EDGES, Model, Region, Tier, TokenCounts};
+use bloclawd_schema::{
+    BucketEnvelope, EventPayload, Harness, LimitType, Model, Region, ReportResolution, Tier,
+    TokenCounts,
+};
 use uuid::Uuid;
 
-use crate::cron::{
-    aggregate::{EventRow, compute_cells},
-    percentile::encode_cell,
-    r2_emit::BucketEnvelope,
-};
+use crate::cron::aggregate::{EventRow, compute_cells};
 
 fn sample_payload(
     model: Model,
@@ -35,33 +34,13 @@ fn sample_payload(
     }
 }
 
-fn enum_string<T: serde::Serialize>(value: T) -> String {
-    serde_json::to_value(value)
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .to_string()
-}
-
 fn row(group_idx: u128, model: Model, tier: Tier, region: Region, seed: u64) -> EventRow {
     let harness = Harness::ClaudeCode;
     EventRow {
         submission_group_id: Uuid::from_u128(group_idx),
         payload: sample_payload(model, tier, harness, region, seed),
-        model: enum_string(model),
-        tier: enum_string(tier),
-        harness: enum_string(harness),
-        region: enum_string(region),
-        limit_type: "5h".to_string(),
+        limit_type: LimitType::FiveH,
     }
-}
-
-fn encoded_cells(rows: &[EventRow]) -> Vec<crate::cron::aggregate::Cell> {
-    let mut cells = compute_cells(rows);
-    for cell in &mut cells {
-        encode_cell(cell, &LOG_BIN_EDGES);
-    }
-    cells
 }
 
 #[test]
@@ -77,20 +56,18 @@ fn pipeline_well_populated_cohort_emits_public_envelope() {
             )
         })
         .collect();
-    let cells = encoded_cells(&rows);
+    let cells = compute_cells(&rows);
     let envelope = BucketEnvelope {
-        schema_version: "v1",
+        schema_version: "v1".to_string(),
         bucket_ts: "2026-05-02T14:15:00Z".to_string(),
-        tier_resolution: "q15",
-        bin_edges: &LOG_BIN_EDGES,
-        cells: &cells,
+        tier_resolution: ReportResolution::Q15,
+        cells,
     };
     let json = serde_json::to_string(&envelope).unwrap();
 
     assert!(json.contains("\"schema_version\":\"v1\""));
-    assert!(json.contains("\"bin_edges\":[1024,2048"));
-    assert!(json.contains("\"Mean\""));
-    assert!(json.contains("\"models\":["));
+    assert!(json.contains("\"api_cost_usd\""));
+    assert!(json.contains("\"typical_mix\":["));
 
     for forbidden in ["submission_group_id", "event_id", "nonce", "tz_offset"] {
         assert!(
@@ -113,25 +90,24 @@ fn pipeline_low_cohort_marks_insufficient_data() {
             )
         })
         .collect();
-    let cells = encoded_cells(&rows);
+    let cells = compute_cells(&rows);
 
     assert_eq!(cells.len(), 1);
     assert!(cells[0].insufficient_data);
-    assert!(cells[0].models.is_empty());
-    assert!(cells[0].unified_cost.is_none());
+    assert!(cells[0].typical_mix.is_empty());
+    assert!(cells[0].api_cost_usd.is_none());
 
     let envelope = BucketEnvelope {
-        schema_version: "v1",
+        schema_version: "v1".to_string(),
         bucket_ts: "2026-05-02T14:15:00Z".to_string(),
-        tier_resolution: "q15",
-        bin_edges: &LOG_BIN_EDGES,
-        cells: &cells,
+        tier_resolution: ReportResolution::Q15,
+        cells,
     };
     let json = serde_json::to_string(&envelope).unwrap();
 
     assert!(json.contains("\"insufficient_data\":true"));
     assert!(!json.contains("\"p10\""));
-    assert!(!json.contains("\"models\":[{"));
+    assert!(!json.contains("\"typical_mix\":[{"));
 }
 
 #[test]
