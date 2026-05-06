@@ -22,7 +22,7 @@ export function Segmented<V extends string>({
     <div
       role="radiogroup"
       aria-label={ariaLabel}
-      className="inline-flex items-center gap-0.5 rounded-full border border-border bg-[var(--bg-1)] p-[3px]"
+      className="inline-flex min-w-0 items-center gap-0.5 rounded-full border border-border bg-[var(--bg-1)] p-[3px]"
     >
       {label ? (
         <span className="px-2 text-[11px] text-muted-foreground">{label}</span>
@@ -37,7 +37,7 @@ export function Segmented<V extends string>({
             aria-checked={active}
             onClick={() => onChange(opt.value)}
             className={
-              "rounded-full px-3 py-1 text-[12px] font-medium transition-colors " +
+              "min-h-11 rounded-full px-3 py-1 text-[12px] font-medium transition-colors lg:min-h-0 " +
               (active
                 ? "bg-[var(--surface)] text-foreground shadow-[0_0_0_1px_var(--line)_inset]"
                 : "text-muted-foreground hover:text-foreground")

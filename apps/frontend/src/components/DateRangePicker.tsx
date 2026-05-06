@@ -72,21 +72,28 @@ export function DateRangePicker() {
         <button
           type="button"
           aria-label="Pick display window"
-          className="inline-flex h-9 items-center gap-2 rounded-full border border-border bg-[var(--surface)] px-3.5 text-[12.5px] font-medium text-foreground hover:bg-[var(--surface-2)]"
+          className="inline-flex h-11 min-w-0 items-center gap-2 rounded-full border border-border bg-[var(--surface)] px-3.5 text-[12.5px] font-medium text-foreground hover:bg-[var(--surface-2)] lg:h-9"
         >
           <CalendarIcon />
           <span className="text-muted-foreground">
             {PRESET_SHORT[search.range]}
           </span>
-          <span className="font-mono tabular-nums">
+          <span className="hidden font-mono tabular-nums sm:inline">
             {formatRangeShort(startMs, endMs)}
+          </span>
+          <span className="font-mono tabular-nums sm:hidden">
+            {formatRangeCompact(startMs, endMs)}
           </span>
           <Caret />
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[640px] p-0" sideOffset={8}>
-        <div className="grid grid-cols-[160px_1fr]">
-          <div className="border-r border-border p-2">
+      <PopoverContent
+        align="end"
+        className="max-h-[min(var(--radix-popover-content-available-height),calc(100vh-1rem))] w-[min(calc(100vw-1rem),640px)] overflow-y-auto overscroll-contain p-0"
+        sideOffset={8}
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr]">
+          <div className="border-b border-border p-2 sm:border-b-0 sm:border-r">
             <div className="px-2 pb-2 pt-1 font-mono text-[10.5px] uppercase tracking-[0.06em] text-muted-foreground">
               Presets
             </div>
@@ -99,7 +106,7 @@ export function DateRangePicker() {
                       if (key !== "custom") setPreset(key);
                     }}
                     className={
-                      "w-full rounded-md px-2.5 py-2 text-left text-[12.5px] " +
+                      "min-h-11 w-full rounded-md px-2.5 py-2 text-left text-[12.5px] lg:min-h-0 " +
                       (search.range === key
                         ? "bg-[var(--bg-1)] text-foreground"
                         : "text-foreground/80 hover:bg-[var(--bg-1)]")
@@ -183,37 +190,41 @@ function CustomRangeCalendar({
           type="button"
           aria-label="Previous month"
           onClick={() => setMonthCursor(addMonths(monthCursor, -1))}
-          className="rounded-md p-1.5 text-muted-foreground hover:bg-[var(--bg-1)] hover:text-foreground"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:bg-[var(--bg-1)] hover:text-foreground lg:h-auto lg:w-auto lg:p-1.5"
         >
           <ChevronLeftIcon />
         </button>
         <div className="font-mono text-[11.5px] text-muted-foreground">
-          {monthLabel(months[0]!)} — {monthLabel(months[1]!)}
+          <span className="sm:hidden">{monthLabel(months[1]!)}</span>
+          <span className="hidden sm:inline">
+            {monthLabel(months[0]!)} — {monthLabel(months[1]!)}
+          </span>
         </div>
         <button
           type="button"
           aria-label="Next month"
           onClick={() => setMonthCursor(addMonths(monthCursor, 1))}
-          className="rounded-md p-1.5 text-muted-foreground hover:bg-[var(--bg-1)] hover:text-foreground"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground hover:bg-[var(--bg-1)] hover:text-foreground lg:h-auto lg:w-auto lg:p-1.5"
         >
           <ChevronRightIcon />
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        {months.map((month) => (
-          <CalendarMonth
-            key={month.toISOString()}
-            month={month}
-            startMs={draft.startMs}
-            endMs={draft.endMs}
-            nowMs={nowMs}
-            onDayClick={onDayClick}
-          />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {months.map((month, index) => (
+          <div className={index === 0 ? "hidden sm:block" : ""} key={month.toISOString()}>
+            <CalendarMonth
+              month={month}
+              startMs={draft.startMs}
+              endMs={draft.endMs}
+              nowMs={nowMs}
+              onDayClick={onDayClick}
+            />
+          </div>
         ))}
       </div>
 
-      <div className="flex items-center justify-between gap-2 border-t border-border pt-2.5">
+      <div className="flex flex-col gap-2 border-t border-border pt-2.5 sm:flex-row sm:items-center sm:justify-between">
         <span className="font-mono text-[11px] text-muted-foreground">
           {draft.startMs != null && draft.endMs != null
             ? `${formatDate(draft.startMs)} → ${formatDate(draft.endMs)}`
@@ -225,7 +236,7 @@ function CustomRangeCalendar({
           <button
             type="button"
             onClick={() => setDraft({ startMs: null, endMs: null })}
-            className="rounded-md px-2.5 py-1.5 text-[12px] text-muted-foreground hover:text-foreground"
+            className="min-h-11 rounded-md px-2.5 py-1.5 text-[12px] text-muted-foreground hover:text-foreground lg:min-h-0"
           >
             Clear
           </button>
@@ -233,7 +244,7 @@ function CustomRangeCalendar({
             type="button"
             onClick={apply}
             disabled={draft.startMs == null || draft.endMs == null}
-            className="rounded-md bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            className="min-h-11 rounded-md bg-primary px-3 py-1.5 text-[12px] font-medium text-primary-foreground disabled:cursor-not-allowed disabled:opacity-40 lg:min-h-0"
           >
             Apply
           </button>
@@ -291,7 +302,7 @@ function CalendarMonth({
               disabled={disabled}
               onClick={() => onDayClick(dayMs)}
               className={
-                "relative h-7 rounded-md text-[11.5px] font-mono tabular-nums " +
+                "relative h-11 rounded-md text-[11.5px] font-mono tabular-nums lg:h-7 " +
                 (disabled
                   ? "cursor-not-allowed text-muted-foreground/40"
                   : isStart || isEnd
@@ -360,6 +371,22 @@ function formatDate(ms: number): string {
 
 function formatRangeShort(startMs: number, endMs: number): string {
   return `${formatDate(startMs)} → ${formatDate(endMs)}`;
+}
+
+function formatRangeCompact(startMs: number, endMs: number): string {
+  const start = new Date(startMs);
+  const end = new Date(endMs);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return formatRangeShort(startMs, endMs);
+  }
+  const sameYear = start.getUTCFullYear() === end.getUTCFullYear();
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: sameYear ? undefined : "2-digit",
+    timeZone: "UTC",
+  });
+  return `${fmt.format(start)}-${fmt.format(end)}`;
 }
 
 function CalendarIcon() {

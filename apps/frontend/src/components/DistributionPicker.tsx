@@ -56,7 +56,7 @@ export function DistributionPicker() {
       <PopoverTrigger asChild>
         <button
           type="button"
-          className="inline-flex h-8 items-center gap-2 rounded-full border border-border bg-[var(--surface)] px-3 text-[12.5px] font-medium text-foreground hover:bg-[var(--surface-2)]"
+          className="inline-flex h-11 items-center gap-2 rounded-full border border-border bg-[var(--surface)] px-3 text-[12.5px] font-medium text-foreground hover:bg-[var(--surface-2)] lg:h-8"
           aria-label="Distribution envelopes"
         >
           <span className="text-muted-foreground">Show</span>

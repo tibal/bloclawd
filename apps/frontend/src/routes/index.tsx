@@ -69,10 +69,10 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   return (
     <div className="space-y-24 py-8">
-      <section className="grid gap-12 lg:grid-cols-[1.05fr_1fr] lg:items-center">
+      <section className="grid min-w-0 gap-12 lg:grid-cols-[1.05fr_1fr] lg:items-center">
         <m.div
           animate="show"
-          className="space-y-7"
+          className="min-w-0 space-y-7"
           initial="hidden"
           variants={heroContainer}
         >
@@ -105,15 +105,15 @@ function HomePage() {
           </m.p>
 
           <m.div
-            className="flex flex-wrap items-center gap-3 sm:flex-nowrap"
+            className="grid max-w-xl grid-cols-2 gap-3 lg:flex lg:flex-wrap lg:items-center"
             variants={heroItem}
           >
-            <Button asChild className="whitespace-nowrap" size="lg">
+            <Button asChild className="min-w-0 px-3 sm:px-8" size="lg">
               <a href="/dashboard">See the cohort</a>
             </Button>
             <Button
               asChild
-              className="whitespace-nowrap"
+              className="min-w-0 px-3 sm:px-8"
               size="lg"
               variant="outline"
             >
@@ -121,7 +121,7 @@ function HomePage() {
             </Button>
             <Button
               asChild
-              className="whitespace-nowrap"
+              className="min-w-0 px-3 sm:px-8"
               size="lg"
               variant="ghost"
             >
@@ -129,7 +129,7 @@ function HomePage() {
             </Button>
             <Button
               asChild
-              className="whitespace-nowrap"
+              className="min-w-0 px-3 sm:px-8"
               size="lg"
               variant="ghost"
             >
@@ -144,7 +144,12 @@ function HomePage() {
           </m.div>
         </m.div>
 
-        <m.div animate="show" initial="hidden" variants={installVariants}>
+        <m.div
+          animate="show"
+          className="min-w-0"
+          initial="hidden"
+          variants={installVariants}
+        >
           <InstallPreview />
         </m.div>
       </section>
@@ -248,17 +253,17 @@ function KpiStrip() {
   return (
     <div
       aria-label="Dataset summary"
-      className="grid max-w-xl grid-cols-3 gap-3 pt-4"
+      className="grid max-w-xl grid-cols-2 gap-3 pt-4 md:grid-cols-3"
       role="group"
     >
       {items.map((item, i) => (
         <m.div
           {...kpiReveal}
-          className="surface-card px-4 py-3"
+          className="surface-card min-w-0 px-4 py-3 last:col-span-2 md:last:col-span-1"
           key={item.label}
           transition={{ duration: 0.55, ease: EASE, delay: 0.4 + i * 0.06 }}
         >
-          <div className="kpi-value tabular-nums">{item.value}</div>
+          <div className="kpi-value truncate tabular-nums">{item.value}</div>
           <div className="kpi-label mt-1">{item.label}</div>
         </m.div>
       ))}

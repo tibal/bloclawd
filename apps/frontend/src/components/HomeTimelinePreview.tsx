@@ -63,7 +63,7 @@ export function HomeTimelinePreview() {
           </p>
         </div>
         <a
-          className="inline-flex h-9 items-center rounded-full border border-border bg-[var(--surface)] px-4 text-[12.5px] font-medium text-foreground transition-colors hover:bg-[var(--surface-2)]"
+          className="inline-flex h-11 items-center rounded-full border border-border bg-[var(--surface)] px-4 text-[12.5px] font-medium text-foreground transition-colors hover:bg-[var(--surface-2)]"
           href="/dashboard"
         >
           Open full dashboard →

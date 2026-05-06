@@ -163,7 +163,7 @@ export function FilterPill({
     <Select onValueChange={onChange} value={value}>
       <SelectTrigger
         aria-label={ariaLabel}
-        className="h-8 w-fit min-h-0 justify-start gap-2 rounded-full border border-border bg-[var(--surface)] px-3 text-[12.5px] font-medium text-foreground hover:bg-[var(--surface-2)] data-[state=open]:bg-[var(--surface-2)]"
+        className="h-11 min-h-11 w-fit justify-start gap-2 rounded-full border border-border bg-[var(--surface)] px-3 text-[12.5px] font-medium text-foreground hover:bg-[var(--surface-2)] data-[state=open]:bg-[var(--surface-2)] lg:h-8 lg:min-h-0"
       >
         <span className="text-muted-foreground">{label}</span>
         <SelectValue />

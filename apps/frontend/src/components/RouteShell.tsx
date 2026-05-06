@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { Menu, X } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { useRouterState } from "@tanstack/react-router";
 
 import { Separator } from "@/components/ui/separator";
@@ -25,6 +26,8 @@ interface RouteShellProps {
 
 export function RouteShell({ children }: RouteShellProps) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const closeMobileMenu = () => setMobileMenuOpen(false);
 
   return (
     <div className="relative min-h-screen text-foreground">
@@ -62,14 +65,53 @@ export function RouteShell({ children }: RouteShellProps) {
               ))}
             </div>
 
+            <button
+              aria-controls="mobile-primary-nav"
+              aria-expanded={mobileMenuOpen}
+              aria-label={
+                mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"
+              }
+              className="nav-menu-toggle"
+              onClick={() => setMobileMenuOpen((open) => !open)}
+              type="button"
+            >
+              {mobileMenuOpen ? <X aria-hidden /> : <Menu aria-hidden />}
+            </button>
+
             <a
-              className="nav-cta"
+              className="nav-cta nav-github-cta"
               href="https://github.com/bloclawd/bloclawd"
               rel="noreferrer"
               target="_blank"
             >
               GitHub
             </a>
+
+            {mobileMenuOpen ? (
+              <div className="nav-mobile-panel" id="mobile-primary-nav">
+                {headerLinks.map((link) => (
+                  <a
+                    className={`nav-mobile-link${
+                      isActiveLink(pathname, link.href) ? " active" : ""
+                    }`}
+                    href={link.href}
+                    key={link.href}
+                    onClick={closeMobileMenu}
+                  >
+                    {link.label}
+                  </a>
+                ))}
+                <a
+                  className="nav-mobile-link external"
+                  href="https://github.com/bloclawd/bloclawd"
+                  onClick={closeMobileMenu}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  GitHub
+                </a>
+              </div>
+            ) : null}
           </nav>
         </header>
 
