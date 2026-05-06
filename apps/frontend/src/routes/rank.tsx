@@ -57,7 +57,7 @@ export const Route = createFileRoute("/rank")({
   head: () => routeHead("/rank"),
 });
 
-const SAMPLE_INPUT = `bloclawd dry-run - group 10000000... - 2 models
+const SAMPLE_INPUT = `bloclawd submit - group 10000000... - 2 models
 
 Limit card: claude-code / max20 / NA / 5h
 Paste the block below into https://bloclawd.com/rank
@@ -143,18 +143,30 @@ function RankPage() {
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
               <span className="tag dot">rank card</span>
-              <span className="tag teal dot">client-side math</span>
+              <span className="tag teal dot">submit first</span>
               <span className="tag amber dot">shareable URL</span>
             </div>
             <h1 className="max-w-3xl text-4xl font-semibold leading-tight tracking-tight text-foreground sm:text-6xl">
-              Your rate limit has a stat profile.
+              Submit a limit hit and make a shareable card.
             </h1>
             <p className="max-w-2xl text-base leading-7 text-muted-foreground">
-              Paste the bloclawd CLI dry-run, get a public-data comparison,
-              then share the card. The score is less interesting than the
-              shape: model mix, cache posture, output burn, and how far your
-              cap sits from similar users.
+              Run the normal bloclawd command after a cap. It asks before
+              sending, contributes an anonymous public data point, and prints
+              the rank block for this card. Use dry-run only if you want to
+              preview without contributing yet.
             </p>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild>
+                <a href="/install">
+                  <Terminal />
+                  Install and submit
+                </a>
+              </Button>
+              <Button onClick={loadSample} type="button" variant="outline">
+                <Zap />
+                Try sample card
+              </Button>
+            </div>
             <Chrome />
           </div>
 
@@ -183,9 +195,9 @@ function RankPage() {
         <div className="surface-card overflow-hidden">
           <div className="flex items-center justify-between gap-3 border-b border-border/60 px-5 py-4">
             <div>
-              <div className="text-sm font-medium text-foreground">Paste CLI output</div>
+              <div className="text-sm font-medium text-foreground">Paste submitted rank block</div>
               <div className="font-mono text-[11.5px] text-muted-foreground">
-                bloclawd --dry-run · no upload · local parsing
+                normal run submits data · browser-only card math
               </div>
             </div>
             <Terminal className="h-4 w-4 text-muted-foreground" />
@@ -323,7 +335,7 @@ function RankPoster({
                   bloclawd / rank
                 </div>
                 <div className="text-sm font-medium text-foreground">
-                  {report ? cohortLabel(report) : "paste a dry-run"}
+                  {report ? cohortLabel(report) : "paste a rank block"}
                 </div>
               </div>
             </div>
@@ -357,11 +369,11 @@ function RankPoster({
                 virality vector
               </div>
               <div className="text-4xl font-semibold leading-tight tracking-tight text-foreground sm:text-6xl">
-                Paste. Compare. Brag carefully.
+                Paste. Compare. Share the card.
               </div>
               <p className="max-w-xl text-sm leading-6 text-muted-foreground">
-                The shared URL carries the whole card. Social crawlers get
-                result-aware metadata; humans get the interactive breakdown.
+                Install the CLI, run the normal command, then paste the rank
+                block it prints. Dry-run is for previewing without contribution.
               </p>
             </div>
           )}
@@ -417,9 +429,9 @@ function ResultSummary({
               The card starts in your terminal.
             </h2>
             <p className="text-sm leading-6 text-muted-foreground">
-              Run `bloclawd --cc --tier max20 --end 16:00 --5h --dry-run`
-              after a bonk, paste the rank block, and the browser does the
-              rest.
+              Run `bloclawd --cc --tier max20 --end 16:00 --5h` after a bonk.
+              It asks before submitting, then prints the rank block for this
+              card.
             </p>
           </div>
         ) : loading ? (
@@ -474,7 +486,7 @@ function SharePanel({
           <div className="text-sm font-medium text-foreground">Social metadata</div>
           <p className="mt-1 text-sm leading-6 text-muted-foreground">
             {analysis.shareTitle}. The URL stores the full card plus compact
-            preview fields.
+            card fields.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">

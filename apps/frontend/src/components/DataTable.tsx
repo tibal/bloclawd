@@ -43,7 +43,9 @@ export function DataTable({ rows, ariaLabel, className }: DataTableProps) {
     >
       <TableHeader className="sticky top-0 bg-background">
         <TableRow>
-          <TableHead>Timestamp</TableHead>
+          <TableHead className="sticky left-0 z-10 bg-background">
+            Timestamp
+          </TableHead>
           {PERCENTILE_COLUMNS.map((column) => (
             <TableHead key={column} className="text-right">
               {column}
@@ -54,7 +56,7 @@ export function DataTable({ rows, ariaLabel, className }: DataTableProps) {
       <TableBody>
         {rows.map((row) => (
           <TableRow key={row.ts}>
-            <TableCell className="whitespace-nowrap font-mono tabular-nums">
+            <TableCell className="sticky left-0 z-10 whitespace-nowrap bg-[var(--bg-1)] font-mono tabular-nums">
               {row.ts}
             </TableCell>
             {PERCENTILE_COLUMNS.map((column) => (

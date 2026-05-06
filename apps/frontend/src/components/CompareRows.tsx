@@ -64,7 +64,7 @@ export function CompareRows() {
         <button
           type="button"
           onClick={addRow}
-          className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border bg-[var(--surface)] px-3 text-[11.5px] font-medium text-foreground hover:bg-[var(--surface-2)]"
+          className="inline-flex h-11 items-center gap-1.5 rounded-full border border-border bg-[var(--surface)] px-3 text-[11.5px] font-medium text-foreground hover:bg-[var(--surface-2)] lg:h-7"
         >
           <PlusIcon /> Add comparison
         </button>
@@ -79,7 +79,7 @@ export function CompareRows() {
           {search.rows.map((row, idx) => (
             <li
               key={idx}
-              className="flex items-start gap-2 rounded-lg border border-border/60 bg-[var(--bg-1)]/60 px-2.5 py-2"
+              className="relative flex items-start gap-2 rounded-lg border border-border/60 bg-[var(--bg-1)]/60 px-2.5 py-2 pr-14"
             >
               <span className="mt-1.5 inline-flex h-5 items-center justify-center rounded-md bg-[var(--surface-2)] px-1.5 font-mono text-[10px] text-muted-foreground">
                 {idx + 2}
@@ -95,7 +95,7 @@ export function CompareRows() {
                 type="button"
                 aria-label={`Remove comparison row ${idx + 1}`}
                 onClick={() => removeRow(idx)}
-                className="mt-1 rounded-full p-1.5 text-muted-foreground transition-colors hover:bg-[var(--bg-1)] hover:text-foreground"
+                className="absolute right-1.5 top-1.5 inline-flex h-11 w-11 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-[var(--bg-1)] hover:text-foreground sm:right-2 sm:top-2"
               >
                 <XIcon />
               </button>

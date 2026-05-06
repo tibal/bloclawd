@@ -7,9 +7,9 @@
 export const SITE_URL = "https://bloclawd.com" as const;
 export const SITE_NAME = "bloclawd" as const;
 export const SITE_TAGLINE =
-  "When do AI subscription users actually hit limits?" as const;
+  "Got rate-limited by Claude Code or Codex?" as const;
 export const SITE_DESCRIPTION =
-  "Live cohort percentiles for Claude Code and Codex rate limits. See where Pro, Max5, and Max20 caps actually fire — and how they drift week to week. Open dataset, one CLI command to contribute, anonymous by construction." as const;
+  "Submit your last Claude Code or Codex limit hit as an anonymous public data point, then turn it into a shareable card. Prompts, paths, account IDs, and API keys are never sent." as const;
 export const SITE_KEYWORDS = [
   "claude code rate limit",
   "codex rate limit",
@@ -75,7 +75,7 @@ export const ROUTES: RouteSeo[] = [
     description: SITE_DESCRIPTION,
     jsonLd: SITE_JSON_LD,
     noscript:
-      "bloclawd shows where Claude Code and Codex rate limits actually fire — for everyone, not just you. Rank your last bonked window against the live cohort, watch the envelope drift week to week, and contribute your own with one CLI command. Anonymous by construction, k ≥ 5.",
+      "bloclawd submits your last Claude Code or Codex limit hit as an anonymous public data point, then turns it into a shareable card. Prompts, file paths, account IDs, API keys, and per-event timestamps are never sent. Public cells require k ≥ 5.",
   },
   {
     path: "/dashboard",
@@ -135,7 +135,7 @@ export const ROUTES: RouteSeo[] = [
     path: "/install",
     title: "Install bloclawd · macOS & Linux",
     description:
-      "Install the bloclawd CLI via curl, cargo, or Homebrew. One command after a 5-hour or weekly rate-limit hit submits a canonicalized, signed event.",
+      "Install the bloclawd CLI via curl, cargo, or Homebrew. One command after a 5-hour or weekly rate-limit hit submits an anonymous event and prints a rank block for your card.",
     jsonLd: {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
@@ -149,7 +149,7 @@ export const ROUTES: RouteSeo[] = [
       author: { "@type": "Organization", name: SITE_NAME, url: SITE_URL },
     },
     noscript:
-      "Install the bloclawd CLI on macOS or Linux: curl -fsSL https://bloclawd.com/install.sh | sh — or cargo install bloclawd, or brew install bloclawd/tap/bloclawd. One command after you hit a rate limit submits a canonicalized, signed event.",
+      "Install the bloclawd CLI on macOS or Linux: curl -fsSL https://bloclawd.com/install.sh | sh — or cargo install bloclawd, or brew install bloclawd/tap/bloclawd. One command after you hit a rate limit submits an anonymous event and prints a rank block for your card.",
   },
   {
     path: "/data",
@@ -161,9 +161,9 @@ export const ROUTES: RouteSeo[] = [
   },
   {
     path: "/rank",
-    title: "Rank your AI rate-limit hit · shareable CLI card",
+    title: "Make a shareable Claude Code or Codex limit card",
     description:
-      "Paste bloclawd CLI output and get a shareable rank card: API-equivalent cost, cohort segment, token profile, model mix, and workflow recommendations.",
+      "Run the normal bloclawd command to submit an anonymous limit hit, then paste the rank block it prints for a shareable card and cohort comparison.",
     jsonLd: {
       "@context": "https://schema.org",
       "@type": "WebApplication",
@@ -172,11 +172,11 @@ export const ROUTES: RouteSeo[] = [
       applicationCategory: "DeveloperApplication",
       operatingSystem: "Any",
       description:
-        "Client-side tool that turns bloclawd CLI dry-run output into a shareable cohort card with API-equivalent cost, token mix, model mix, and recommendations.",
+        "Client-side tool that turns a submitted bloclawd rank block into a shareable limit card with profile, cohort comparison, token mix, model mix, and recommendations.",
       offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
     },
     noscript:
-      "Rank your AI rate-limit hit: paste bloclawd CLI dry-run output and get a shareable card with API-equivalent cost, cohort segment, token profile, model mix, and workflow recommendations.",
+      "Make a shareable Claude Code or Codex limit card: run the normal bloclawd command to contribute anonymously, then paste the rank block for your profile and cohort comparison.",
   },
   {
     path: "/compare",

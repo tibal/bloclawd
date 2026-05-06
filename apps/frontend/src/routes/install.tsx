@@ -106,7 +106,7 @@ function InstallPage() {
           <span className="font-mono text-foreground">bloclawd</span> is a
           small Rust binary. It reads local Claude Code or Codex session logs,
           builds a payload for a fixed time window, shows you the exact event,
-          and only submits after you confirm.
+          asks before submitting, and prints the rank block for your card.
         </p>
       </header>
 
@@ -145,15 +145,15 @@ function InstallPage() {
 
       <section className="space-y-4">
         <h2 className="text-xl font-semibold tracking-tight text-foreground">
-          Then submit a window
+          Submit a window and make a card
         </h2>
         <div className="surface-card p-5">
           <pre className="code-block">
-{`# Dry run first — no network, just preview
-`}<span className="c-cmd">bloclawd</span>{" "}<span className="c-flag">--cc --tier max20 --end 16:00 --5h --dry-run</span>{`
-
-# Then actually submit (asks one [y/N])
+{`# Recommended: submit the anonymous hit and print the card block
 `}<span className="c-cmd">bloclawd</span>{" "}<span className="c-flag">--cc --tier max20 --end 16:00 --5h</span>{`
+
+# Preview-only mode skips the public dataset contribution
+`}<span className="c-cmd">bloclawd</span>{" "}<span className="c-flag">--cc --tier max20 --end 16:00 --5h --dry-run</span>{`
 
 `}<span className="c-com"># For Codex sessions, swap --cc for --codex.</span>
           </pre>

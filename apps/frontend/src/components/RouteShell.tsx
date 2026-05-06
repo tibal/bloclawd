@@ -1,15 +1,13 @@
-import type { ReactNode } from "react";
+import { Menu, X } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { useRouterState } from "@tanstack/react-router";
 
 import { Separator } from "@/components/ui/separator";
 
 const headerLinks = [
-  { label: "Home", href: "/" },
-  { label: "Dashboard", href: "/dashboard" },
-  { label: "Rank", href: "/rank" },
+  { label: "Make card", href: "/rank" },
+  { label: "Live data", href: "/dashboard" },
   { label: "Install", href: "/install" },
-  { label: "Methodology", href: "/methodology" },
-  { label: "Data", href: "/data" },
 ] as const;
 
 const footerLinks = [
@@ -25,6 +23,8 @@ interface RouteShellProps {
 
 export function RouteShell({ children }: RouteShellProps) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const closeMobileMenu = () => setMobileMenuOpen(false);
 
   return (
     <div className="relative min-h-screen text-foreground">
@@ -62,14 +62,53 @@ export function RouteShell({ children }: RouteShellProps) {
               ))}
             </div>
 
+            <button
+              aria-controls="mobile-primary-nav"
+              aria-expanded={mobileMenuOpen}
+              aria-label={
+                mobileMenuOpen ? "Close navigation menu" : "Open navigation menu"
+              }
+              className="nav-menu-toggle"
+              onClick={() => setMobileMenuOpen((open) => !open)}
+              type="button"
+            >
+              {mobileMenuOpen ? <X aria-hidden /> : <Menu aria-hidden />}
+            </button>
+
             <a
-              className="nav-cta"
+              className="nav-cta nav-github-cta"
               href="https://github.com/bloclawd/bloclawd"
               rel="noreferrer"
               target="_blank"
             >
               GitHub
             </a>
+
+            {mobileMenuOpen ? (
+              <div className="nav-mobile-panel" id="mobile-primary-nav">
+                {headerLinks.map((link) => (
+                  <a
+                    className={`nav-mobile-link${
+                      isActiveLink(pathname, link.href) ? " active" : ""
+                    }`}
+                    href={link.href}
+                    key={link.href}
+                    onClick={closeMobileMenu}
+                  >
+                    {link.label}
+                  </a>
+                ))}
+                <a
+                  className="nav-mobile-link external"
+                  href="https://github.com/bloclawd/bloclawd"
+                  onClick={closeMobileMenu}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  GitHub
+                </a>
+              </div>
+            ) : null}
           </nav>
         </header>
 
@@ -119,7 +158,7 @@ function isActiveLink(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-const SUBMIT_CTA_HIDDEN_PATHS = new Set(["/install"]);
+const SUBMIT_CTA_HIDDEN_PATHS = new Set(["/install", "/rank"]);
 
 function SubmitCtaStrip({ pathname }: { pathname: string }) {
   if (SUBMIT_CTA_HIDDEN_PATHS.has(pathname)) return null;
@@ -132,11 +171,11 @@ function SubmitCtaStrip({ pathname }: { pathname: string }) {
       <div className="surface-card flex flex-wrap items-center justify-between gap-4 p-5">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-foreground">
-            Bonked a 5-hour or weekly cap?
+            Got rate-limited by Claude Code or Codex?
           </p>
           <p className="text-sm leading-6 text-muted-foreground">
-            One CLI command turns it into a public data point — anonymous,
-            PoW-gated, dry-run first.
+            The normal CLI run submits an anonymous data point and prints the
+            card block. No prompts, paths, or account info.
           </p>
         </div>
         <a
@@ -144,7 +183,7 @@ function SubmitCtaStrip({ pathname }: { pathname: string }) {
           data-testid="submit-cta"
           href="/install"
         >
-          Submit yours →
+          Submit + card →
         </a>
       </div>
     </aside>

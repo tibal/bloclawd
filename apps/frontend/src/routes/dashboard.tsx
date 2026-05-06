@@ -101,8 +101,8 @@ function DashboardPage() {
           </h1>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
             Where your tier&apos;s limits actually fire. Pick a tier for the
-            live API-cost envelope, or open Rank to turn a CLI dry-run into a
-            shareable cohort card.
+            live API-cost envelope, or open Rank to turn a submitted rank block
+            into a shareable cohort card.
             Cells with fewer than 5 contributors are suppressed for anonymity.
           </p>
           <Chrome />
@@ -121,7 +121,7 @@ function DashboardPage() {
           <div className="min-w-0 grow">
             <Filters />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Toggle
               aria-label="Toggle compare mode"
               pressed={search.compare}
@@ -131,7 +131,7 @@ function DashboardPage() {
                 })
               }
               variant="outline"
-              className="h-9 rounded-full px-3.5 text-[12.5px]"
+              className="h-11 rounded-full px-3.5 text-[12.5px] lg:h-9"
             >
               {search.compare ? "Comparing" : "Compare"}
             </Toggle>
@@ -151,7 +151,7 @@ function DashboardPage() {
               bins · k ≥ 5 cells only · {kpis.submissionsLabel} submissions
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <PercentilePicker />
             {!search.compare ? <DistributionPicker /> : null}
           </div>
@@ -358,7 +358,7 @@ function ChartArea({
           <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-[var(--bg-1)]">
             Show percentile values per timestamp
           </summary>
-          <div className="border-t border-border px-4 py-3">
+          <div className="border-t border-border px-0 py-3 sm:px-4">
             <DataTable
               ariaLabel="Percentile values per timestamp"
               rows={alignedDataToRows(primary.data)}
@@ -400,7 +400,7 @@ function KpiRow({ kpis, hasData }: { kpis: ComputedKpis; hasData: boolean }) {
   ];
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
       {items.map((item) => (
         <div key={item.label} className="surface-card px-5 py-4">
           <div className="kpi-label">{item.label}</div>
