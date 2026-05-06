@@ -5,12 +5,9 @@ import { useRouterState } from "@tanstack/react-router";
 import { Separator } from "@/components/ui/separator";
 
 const headerLinks = [
-  { label: "Home", href: "/" },
-  { label: "Dashboard", href: "/dashboard" },
-  { label: "Rank", href: "/rank" },
+  { label: "Make card", href: "/rank" },
+  { label: "Live data", href: "/dashboard" },
   { label: "Install", href: "/install" },
-  { label: "Methodology", href: "/methodology" },
-  { label: "Data", href: "/data" },
 ] as const;
 
 const footerLinks = [
@@ -161,7 +158,7 @@ function isActiveLink(pathname: string, href: string): boolean {
   return pathname === href || pathname.startsWith(href + "/");
 }
 
-const SUBMIT_CTA_HIDDEN_PATHS = new Set(["/install"]);
+const SUBMIT_CTA_HIDDEN_PATHS = new Set(["/install", "/rank"]);
 
 function SubmitCtaStrip({ pathname }: { pathname: string }) {
   if (SUBMIT_CTA_HIDDEN_PATHS.has(pathname)) return null;
@@ -174,11 +171,11 @@ function SubmitCtaStrip({ pathname }: { pathname: string }) {
       <div className="surface-card flex flex-wrap items-center justify-between gap-4 p-5">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-foreground">
-            Bonked a 5-hour or weekly cap?
+            Got rate-limited by Claude Code or Codex?
           </p>
           <p className="text-sm leading-6 text-muted-foreground">
-            One CLI command turns it into a public data point — anonymous,
-            PoW-gated, dry-run first.
+            The normal CLI run submits an anonymous data point and prints the
+            card block. No prompts, paths, or account info.
           </p>
         </div>
         <a
@@ -186,7 +183,7 @@ function SubmitCtaStrip({ pathname }: { pathname: string }) {
           data-testid="submit-cta"
           href="/install"
         >
-          Submit yours →
+          Submit + card →
         </a>
       </div>
     </aside>

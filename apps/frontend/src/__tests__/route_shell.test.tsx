@@ -85,10 +85,13 @@ describe("RouteShell", () => {
         '[data-testid="submit-cta"]',
       );
 
-      expect(cta?.textContent?.trim()).toBe("Submit yours →");
+      expect(cta?.textContent?.trim()).toBe("Submit + card →");
       expect(cta?.getAttribute("href")).toBe("/install");
       expect(container.textContent).toContain(
-        "Bonked a 5-hour or weekly cap?",
+        "Got rate-limited by Claude Code or Codex?",
+      );
+      expect(container.textContent).toContain(
+        "The normal CLI run submits an anonymous data point",
       );
     } finally {
       cleanup();

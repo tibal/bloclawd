@@ -58,21 +58,28 @@ async function renderHome() {
 }
 
 describe("home page CTAs", () => {
-  it("links to the dashboard and methodology", async () => {
+  it("prioritizes the rank card and keeps live data accessible", async () => {
     const { container, cleanup } = await renderHome();
 
     try {
       const links = Array.from(container.querySelectorAll<HTMLAnchorElement>("a"));
-      const dashboard = links.find(
-        (link) => link.textContent === "See the cohort",
+      const install = links.find(
+        (link) => link.textContent === "Submit + make card",
       );
+      const dashboard = links.find(
+        (link) => link.textContent === "See live limits",
+      );
+      const rank = links.find((link) => link.textContent === "Try sample card");
       const methodology = links.find(
-        (link) => link.textContent === "Read the methodology",
+        (link) => link.textContent === "Privacy details",
       );
 
-      expect(dashboard?.textContent).toBe("See the cohort");
+      expect(install?.textContent).toBe("Submit + make card");
+      expect(install?.getAttribute("href")).toBe("/install");
+      expect(dashboard?.textContent).toBe("See live limits");
       expect(dashboard?.getAttribute("href")).toBe("/dashboard");
-      expect(methodology?.textContent).toBe("Read the methodology");
+      expect(rank?.getAttribute("href")).toBe("/rank");
+      expect(methodology?.textContent).toBe("Privacy details");
       expect(methodology?.getAttribute("href")).toBe("/methodology");
     } finally {
       cleanup();

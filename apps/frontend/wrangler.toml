@@ -53,6 +53,8 @@ custom_domain = true
 
 [env.production]
 name = "bloclawd-frontend"
+workers_dev = false
+preview_urls = false
 vars = { ENVIRONMENT = "production" }
 
 [env.production.assets]
@@ -60,6 +62,11 @@ directory = "./dist/client"
 not_found_handling = "single-page-application"
 binding = "ASSETS"
 run_worker_first = true
+
+[[env.production.r2_buckets]]
+binding = "BUCKET"
+bucket_name = "bloclawd-reports"
+preview_bucket_name = "bloclawd-reports"
 
 # Custom-domain attach (DIST-07). Cloudflare auto-creates the proxied
 # DNS record + edge cert on `wrangler deploy --env production`.

@@ -9,8 +9,6 @@ import { useStatus } from "@/lib/r2";
 import { routeHead } from "@/lib/route-head";
 import { useCountUp } from "@/lib/use-count-up";
 
-const githubUrl = "https://github.com/bloclawd/bloclawd";
-
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 const heroContainer: Variants = {
@@ -80,28 +78,27 @@ function HomePage() {
             className="flex flex-wrap items-center gap-2"
             variants={heroItem}
           >
-            <span className="tag dot">cohort percentiles</span>
-            <span className="tag">drift over time</span>
-            <span className="tag">anonymous by construction</span>
+            <span className="tag dot">real limit hits</span>
+            <span className="tag">contribute + card</span>
+            <span className="tag">prompts never sent</span>
           </m.div>
 
           <m.h1
             className="text-4xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-5xl lg:text-6xl"
             variants={heroItem}
           >
-            When do AI subscription users{" "}
-            <ShimmerWord>actually</ShimmerWord>{" "}
-            hit limits?
+            Got rate-limited by{" "}
+            <ShimmerWord>Claude Code</ShimmerWord>{" "}
+            or Codex?
           </m.h1>
 
           <m.p
             className="max-w-xl text-base leading-7 text-muted-foreground"
             variants={heroItem}
           >
-            See where Claude Code &amp; Codex limits actually fire — for
-            everyone, not just you. Paste your last bonked window into a rank
-            card, compare it to the live cohort, and watch the envelope drift
-            week to week. One CLI command, anonymous by construction.
+            Submit your last limit hit as an anonymous public data point, then
+            turn it into a shareable card. No prompts, file paths, account IDs,
+            API keys, or per-event timestamps are sent.
           </m.p>
 
           <m.div
@@ -109,7 +106,7 @@ function HomePage() {
             variants={heroItem}
           >
             <Button asChild className="min-w-0 px-3 sm:px-8" size="lg">
-              <a href="/dashboard">See the cohort</a>
+              <a href="/install">Submit + make card</a>
             </Button>
             <Button
               asChild
@@ -117,7 +114,7 @@ function HomePage() {
               size="lg"
               variant="outline"
             >
-              <a href="/rank">Rank your bonk</a>
+              <a href="/dashboard">See live limits</a>
             </Button>
             <Button
               asChild
@@ -125,7 +122,7 @@ function HomePage() {
               size="lg"
               variant="ghost"
             >
-              <a href="/methodology">Read the methodology</a>
+              <a href="/rank">Try sample card</a>
             </Button>
             <Button
               asChild
@@ -133,9 +130,7 @@ function HomePage() {
               size="lg"
               variant="ghost"
             >
-              <a href={githubUrl} rel="noreferrer" target="_blank">
-                View source
-              </a>
+              <a href="/methodology">Privacy details</a>
             </Button>
           </m.div>
 
@@ -157,16 +152,16 @@ function HomePage() {
       <section className="grid gap-3 sm:grid-cols-3">
         {[
           {
-            t: "See the cohort, not just yourself",
-            d: "Live p10–p90 envelope for every tier × harness × model. Find out whether your last 5-hour bonk is normal — or you're sitting in a tighter cohort than your tier-mates.",
+            t: "One run powers both loops",
+            d: "The normal CLI command contributes an anonymous limit hit and prints the rank block for your card. Use dry-run only when you want to preview without helping the dataset yet.",
           },
           {
-            t: "Watch the line move",
-            d: "Daily aggregates over 24h / 7d / 30d / 90d. Limits tightening? Loosening? You'll see the envelope shift before any changelog admits it.",
+            t: "See whether your cap was normal",
+            d: "Compare your hit with other Claude Code and Codex users on the same tier, region, and limit window.",
           },
           {
-            t: "Turn bonks into share cards",
-            d: "Paste the CLI dry-run and get a profile: cache stacker, output spender, context hauler, or premium model loyalist. The URL carries the full card.",
+            t: "Share the result, not your work",
+            d: "The card URL carries the score and breakdown. Prompts, tool arguments, file paths, account IDs, API keys, and per-event timestamps never leave your machine.",
           },
         ].map((p, i) => (
           <m.article
@@ -192,8 +187,7 @@ function HomePage() {
         aria-label="Trust guarantees"
         className="text-center text-xs leading-6 text-muted-foreground"
       >
-        Anonymous by construction · k ≥ 5 · proof-of-work admission · open
-        source ·{" "}
+        Submit once, get a card · prompts never sent · k ≥ 5 public cells · open source ·{" "}
         <a
           className="text-primary underline underline-offset-4"
           href="/data"
@@ -294,7 +288,7 @@ function InstallPreview() {
       <div className="relative space-y-4">
         <div className="flex items-center justify-between">
           <div className="text-sm font-medium text-foreground">
-            After you hit a limit, run
+            Submit once, paste the rank block
           </div>
           <span className="tag">macOS · Linux</span>
         </div>
@@ -302,12 +296,12 @@ function InstallPreview() {
         <pre className="code-block">{`# 1. Install (universal)
 `}<span className="c-cmd">curl</span><span className="c-flag"> -fsSL</span><span className="c-str"> https://bloclawd.com/install.sh</span>{` | `}<span className="c-cmd">sh</span>{`
 
-# 2. Submit a 5-hour window
+# 2. Submit and generate the rank block
 `}<span className="c-cmd">bloclawd</span><span className="c-flag"> --cc --tier max20 --end 16:00 --5h</span>{`
 
 `}<span className="c-com">› reads ~/.claude/projects/**/*.jsonl</span>{`
-`}<span className="c-com">› shows the exact event before submission</span>{`
-`}<span className="c-com">› solves a PoW challenge locally</span>
+`}<span className="c-com">› asks before submitting the anonymous event</span>{`
+`}<span className="c-com">› prints the rank block for your card</span>
         </pre>
 
         <div className="grid grid-cols-2 gap-2">

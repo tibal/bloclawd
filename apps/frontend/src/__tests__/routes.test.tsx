@@ -82,9 +82,9 @@ async function renderPath(path: string) {
 
 describe("frontend routes", () => {
   it.each([
-    ["/", "When do AI subscription users actually hit limits?"],
+    ["/", "Got rate-limited by Claude Code or Codex?"],
     ["/dashboard", "API-equivalent cost"],
-    ["/rank", "Your rate limit has a stat profile"],
+    ["/rank", "Submit a limit hit and make a shareable card"],
     ["/compare", "Compare is now Rank"],
     ["/methodology", "How bloclawd computes what you see"],
     ["/methodology/changelog", "Methodology changelog"],
@@ -126,7 +126,9 @@ describe("frontend routes", () => {
     );
 
     try {
-      expect(container.textContent).toContain("Your rate limit has a stat profile");
+      expect(container.textContent).toContain(
+        "Submit a limit hit and make a shareable card",
+      );
       expect(container.textContent).toContain("Cache Stacker");
     } finally {
       cleanup();

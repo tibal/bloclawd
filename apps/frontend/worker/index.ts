@@ -26,9 +26,9 @@ export interface Env {
 const REPORTS_PREFIX = "/reports/v1/";
 const SITE_URL = "https://bloclawd.com";
 const SITE_NAME = "bloclawd";
-const RANK_TITLE = "Rank your AI rate-limit hit · bloclawd";
+const RANK_TITLE = "Make a shareable Claude Code or Codex limit card · bloclawd";
 const RANK_DESCRIPTION =
-  "Paste bloclawd CLI output and get a shareable rank card: API-equivalent cost, cohort segment, token profile, model mix, and recommendations.";
+  "Run the normal bloclawd command to submit an anonymous limit hit, then paste the rank block it prints for a shareable card and cohort comparison.";
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -165,9 +165,9 @@ function rankMetaFor(url: URL): {
       : RANK_TITLE;
   const description =
     profile && ratioLabel
-      ? `My ${cohort} rank card landed ${ratioLabel}${
+      ? `My ${cohort} limit card landed ${ratioLabel}${
           cost ? ` at $${cost} API-equivalent` : ""
-        }. Paste your bloclawd dry-run and compare.`
+        }. Submit with bloclawd, paste the rank block, and compare.`
       : RANK_DESCRIPTION;
 
   return {
