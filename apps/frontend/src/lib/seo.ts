@@ -87,7 +87,7 @@ export const ROUTES: RouteSeo[] = [
       "@type": "Dataset",
       name: "bloclawd — AI subscription rate-limit dataset",
       description:
-        "Community-sourced, k-anonymized aggregates of Claude Code and Codex rate-limit events: API-equivalent cost, token mix, harness, tier, region, and model. Updated daily.",
+        "Community-sourced, rounded aggregates of Claude Code and Codex rate-limit events: API-equivalent cost, token mix, harness, tier, region, and model. Updated every 15 minutes.",
       url: `${SITE_URL}/dashboard`,
       keywords: SITE_KEYWORDS.join(", "),
       license: "https://creativecommons.org/licenses/by/4.0/",
@@ -113,15 +113,15 @@ export const ROUTES: RouteSeo[] = [
       ],
     },
     noscript:
-      "Where your tier's limits actually fire. Pick Pro, Max5, or Max20 for the live percentile envelope, or compare tiers side-by-side to spot drift. Cells with fewer than five contributors are suppressed for anonymity.",
+      "Where your tier's limits actually fire. Pick Pro, Max5, or Max20 for the live rounded percentile envelope, or compare tiers side-by-side to spot drift.",
   },
   {
     path: "/methodology",
     title: "Methodology · how bloclawd computes what you see",
     description:
-      "How bloclawd derives public aggregates from local CLI submissions: canonicalization, k-anonymity, API-cost percentiles, outlier trimming, and the cron pipeline.",
+      "How bloclawd derives public aggregates from local CLI submissions: canonicalization, rounded API-cost percentiles, token redaction, outlier trimming, and the cron pipeline.",
     noscript:
-      "How bloclawd computes what you see: canonicalization of submissions, proof-of-work admission control, k-anonymity at n ≥ 5, API-cost percentiles, and the daily aggregation pipeline.",
+      "How bloclawd computes what you see: canonicalization of submissions, proof-of-work admission control, rounded API-cost percentiles, token redaction, and the 15-minute aggregation pipeline.",
   },
   {
     path: "/methodology/changelog",

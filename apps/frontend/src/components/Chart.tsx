@@ -342,7 +342,7 @@ function HoverTooltip({
           <span className="text-foreground">
             {submissions.toLocaleString()}
           </span>{" "}
-          submissions · k≥5
+          submissions
         </div>
       ) : null}
     </div>

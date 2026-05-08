@@ -1,6 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import type { Provider } from "@web/Provider";
-import type { ReportResolution } from "@web/ReportResolution";
 import {
   BarChart3,
   Copy,
@@ -16,8 +14,12 @@ import { z } from "zod";
 import { Chrome } from "@/components/Chrome";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CATALOG } from "@/lib/catalog";
-import { aggregateCohortCell } from "@/lib/cohort";
+import {
+  aggregateCohortCells,
+  cellMatchesFilter,
+  type AggregatedCohortCell,
+  type CohortCellFilter,
+} from "@/lib/cohort";
 import { formatTokens, formatUsd } from "@/lib/format";
 import {
   MODEL_COLOR,
@@ -40,7 +42,7 @@ import {
   type Recommendation,
   type ShareEntry,
 } from "@/lib/rank-report";
-import { useBucket, useManifest } from "@/lib/r2";
+import { useBuckets, useManifest, type BucketEnvelope } from "@/lib/r2";
 import { routeHead } from "@/lib/route-head";
 
 const rankSearchSchema = z.object({
@@ -91,16 +93,24 @@ Paste the block below into https://bloclawd.com/rank
 }
 --- end bloclawd rank input ---`;
 
+const RANK_DAILY_BUCKET_LIMIT = 7;
+const RANK_MIN_RETAINED = 100;
+const EMPTY_PATHS: string[] = [];
+
 function RankPage() {
   const search = Route.useSearch();
   const decodedReport = useMemo(() => decodeRankReport(search.s), [search.s]);
   const [report, setReport] = useState<RankReport | null>(decodedReport);
   const [input, setInput] = useState("");
   const [parseError, setParseError] = useState<string | null>(null);
-  const cohort = useRankCohort(report);
+  const cohort = useRankCohorts(report);
   const analysis = useMemo(
-    () => (report ? analyzeRankReport(report, cohort.cell) : null),
-    [cohort.cell, report],
+    () => (report ? analyzeRankReport(report, cohort.exact) : null),
+    [cohort.exact, report],
+  );
+  const broadAnalysis = useMemo(
+    () => (report ? analyzeRankReport(report, cohort.broad) : null),
+    [cohort.broad, report],
   );
   const shareUrl = useMemo(
     () => (report && analysis ? buildShareUrl(report, analysis) : null),
@@ -229,6 +239,9 @@ function RankPage() {
         <div className="space-y-4">
           <ResultSummary
             analysis={analysis}
+            broadAnalysis={broadAnalysis}
+            broadCell={cohort.broad}
+            exactCell={cohort.exact}
             error={cohort.error}
             loading={Boolean(report && cohort.loading)}
             report={report}
@@ -283,23 +296,40 @@ function RankPage() {
   );
 }
 
-function useRankCohort(report: RankReport | null) {
+function useRankCohorts(report: RankReport | null) {
   const manifest = useManifest();
-  const latest = useMemo(
-    () => latestBucketPath(manifest.data?.tiers ?? null),
-    [manifest.data?.tiers],
+  const dailyPaths = useMemo(
+    () => (report ? latestDailyBucketPaths(manifest.data?.tiers ?? null) : EMPTY_PATHS),
+    [manifest.data?.tiers, report],
   );
-  const bucket = useBucket(latest?.tier ?? "h1", latest?.path ?? "");
-  const row = useMemo(() => (report ? rowForReport(report) : null), [report]);
-  const cell = useMemo(
-    () => (bucket.data && row ? aggregateCohortCell(bucket.data, row) : null),
-    [bucket.data, row],
+  const bucketResults = useBuckets("d1", dailyPaths);
+  const buckets = useMemo(
+    () => bucketResults.flatMap((result) => (result.data ? [result.data] : [])),
+    [bucketResults],
   );
+  const exactFilter = useMemo(
+    () => (report ? exactFilterForReport(report) : null),
+    [report],
+  );
+  const broadFilter = useMemo(
+    () => (report ? broadFilterForReport(report) : null),
+    [report],
+  );
+  const exact = useMemo(
+    () => (exactFilter ? aggregateRankBuckets(buckets, exactFilter) : null),
+    [buckets, exactFilter],
+  );
+  const broad = useMemo(
+    () => (broadFilter ? aggregateRankBuckets(buckets, broadFilter) : null),
+    [buckets, broadFilter],
+  );
+  const bucketError = bucketResults.find((result) => result.error)?.error ?? null;
 
   return {
-    cell,
-    loading: manifest.isLoading || bucket.isLoading,
-    error: manifest.error || bucket.error ? "Public cohort data is unavailable." : null,
+    exact,
+    broad,
+    loading: manifest.isLoading || bucketResults.some((result) => result.isLoading),
+    error: manifest.error || bucketError ? "Public cohort data is unavailable." : null,
   };
 }
 
@@ -402,11 +432,17 @@ function RankPoster({
 
 function ResultSummary({
   analysis,
+  broadAnalysis,
+  broadCell,
+  exactCell,
   error,
   loading,
   report,
 }: {
   analysis: RankAnalysis | null;
+  broadAnalysis: RankAnalysis | null;
+  broadCell: AggregatedCohortCell | null;
+  exactCell: AggregatedCohortCell | null;
   error: string | null;
   loading: boolean;
   report: RankReport | null;
@@ -417,7 +453,7 @@ function ResultSummary({
         <div>
           <div className="text-sm font-medium text-foreground">Cohort readout</div>
           <div className="font-mono text-[11.5px] text-muted-foreground">
-            same tier · limit · region · harness
+            exact cohort + same plan limit
           </div>
         </div>
         <BarChart3 className="h-4 w-4 text-muted-foreground" />
@@ -439,20 +475,19 @@ function ResultSummary({
         ) : error ? (
           <p className="text-sm text-destructive">{error}</p>
         ) : analysis ? (
-          <div className="grid gap-4 sm:grid-cols-[1fr_1fr]">
-            <div>
-              <div className="text-sm text-muted-foreground">You are in</div>
-              <div className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
-                {analysis.segment}
-              </div>
-              <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                {analysis.medianCostUsd == null
-                  ? "This exact cohort is still waiting for enough public data."
-                  : `Similar users hit the median at ${formatUsd(
-                      analysis.medianCostUsd,
-                    )}. Your card lands at ${formatUsd(analysis.apiCostUsd)}.`}
-              </p>
-            </div>
+          <div className="grid gap-4 lg:grid-cols-3">
+            <CohortReadout
+              analysis={analysis}
+              cell={exactCell}
+              label="Exact cohort"
+              missing="No exact daily cohort match yet."
+            />
+            <CohortReadout
+              analysis={broadAnalysis}
+              cell={broadCell}
+              label="Same plan + limit"
+              missing="No same-plan daily cohort match yet."
+            />
             <div className="rounded-lg border border-border/60 bg-[var(--bg-1)] p-4">
               <div className="text-sm text-muted-foreground">Profile category</div>
               <div className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
@@ -465,6 +500,41 @@ function ResultSummary({
           </div>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function CohortReadout({
+  analysis,
+  cell,
+  label,
+  missing,
+}: {
+  analysis: RankAnalysis | null;
+  cell: AggregatedCohortCell | null;
+  label: string;
+  missing: string;
+}) {
+  return (
+    <div className="rounded-lg border border-border/60 bg-[var(--bg-1)] p-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="text-sm text-muted-foreground">{label}</div>
+        {cell ? (
+          <span className="font-mono text-[11px] text-muted-foreground">
+            n={cell.n_retained}
+          </span>
+        ) : null}
+      </div>
+      <div className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
+        {analysis?.segment ?? "No match"}
+      </div>
+      <p className="mt-3 text-sm leading-6 text-muted-foreground">
+        {analysis?.medianCostUsd == null
+          ? missing
+          : `Median ${formatUsd(analysis.medianCostUsd)}. Your card lands at ${formatUsd(
+              analysis.apiCostUsd,
+            )}.`}
+      </p>
     </div>
   );
 }
@@ -556,7 +626,7 @@ function ShareBar({
       <div className="flex items-center justify-between text-sm">
         <span className="font-medium text-foreground">{label}</span>
         <span className="font-mono text-[11.5px] text-muted-foreground">
-          {entries.length ? `${entries.length} component${entries.length === 1 ? "" : "s"}` : "k-anonymous gap"}
+          {entries.length ? `${entries.length} component${entries.length === 1 ? "" : "s"}` : "no public mix"}
         </span>
       </div>
       <div className="flex h-9 overflow-hidden rounded-md bg-[var(--bg-1)]">
@@ -693,9 +763,8 @@ function PosterMetric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function rowForReport(report: RankReport) {
+function exactFilterForReport(report: RankReport): CohortCellFilter {
   return {
-    provider: providerForHarness(report.harness),
     harness: report.harness,
     tier: report.tier,
     region: report.region,
@@ -703,20 +772,33 @@ function rowForReport(report: RankReport) {
   };
 }
 
-function providerForHarness(harness: RankReport["harness"]): Provider {
-  const plan = CATALOG.plans.find((entry) => entry.harnesses.includes(harness));
-  return plan?.provider ?? "anthropic";
+function broadFilterForReport(report: RankReport): CohortCellFilter {
+  return {
+    tier: report.tier,
+    limit_type: report.limit_type,
+  };
 }
 
-function latestBucketPath(
+function latestDailyBucketPaths(
   tiers: { q15: string[]; h1: string[]; d1: string[] } | null,
-): { tier: ReportResolution; path: string } | null {
-  if (!tiers) return null;
-  for (const tier of ["h1", "d1", "q15"] as const) {
-    const path = tiers[tier].at(-1);
-    if (path) return { tier, path };
+): string[] {
+  return tiers?.d1.slice(0, RANK_DAILY_BUCKET_LIMIT) ?? EMPTY_PATHS;
+}
+
+function aggregateRankBuckets(
+  buckets: readonly BucketEnvelope[],
+  filter: CohortCellFilter,
+): AggregatedCohortCell | null {
+  const selected: BucketEnvelope["cells"] = [];
+  let retained = 0;
+  for (const bucket of buckets) {
+    const matches = bucket.cells.filter((cell) => cellMatchesFilter(cell, filter));
+    if (matches.length === 0) continue;
+    selected.push(...matches);
+    retained += matches.reduce((sum, cell) => sum + cell.n_retained, 0);
+    if (retained >= RANK_MIN_RETAINED) break;
   }
-  return null;
+  return aggregateCohortCells(selected, filter);
 }
 
 function cohortLabel(report: RankReport): string {

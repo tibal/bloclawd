@@ -77,8 +77,8 @@ fn pipeline_well_populated_cohort_emits_public_envelope() {
 }
 
 #[test]
-fn pipeline_low_cohort_marks_insufficient_data() {
-    let rows: Vec<EventRow> = (0..4)
+fn pipeline_low_cohort_emits_rounded_public_data() {
+    let rows: Vec<EventRow> = (0..1)
         .map(|idx| {
             row(
                 idx + 1,
@@ -92,9 +92,9 @@ fn pipeline_low_cohort_marks_insufficient_data() {
     let cells = compute_cells(&rows);
 
     assert_eq!(cells.len(), 1);
-    assert!(cells[0].insufficient_data);
+    assert_eq!(cells[0].n_retained, 1);
     assert!(cells[0].typical_mix.is_empty());
-    assert!(cells[0].api_cost_usd.is_none());
+    assert!(cells[0].api_cost_usd.p50 > 0.0);
 
     let envelope = BucketEnvelope {
         schema_version: "v1".to_string(),
@@ -104,8 +104,8 @@ fn pipeline_low_cohort_marks_insufficient_data() {
     };
     let json = serde_json::to_string(&envelope).unwrap();
 
-    assert!(json.contains("\"insufficient_data\":true"));
-    assert!(!json.contains("\"p10\""));
+    assert!(!json.contains("insufficient_data"));
+    assert!(json.contains("\"p10\""));
     assert!(!json.contains("\"typical_mix\":[{"));
 }
 

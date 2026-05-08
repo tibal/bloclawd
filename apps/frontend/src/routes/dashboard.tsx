@@ -102,8 +102,8 @@ function DashboardPage() {
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
             Where your tier&apos;s limits actually fire. Pick a tier for the
             live API-cost envelope, or open Rank to turn a submitted rank block
-            into a shareable cohort card.
-            Cells with fewer than 5 contributors are suppressed for anonymity.
+            into a shareable cohort card. Public values are rounded before
+            publication.
           </p>
           <Chrome />
           {statusNotice?.kind === "degraded" ? (
@@ -299,7 +299,7 @@ function ChartArea({
     return isR2NotFound(error) ? (
       <EmptyState
         heading="No public data published yet"
-        subhead="The first daily aggregation runs at 03:00 UTC. Check the methodology page to see what will be published."
+        subhead="The first 15-minute aggregate has not been published yet. Check the methodology page to see what will be published."
       />
     ) : (
       <EmptyState
@@ -321,8 +321,8 @@ function ChartArea({
   if (!hasChartData) {
     return (
       <EmptyState
-        heading="Not enough data yet"
-        subhead="Fewer than 5 contributors in this slice, so percentiles are suppressed for anonymity. Widen the range, drop a filter, or check back tomorrow — the next aggregate runs at 03:00 UTC."
+        heading="No matching data yet"
+        subhead="No public cell matches this slice yet. Widen the range, drop a filter, or check back after the next 15-minute aggregate."
       />
     );
   }

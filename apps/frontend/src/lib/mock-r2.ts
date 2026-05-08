@@ -170,6 +170,65 @@ function buildApiCostUsd(
   return pcts(center, spread);
 }
 
+function singleSampleApiCostUsd(tier: Tier): Percentiles {
+  const value = TIER_BASELINE_USD[tier];
+  return {
+    p10: value,
+    p25: value,
+    p50: value,
+    p75: value,
+    p90: value,
+  };
+}
+
+function buildSmallSampleMix(harness: Harness): ModelTokenMix[] {
+  if (harness === "codex") {
+    return [
+      {
+        model: "gpt-5-codex",
+        tokens: {
+          input_tokens: 200_000,
+          output_tokens: 0,
+          cache_read_input_tokens: 0,
+          ephemeral_5m_input_tokens: 0,
+          ephemeral_1h_input_tokens: 0,
+          cached_input_tokens: 100_000,
+          reasoning_output_tokens: 0,
+        },
+      },
+    ];
+  }
+
+  return [
+    {
+      model: "claude-sonnet-4-5",
+      tokens: {
+        input_tokens: 400_000,
+        output_tokens: 100_000,
+        cache_read_input_tokens: 400_000,
+        ephemeral_5m_input_tokens: 100_000,
+        ephemeral_1h_input_tokens: 0,
+        cached_input_tokens: 0,
+        reasoning_output_tokens: 0,
+      },
+    },
+  ];
+}
+
+function isSmallSampleCell(
+  tier: Tier,
+  harness: Harness,
+  region: BucketCell["region"],
+  limitType: BucketCell["limit_type"],
+): boolean {
+  return (
+    tier === "max20" &&
+    harness === "claude-code" &&
+    region === "NA" &&
+    limitType === "5h"
+  );
+}
+
 function buildCells(
   bucketSeed: number,
   weight: number,
@@ -187,26 +246,25 @@ function buildCells(
             region.length * 5 +
             limitType.length;
           const rng = mulberry32(seed);
-          const insufficient = rng() < 0.02;
-          // Boost submissions on h1 (largest bucket) so daily-mode panels
-          // hit k≥5 across most cells.
           const baseN = resolution === "d1" ? 220 : resolution === "h1" ? 80 : 22;
-          const retained = insufficient
-            ? 3
-            : Math.round(baseN + rng() * baseN * 1.2);
-          const dropped = insufficient ? 0 : Math.floor(rng() * 4);
+          const smallSample = isSmallSampleCell(tier, harness, region, limitType);
+          const retained = smallSample
+            ? 1
+            : Math.max(1, Math.round(baseN + rng() * baseN * 1.2));
+          const dropped = Math.floor(rng() * 4);
           cells.push({
             subscription_tier: tier,
             harness,
             region,
             limit_type: limitType,
-            api_cost_usd: insufficient
-              ? null
+            api_cost_usd: smallSample
+              ? singleSampleApiCostUsd(tier)
               : buildApiCostUsd(tier, weight, rng),
             n_dropped: dropped,
             n_retained: retained,
-            typical_mix: insufficient ? [] : buildTypicalMix(harness, tier, rng),
-            insufficient_data: insufficient,
+            typical_mix: smallSample
+              ? buildSmallSampleMix(harness)
+              : buildTypicalMix(harness, tier, rng),
           });
         }
       }

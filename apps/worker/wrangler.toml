@@ -17,7 +17,7 @@ mode = "smart"
 # Free tier caps cron CPU at 10ms - insufficient for aggregation + R2 writes.
 # See apps/worker/README.md "Cloudflare Workers Paid subscription requirement".
 [triggers]
-crons = ["0 3 * * *"]   # daily 03:00 UTC for `wrangler dev` defaults (matches production cadence)
+crons = ["*/15 * * * *"]   # 15-minute ticks for `wrangler dev` defaults (matches production cadence)
 
 # Top-level dev defaults (only used by `wrangler dev`). Real deploys go through
 # `wrangler deploy --env staging` / `wrangler deploy --env production`.
@@ -92,7 +92,7 @@ binding = "BUCKET"
 bucket_name = "bloclawd-reports"
 
 [env.production.triggers]
-crons = ["0 3 * * *"]   # daily 03:00 UTC; v1 cadence
+crons = ["*/15 * * * *"]   # 15-minute ticks; v1 cadence
 
 [[env.production.ratelimits]]
 name = "RL_CHALLENGE"

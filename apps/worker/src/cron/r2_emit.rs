@@ -276,7 +276,7 @@ mod tests {
     }
 
     fn sample_cells() -> Vec<Cell> {
-        vec![sample_full_cell(), sample_insufficient_cell()]
+        vec![sample_full_cell(), sample_low_count_cell()]
     }
 
     fn sample_full_cell() -> Cell {
@@ -285,13 +285,13 @@ mod tests {
             harness: Harness::ClaudeCode,
             region: Region::Na,
             limit_type: LimitType::FiveH,
-            api_cost_usd: Some(Percentiles {
+            api_cost_usd: Percentiles {
                 p10: 1.10,
                 p25: 1.50,
                 p50: 2.00,
                 p75: 2.50,
                 p90: 3.00,
-            }),
+            },
             n_dropped: 2,
             n_retained: 21,
             typical_mix: vec![ModelTokenMix {
@@ -306,21 +306,25 @@ mod tests {
                     reasoning_output_tokens: 0.0,
                 },
             }],
-            insufficient_data: false,
         }
     }
 
-    fn sample_insufficient_cell() -> Cell {
+    fn sample_low_count_cell() -> Cell {
         Cell {
             subscription_tier: Tier::Max5,
             harness: Harness::Codex,
             region: Region::Eu,
             limit_type: LimitType::Weekly,
-            api_cost_usd: None,
+            api_cost_usd: Percentiles {
+                p10: 9.0,
+                p25: 9.0,
+                p50: 10.0,
+                p75: 10.0,
+                p90: 20.0,
+            },
             n_dropped: 0,
             n_retained: 3,
             typical_mix: Vec::new(),
-            insufficient_data: true,
         }
     }
 

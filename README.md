@@ -112,7 +112,7 @@ max20  # $200 individual tier
 
 `bloclawd` is not background telemetry. It runs only when invoked by the user, derives the payload locally, and submits no account identity.
 
-Public outputs apply k-anonymity suppression (n ≥ 5), outlier-trimmed API-cost percentiles, average retained token mix, no public event IDs or nonces, and no persisted per-event timing.
+Public outputs apply outlier-trimmed API-cost percentiles rounded to one significant digit, exact retained counts, small-cell token-mix redaction, no public event IDs or nonces, and no persisted per-event timing.
 
 See [THREAT-MODEL.md](./THREAT-MODEL.md) for the full anonymity boundary, wire-integrity promises, and AS-IS non-promises.
 

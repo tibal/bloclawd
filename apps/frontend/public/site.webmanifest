@@ -1,7 +1,7 @@
 {
   "name": "bloclawd",
   "short_name": "bloclawd",
-  "description": "An anonymous, k-anonymized public dataset of Claude Code and Codex rate-limit events.",
+  "description": "An anonymous, rounded public dataset of Claude Code and Codex rate-limit events.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

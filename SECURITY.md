@@ -50,7 +50,8 @@ In scope (please report):
   database access
 - Vulnerabilities in the public dataset materialization (cron) that violate
   the anonymity-boundary promises in [THREAT-MODEL.md](./THREAT-MODEL.md)
-  (k-anonymity floor, log-binning, strip-at-cron of event_id/nonce/tz_offset)
+  (rounded API-cost percentiles, small-cell token redaction, strip-at-cron of
+  event_id/nonce/tz_offset)
 - Vulnerabilities in the install.sh trust chain (TLS, sha256 verification)
 - Supply-chain vulnerabilities in our published crates on crates.io
 

@@ -514,7 +514,7 @@ function segmentFor(
     return {
       segment: "Unscored cohort",
       segmentId: "below-median",
-      percentileLabel: "Waiting for k-anonymous public data",
+      percentileLabel: "Waiting for public cohort data",
     };
   }
   if (cost < p.p10) {

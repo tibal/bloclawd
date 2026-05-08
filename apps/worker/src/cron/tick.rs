@@ -14,8 +14,9 @@ use worker::{Env, Hyperdrive, Result, console_log};
 
 use crate::cron::{aggregate, health, r2_emit, state};
 
-pub const CRON_INTERVAL_MS_PROD: i64 = 86_400_000;
-pub const CRON_INTERVAL_MS_STAGING: i64 = 900_000;
+pub const CRON_INTERVAL_MS_15_MIN: i64 = 900_000;
+pub const CRON_INTERVAL_MS_DAILY: i64 = 86_400_000;
+const WORK_TIERS: [&str; 3] = ["q15", "h1", "d1"];
 
 const EVENT_SELECT_SQL: &str = r#"
     SELECT submission_group_id, payload, limit_type
@@ -36,26 +37,31 @@ pub async fn run(cron_expr: &str, scheduled_ms: f64, env: &Env) -> Result<()> {
         console_log!("cron tick sweep failed err={}", e);
     }
 
-    for tier in ["q15", "h1", "d1"] {
+    for tier in WORK_TIERS {
         if let Err(e) = state::eager_fill(env, tier, lateness_for_cron(cron_expr)).await {
             console_log!("cron tick eager_fill failed err={}", e);
         }
     }
 
     let worker_id = format!("{}", scheduled_ms as u64);
-    match state::claim_one(env, &worker_id, stale_threshold).await {
-        Ok(Some((tier, bucket_ts))) => {
-            if let Err(e) = process_claimed(env, &tier, bucket_ts).await {
-                console_log!("cron tick process failed err={}", e);
-                revert_claim(env, &tier, bucket_ts, &format!("err: {e}")).await;
+    let mut claimed_any = false;
+    for tier_name in WORK_TIERS {
+        match state::claim_one_for_tier(env, &worker_id, stale_threshold, tier_name).await {
+            Ok(Some((tier, bucket_ts))) => {
+                claimed_any = true;
+                if let Err(e) = process_claimed(env, &tier, bucket_ts).await {
+                    console_log!("cron tick process failed err={}", e);
+                    revert_claim(env, &tier, bucket_ts, &format!("err: {e}")).await;
+                }
+            }
+            Ok(None) => {}
+            Err(e) => {
+                console_log!("cron tick claim failed err={}", e);
             }
         }
-        Ok(None) => {
-            console_log!("cron tick no work");
-        }
-        Err(e) => {
-            console_log!("cron tick claim failed err={}", e);
-        }
+    }
+    if !claimed_any {
+        console_log!("cron tick no work");
     }
 
     if let Err(e) = write_status_then_manifest(env, scheduled_ts, cron_interval_ms(cron_expr)).await
@@ -204,10 +210,10 @@ fn cron_interval(cron_expr: &str) -> &'static str {
 
 fn cron_interval_ms(cron_expr: &str) -> i64 {
     match cron_interval(cron_expr) {
-        "15 minutes" => CRON_INTERVAL_MS_STAGING,
+        "15 minutes" => CRON_INTERVAL_MS_15_MIN,
         "30 minutes" => 1_800_000,
         "1 hour" => 3_600_000,
-        "1 day" => CRON_INTERVAL_MS_PROD,
+        "1 day" => CRON_INTERVAL_MS_DAILY,
         _ => 3_600_000,
     }
 }
@@ -274,7 +280,12 @@ mod tests {
 
     #[test]
     fn cron_interval_ms_daily() {
-        assert_eq!(cron_interval_ms("0 3 * * *"), CRON_INTERVAL_MS_PROD);
+        assert_eq!(cron_interval_ms("0 3 * * *"), CRON_INTERVAL_MS_DAILY);
+    }
+
+    #[test]
+    fn cron_interval_ms_15min() {
+        assert_eq!(cron_interval_ms("*/15 * * * *"), CRON_INTERVAL_MS_15_MIN);
     }
 
     #[test]

@@ -241,7 +241,7 @@ function KpiStrip() {
       value: kpiValue(isLoading, ready, `~${contributors}`, "w-20"),
       label: `contributors · ${data?.approximate_contributors_window_days ?? 30}d`,
     },
-    { value: "daily", label: "updates · 03:00 UTC" },
+    { value: "15 min", label: "update cadence" },
   ];
 
   return (

@@ -6,4 +6,4 @@ import type { Percentiles } from "./Percentiles";
 import type { Region } from "./Region";
 import type { Tier } from "./Tier";
 
-export type BucketCell = { subscription_tier: Tier, harness: Harness, region: Region, limit_type: LimitType, api_cost_usd: Percentiles | null, n_dropped: number, n_retained: number, typical_mix: Array<ModelTokenMix>, insufficient_data: boolean, };
+export type BucketCell = { subscription_tier: Tier, harness: Harness, region: Region, limit_type: LimitType, api_cost_usd: Percentiles, n_dropped: number, n_retained: number, typical_mix: Array<ModelTokenMix>, };

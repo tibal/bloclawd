@@ -91,7 +91,6 @@ function bucket(): BucketEnvelope {
         limit_type: "5h",
         n_dropped: 0,
         n_retained: 100,
-        insufficient_data: false,
         api_cost_usd: percentiles(999),
         typical_mix: [
           {
@@ -118,7 +117,6 @@ function codexCell(
     limit_type: "5h",
     n_dropped: 1,
     n_retained: nRetained,
-    insufficient_data: false,
     api_cost_usd: percentiles(p50),
     typical_mix: [
       {
