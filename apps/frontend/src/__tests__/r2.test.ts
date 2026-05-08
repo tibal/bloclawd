@@ -1,10 +1,10 @@
-import { useQueries } from "@tanstack/react-query";
+import { useQueries, useQuery } from "@tanstack/react-query";
 import React from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { fetchR2, useBuckets, type BucketResult } from "@/lib/r2";
+import { fetchR2, useBucket, useBuckets, type BucketResult } from "@/lib/r2";
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: vi.fn(),
@@ -22,6 +22,7 @@ vi.mock("@tanstack/react-query", () => ({
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.mocked(useQuery).mockClear();
   vi.mocked(useQueries).mockClear();
 });
 
@@ -91,6 +92,41 @@ describe("useBuckets", () => {
           (result) => (result.data as unknown as { path: string } | undefined)?.path,
         ),
       ).toEqual(["a.json", "b.json", "c.json"]);
+    } finally {
+      root.unmount();
+      container.remove();
+    }
+  });
+});
+
+describe("useBucket", () => {
+  it("disables the query for an empty path", () => {
+    vi.mocked(useQuery).mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      error: null,
+    } as unknown as ReturnType<typeof useQuery>);
+
+    function Probe() {
+      useBucket("h1", "");
+      return null;
+    }
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    try {
+      flushSync(() => {
+        root.render(React.createElement(Probe));
+      });
+
+      expect(useQuery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          enabled: false,
+          queryKey: ["r2", "/reports/v1/h1/"],
+        }),
+      );
     } finally {
       root.unmount();
       container.remove();
