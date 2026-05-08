@@ -119,6 +119,7 @@ export function useBucket(tier: Tier, path: string) {
   return useQuery({
     queryKey: ["r2", url],
     queryFn: () => fetchR2<BucketEnvelope>(url),
+    enabled: path.length > 0,
     staleTime: Infinity,
   });
 }

@@ -25,8 +25,6 @@ const EVENT_SELECT_SQL: &str = r#"
       AND bucket_ts < $1::timestamptz + $2::interval
 "#;
 
-const LAST_SUCCESS_SQL: &str = "SELECT MAX(finished_at) FROM cron_state WHERE state = 'processed'";
-
 pub async fn run(cron_expr: &str, scheduled_ms: f64, env: &Env) -> Result<()> {
     console_log!("cron tick start cron={} ms={}", cron_expr, scheduled_ms);
 
@@ -134,29 +132,10 @@ async fn write_status_then_manifest(
     cron_interval_ms: i64,
 ) -> Result<()> {
     let bucket = env.bucket("BUCKET")?;
-    let last_success_ts = match last_success_from_cron_state(env).await {
-        Ok(Some(ts)) => ts,
-        Ok(None) => fallback_last_success(scheduled_ts, cron_interval_ms),
-        Err(e) => {
-            console_log!("cron tick last_success fallback err={}", e);
-            fallback_last_success(scheduled_ts, cron_interval_ms)
-        }
-    };
     let status =
-        health::build_status_json(env, last_success_ts, scheduled_ts, cron_interval_ms).await?;
+        health::build_status_json(env, scheduled_ts, scheduled_ts, cron_interval_ms).await?;
     r2_emit::write_status(&bucket, &status).await?;
     r2_emit::rewrite_manifest(env, &bucket, scheduled_ts).await
-}
-
-async fn last_success_from_cron_state(env: &Env) -> Result<Option<SystemTime>> {
-    let client = open_client(env).await?;
-    let row = client
-        .query_typed_one(LAST_SUCCESS_SQL, &[])
-        .await
-        .map_err(|e| worker::Error::RustError(format!("last_success: {e}")))?;
-    let ts: Option<SystemTime> = row.get(0);
-    drop(client);
-    Ok(ts)
 }
 
 async fn revert_claim(env: &Env, tier: &str, bucket_ts: SystemTime, msg: &str) {
@@ -252,11 +231,6 @@ fn scheduled_time(scheduled_ms: f64) -> SystemTime {
         0
     };
     UNIX_EPOCH + Duration::from_millis(millis)
-}
-
-fn fallback_last_success(scheduled_ts: SystemTime, cron_interval_ms: i64) -> SystemTime {
-    let interval = Duration::from_millis(cron_interval_ms.max(0) as u64);
-    scheduled_ts.checked_sub(interval).unwrap_or(UNIX_EPOCH)
 }
 
 #[cfg(test)]
