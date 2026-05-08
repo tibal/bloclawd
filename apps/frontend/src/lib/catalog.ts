@@ -557,23 +557,27 @@ export function resolveRow(filters: CatalogFilters): ResolvedRow {
 
   next = { ...next, provider, harness };
 
-  // Drop tier entirely when the catalog has no tier aliases for this
-  // provider (e.g. OpenAI). Otherwise, keep current tier when valid or
-  // fall back to the first available.
+  // Drop tier entirely when the provider has no tier aliases (OpenAI).
+  // Plan→tier is 1:1 in the catalog, so a set plan always wins.
   if (providerHasTierAliases(next)) {
-    const tier =
+    const planTier = next.plan ? tierForPlan(next.plan) : null;
+    const fallbackTier =
       next.tier && tierIsAvailable(next.tier, next)
         ? next.tier
         : firstAvailableTier(next);
-    next = { ...next, tier: tier ?? undefined };
+    next = { ...next, tier: planTier ?? fallbackTier ?? undefined };
   } else {
     next = { ...next, tier: undefined };
   }
 
+  // "weekly" is the dashboard's default surface (matches the dominant
+  // user pain point); fall back if the catalog ever drops it.
   let limit_type =
     next.limit_type && limitTypeIsAvailable(next.limit_type, next)
       ? next.limit_type
-      : firstAvailableLimitType(next);
+      : limitTypeIsAvailable("weekly", next)
+        ? "weekly"
+        : firstAvailableLimitType(next);
   if (!limit_type) {
     limit_type = CATALOG.limit_types[0]!;
   }

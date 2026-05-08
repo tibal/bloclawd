@@ -87,6 +87,10 @@ function DashboardPage() {
     () => rangeWindow(search, Date.now()),
     [search],
   );
+  const chartDomain = useMemo(
+    () => ({ start: Math.floor(startMs / 1000), end: Math.floor(endMs / 1000) }),
+    [startMs, endMs],
+  );
 
   return (
     <section className="flex flex-col gap-6">
@@ -178,6 +182,7 @@ function DashboardPage() {
             hasChartData={hasChartData}
             meta={meta}
             search={search}
+            domain={chartDomain}
           />
         </div>
       </div>
@@ -284,6 +289,7 @@ interface ChartAreaProps {
   hasChartData: boolean;
   meta: ChartMeta | null;
   search: DashboardSearch;
+  domain: { start: number; end: number };
 }
 
 function ChartArea({
@@ -294,6 +300,7 @@ function ChartArea({
   hasChartData,
   meta,
   search,
+  domain,
 }: ChartAreaProps): ReactNode {
   if (error) {
     return isR2NotFound(error) ? (
@@ -344,11 +351,12 @@ function ChartArea({
       ) : null}
 
       <Chart
-        ariaLabel={chartAriaLabel(search)}
+        ariaLabel={chartAriaLabel(search, primary)}
         primary={search.primary}
         dist={search.dist}
         curves={curves}
         meta={meta ?? undefined}
+        domain={domain}
       />
 
       <ChartLegend curves={curves} compare={search.compare} />
@@ -581,11 +589,14 @@ function numericValue(value: number | null | undefined): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
-function chartAriaLabel(search: DashboardSearch): string {
+function chartAriaLabel(
+  search: DashboardSearch,
+  primary: CurveResult | undefined,
+): string {
   if (search.compare) return "Compare cohorts API-cost percentiles";
-  return `${search.tier ?? "selected tier"} ${limitTypeLabel(
-    search.limit_type ?? "5h",
-  )} percentiles`;
+  const tier = primary?.filters.tier ?? "selected tier";
+  const limit = primary?.filters.limit_type ?? "5h";
+  return `${tier} ${limitTypeLabel(limit)} percentiles`;
 }
 
 function formatRelative(timestamp: string): string {

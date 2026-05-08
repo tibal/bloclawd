@@ -31,3 +31,6 @@ apps/frontend/node_modules/
 dist/
 build/
 apps/frontend/dist/
+
+# Playwright MCP scratch artifacts
+.playwright-mcp/
