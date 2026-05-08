@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   Popover,
@@ -153,6 +153,20 @@ function CustomRangeCalendar({
   const [monthCursor, setMonthCursor] = useState<Date>(
     () => addMonths(initialMonth, -1),
   );
+
+  // Popover stays mounted across preset clicks: without this sync the
+  // calendar keeps the previous draft range until reopened.
+  useEffect(() => {
+    setDraft({ startMs, endMs });
+    setAnchor(null);
+    const target = addMonths(firstOfMonth(new Date(endMs)), -1);
+    setMonthCursor((prev) =>
+      prev.getFullYear() === target.getFullYear() &&
+      prev.getMonth() === target.getMonth()
+        ? prev
+        : target,
+    );
+  }, [startMs, endMs]);
 
   const months = useMemo(
     () => [monthCursor, addMonths(monthCursor, 1)],

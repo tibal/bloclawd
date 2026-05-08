@@ -79,10 +79,10 @@ beforeEach(() => {
 });
 
 describe("Filters", () => {
-  it("reads model and tier selections from dashboard search params", async () => {
+  it("reads model and plan selections from dashboard search params", async () => {
     const { container, cleanup } = await renderDashboard(
       <Filters />,
-      "/dashboard?model=claude-opus-4-7&tier=max20",
+      "/dashboard?model=claude-opus-4-7&plan=anthropic-max20",
     );
 
     try {
@@ -90,21 +90,21 @@ describe("Filters", () => {
         container.querySelector('[aria-label="Model"]')?.textContent,
       ).toContain("Claude Opus 4.7");
       expect(
-        container.querySelector('[aria-label="Tier"]')?.textContent,
-      ).toContain("max20");
+        container.querySelector('[aria-label="Plan"]')?.textContent,
+      ).toContain("Claude Max 20");
     } finally {
       cleanup();
     }
   });
 
-  it("updates the URL when tier changes", async () => {
+  it("updates the URL when plan changes", async () => {
     const { container, router, cleanup } = await renderDashboard(
       <Filters />,
-      "/dashboard?model=claude-opus-4-7&tier=max20",
+      "/dashboard?model=claude-opus-4-7&plan=anthropic-max20",
     );
 
     try {
-      const trigger = container.querySelector('[aria-label="Tier"]');
+      const trigger = container.querySelector('[aria-label="Plan"]');
       expect(trigger).not.toBeNull();
       trigger?.dispatchEvent(
         new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
@@ -113,14 +113,16 @@ describe("Filters", () => {
 
       const option = Array.from(
         document.body.querySelectorAll('[role="option"]'),
-      ).find((item) => item.textContent?.includes("pro"));
+      ).find((item) => item.textContent?.includes("Claude Max 5"));
       expect(option).not.toBeUndefined();
       option?.dispatchEvent(
         new KeyboardEvent("keydown", { key: "Enter", bubbles: true }),
       );
       await settle();
 
-      expect(router.state.location.search).toMatchObject({ tier: "pro" });
+      expect(router.state.location.search).toMatchObject({
+        plan: "anthropic-max5",
+      });
     } finally {
       cleanup();
     }

@@ -4,7 +4,6 @@ import type { LimitType } from "@web/LimitType";
 import type { Model } from "@web/Model";
 import type { Plan } from "@web/Plan";
 import type { Region } from "@web/Region";
-import type { Tier } from "@web/Tier";
 
 import {
   Select,
@@ -24,7 +23,6 @@ import {
   providerHarnessOptions,
   regionOptions,
   resolveRow,
-  tierOptions,
   type CatalogFilters,
 } from "@/lib/catalog";
 import type { FilterRow } from "@/lib/dashboard-search";
@@ -75,7 +73,6 @@ export function FilterRowFields({
     );
   };
 
-  const onTier = (value: string) => apply(cascade(row, { tier: value as Tier }));
   const onLimit = (value: string) =>
     onChange(prune({ ...row, limit_type: value as LimitType }) as FilterRow);
   const onRegion = (value: string) =>
@@ -94,15 +91,6 @@ export function FilterRowFields({
         options={PROVIDER_HARNESS_OPTIONS}
         value={encodeProviderHarness(resolved.provider, resolved.harness)}
       />
-      {tierOptions(resolved).length > 0 && resolved.tier ? (
-        <FilterPill
-          ariaLabel="Tier"
-          label="Tier"
-          onChange={onTier}
-          options={tierOptions(resolved)}
-          value={resolved.tier}
-        />
-      ) : null}
       <FilterPill
         ariaLabel="Region"
         label="Region"

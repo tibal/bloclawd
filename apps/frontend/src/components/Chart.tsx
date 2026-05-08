@@ -31,6 +31,9 @@ export interface ChartProps {
   ariaLabel: string;
   meta?: ChartMeta;
   yLabel?: string;
+  // Epoch seconds, matching `xs`. Drives the x-axis domain so a sparse
+  // selection still spans its full range.
+  domain?: { start: number; end: number };
 }
 
 const HEIGHT = 360;
@@ -39,6 +42,7 @@ const PAD_L = 56;
 const PAD_R = 24;
 const PAD_T = 24;
 const PAD_B = 36;
+const MARKER_DENSITY_LIMIT = 80;
 
 const RESOLUTION_LABEL: Record<NonNullable<ChartMeta["resolution"]>, string> = {
   q15: "15 min",
@@ -63,6 +67,7 @@ export function Chart({
   ariaLabel,
   meta,
   yLabel,
+  domain,
 }: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(WIDTH_FALLBACK);
@@ -89,8 +94,8 @@ export function Chart({
   );
 
   const geometry = useMemo(
-    () => buildGeometry({ curves, width, primary }),
-    [curves, width, primary],
+    () => buildGeometry({ curves, width, primary, domain }),
+    [curves, width, primary, domain],
   );
 
   const innerWidth = Math.max(0, width - PAD_L - PAD_R);
@@ -157,7 +162,7 @@ export function Chart({
         </text>
 
         {geometry.yTicks.map((tick, idx) => (
-          <g key={`y-${tick.value}`}>
+          <g key={`y-${idx}`}>
             <line
               stroke="var(--chart-grid)"
               strokeDasharray={idx === 0 ? "0" : "2 4"}
@@ -179,9 +184,9 @@ export function Chart({
           </g>
         ))}
 
-        {geometry.xTicks.map((tick) => (
+        {geometry.xTicks.map((tick, idx) => (
           <text
-            key={`x-${tick.x}`}
+            key={`x-${idx}`}
             fill="var(--muted-foreground)"
             fontFamily="var(--font-mono)"
             fontSize="10.5"
@@ -224,6 +229,26 @@ export function Chart({
             strokeWidth="2"
           />
         ))}
+
+        {/* Without markers, a single-bucket selection renders an invisible
+            1-px-long path. */}
+        {geometry.curveLines.flatMap(({ key, primaryPoints, color }) =>
+          primaryPoints.length > MARKER_DENSITY_LIMIT
+            ? []
+            : primaryPoints.flatMap((pt, idx) =>
+                pt
+                  ? [
+                      <circle
+                        key={`mark-${key}-${idx}`}
+                        cx={pt.x}
+                        cy={pt.y}
+                        fill={color}
+                        r="2.5"
+                      />,
+                    ]
+                  : [],
+              ),
+        )}
 
         {hoverIndex != null && geometry.crosshair ? (
           <line
@@ -426,18 +451,43 @@ function buildGeometry({
   curves,
   width,
   primary,
+  domain,
 }: {
   curves: ChartCurve[];
   width: number;
   primary: PercentileKey;
+  domain?: { start: number; end: number };
 }): ChartGeometry {
   const xs = alignedXs(curves[0]?.data) as readonly number[];
   const innerWidth = Math.max(0, width - PAD_L - PAD_R);
   const innerHeight = Math.max(0, HEIGHT - PAD_T - PAD_B);
   const length = xs.length;
 
-  const xAt = (idx: number) =>
-    length <= 1 ? PAD_L : PAD_L + (idx / (length - 1)) * innerWidth;
+  // Prefer the caller's domain so a sparse selection still spans the full
+  // range; fall back to data extent when no domain is given.
+  const explicitDomain = domain && domain.end > domain.start ? domain : null;
+  const domainMin = explicitDomain
+    ? explicitDomain.start
+    : length > 0
+      ? xs[0]!
+      : 0;
+  const domainMax = explicitDomain
+    ? explicitDomain.end
+    : length > 0
+      ? xs[length - 1]!
+      : 0;
+  const domainSpan = Math.max(1, domainMax - domainMin);
+
+  const xAt = (idx: number) => {
+    const ts = xs[idx];
+    if (typeof ts !== "number") return PAD_L;
+    const fraction = explicitDomain
+      ? (ts - domainMin) / domainSpan
+      : length <= 1
+        ? 0
+        : idx / (length - 1);
+    return PAD_L + fraction * innerWidth;
+  };
 
   let rawMax = 0;
   for (const curve of curves) {
@@ -468,8 +518,9 @@ function buildGeometry({
   const xTickCount = Math.min(7, Math.max(2, Math.floor(innerWidth / 110)));
   const xTicks = Array.from({ length: xTickCount }, (_, idx) => {
     const fraction = xTickCount === 1 ? 0 : idx / (xTickCount - 1);
-    const dataIdx = Math.round(fraction * Math.max(0, length - 1));
-    const ts = xs[dataIdx];
+    const ts = explicitDomain
+      ? domainMin + fraction * domainSpan
+      : xs[Math.round(fraction * Math.max(0, length - 1))];
     return {
       x: PAD_L + fraction * innerWidth,
       label: typeof ts === "number" ? formatXTick(ts) : "",
