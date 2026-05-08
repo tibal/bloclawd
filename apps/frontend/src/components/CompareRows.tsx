@@ -41,11 +41,11 @@ export function CompareRows() {
         const primary = resolveRow(primaryRowFromSearch(prev));
         const seed: FilterRow = {
           provider: primary.provider,
-          plan: prev.plan,
-          model: prev.model,
+          plan: primary.plan,
+          model: primary.model,
           tier: primary.tier,
           harness: primary.harness,
-          region: prev.region,
+          region: primary.region,
           limit_type: primary.limit_type,
         };
         return { ...prev, rows: [...prev.rows, seed] };

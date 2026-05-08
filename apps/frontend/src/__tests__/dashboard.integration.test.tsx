@@ -73,11 +73,17 @@ function makeCurve(
   data: AlignedData,
   tier: "pro" | "max5" | "max20" = "max20",
 ): CurveResult {
+  const planByTier = {
+    pro: "anthropic-pro",
+    max5: "anthropic-max5",
+    max20: "anthropic-max20",
+  } as const;
   return {
     key,
     label: `${tier} cohort`,
     filters: {
       provider: "anthropic",
+      plan: planByTier[tier],
       harness: "claude-code",
       tier,
       limit_type: "5h",

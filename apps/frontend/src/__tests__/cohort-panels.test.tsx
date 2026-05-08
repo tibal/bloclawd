@@ -16,13 +16,13 @@ describe("cohort panels", () => {
   it("aggregates the panel mix with the same model and provider filters as the chart", () => {
     const cell = aggregateCohortCell(bucket(), CODEX_FILTERS);
 
-    expect(cell?.n_retained).toBe(60);
-    expect(cell?.cell_count).toBe(3);
+    expect(cell?.n_retained).toBe(30);
+    expect(cell?.cell_count).toBe(1);
     expect(cell?.typical_mix.map((entry) => entry.model)).toEqual([
       "gpt-5-codex",
     ]);
     expect(cell?.typical_mix[0]?.tokens.input_tokens).toBeCloseTo(
-      (100 * 10 + 200 * 20 + 300 * 30) / 60,
+      300,
     );
   });
 
@@ -52,6 +52,8 @@ describe("cohort panels", () => {
 
 const CODEX_FILTERS: ResolvedRow = {
   provider: "openai",
+  plan: "openai-pro",
+  tier: "max20",
   harness: "codex",
   limit_type: "5h",
   model: "gpt-5-codex",

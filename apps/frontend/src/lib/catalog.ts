@@ -98,6 +98,16 @@ export function providerOfPlan(plan: Plan): Provider {
   return planInfo(plan).provider;
 }
 
+export function providerOfHarness(harness: Harness): Provider {
+  const provider = CATALOG.providers.find((candidate) =>
+    harnessesForProvider(candidate).includes(harness),
+  );
+  if (!provider) {
+    throw new Error(`unknown harness provider: ${harness}`);
+  }
+  return provider;
+}
+
 export function plansForProvider(provider: Provider): readonly PlanInfo[] {
   return CATALOG.plans.filter((p) => p.provider === provider);
 }
@@ -175,8 +185,8 @@ export function planIncludesModel(plan: Plan, model: Model): boolean {
 //
 // Rules:
 //   * Setting `plan` forces `provider = plan.provider`, sets `tier` to
-//     `plan.tier_alias` if it has one, and clears `model` / `harness`
-//     when they are not part of the plan.
+//     `plan.tier_alias`, and clears `model` / `harness` when they are not
+//     part of the plan.
 //   * Setting `provider` clears `plan`, `model`, `harness` if they belong
 //     to a different provider.
 //   * Setting `model` forces `provider = model.provider` and clears `plan`
@@ -306,10 +316,10 @@ export function providerOptions(): Options<Provider> {
 }
 
 export function planOptions(filters: CatalogFilters): Options<Plan> {
-  const plans = filters.provider
-    ? plansForProvider(filters.provider)
-    : CATALOG.plans;
-  return plans.map((p) => ({ value: p.plan, label: planLabel(p) }));
+  return candidatePlansFor({ ...filters, tier: undefined }).map((p) => ({
+    value: p.plan,
+    label: planLabel(p),
+  }));
 }
 
 export function modelOptions(filters: CatalogFilters): Options<Model> {
@@ -409,9 +419,7 @@ export function decodeProviderHarness(value: string): ProviderHarness | null {
 
 export function tierOptions(filters?: CatalogFilters): Options<Tier> {
   // Only surface tiers reachable in plans matching the current
-  // provider/harness. OpenAI plans have tier_alias=null today, so the
-  // tier picker hides itself for OpenAI rather than offering selections
-  // that wipe limit_type / plan.
+  // provider/harness.
   const seen = new Set<Tier>();
   for (const plan of CATALOG.plans) {
     if (filters?.provider && plan.provider !== filters.provider) continue;
@@ -461,10 +469,10 @@ function candidatePlansFor(filters: CatalogFilters): readonly PlanInfo[] {
     if (filters.harness && !plan.harnesses.includes(filters.harness)) {
       return false;
     }
+    if (filters.model && !plan.models.includes(filters.model)) return false;
     // Tier filtering only applies when the matching provider exposes
-    // tier_alias values (Anthropic does, OpenAI plans are tier_alias=null
-    // today). Otherwise we drop the tier filter so siblings — limit_type,
-    // model, plan — remain selectable.
+    // tier_alias values. Otherwise we drop the tier filter so siblings —
+    // limit_type, model, plan — remain selectable.
     if (filters.tier && providerHasTierAliases(filters)) {
       if (plan.tier_alias !== filters.tier) return false;
     }
@@ -482,15 +490,11 @@ function providerHasTierAliases(filters: CatalogFilters): boolean {
   });
 }
 
-// First non-aggregable value still valid under `filters`. Used to keep
-// tier / harness / limit_type pinned to a single non-`all` value (and
-// auto-pick a fresh one when a sibling change invalidates the current
-// choice).
+// Non-aggregable defaults still valid under `filters`. Used to keep tier /
+// harness / limit_type pinned to a single non-`all` value (and auto-pick a
+// fresh one when a sibling change invalidates the current choice).
 export function firstAvailableTier(filters: CatalogFilters): Tier | null {
-  for (const tier of CATALOG.tiers) {
-    if (tierIsAvailable(tier, filters)) return tier;
-  }
-  return CATALOG.tiers[0] ?? null;
+  return defaultPlanFor(filters)?.tier_alias ?? CATALOG.tiers.at(-1) ?? null;
 }
 
 export function tierIsAvailable(tier: Tier, filters: CatalogFilters): boolean {
@@ -529,21 +533,48 @@ export function limitTypeIsAvailable(
   return limitTypeOptions(filters).some((o) => o.value === limitType);
 }
 
+export function defaultPlanFor(filters: CatalogFilters): PlanInfo | null {
+  const planFromTier = filters.tier
+    ? highestMonthlyPlan(candidatePlansFor({ ...filters, model: undefined }))
+    : null;
+  if (planFromTier) return planFromTier;
+  return highestMonthlyPlan(candidatePlansFor(filters));
+}
+
+function highestMonthlyPlan(plans: readonly PlanInfo[]): PlanInfo | null {
+  let best: PlanInfo | null = null;
+  for (const plan of plans) {
+    if (!best || plan.monthly_cost_usd > best.monthly_cost_usd) {
+      best = plan;
+    }
+  }
+  return best;
+}
+
 // Resolve a partial filter row to one with non-aggregable fields filled in.
 // Provider+harness move together (1:1 today); when only one is set we pin
-// the other from the catalog. Tier is left undefined when the active
-// provider has no tier_alias (OpenAI today). limit_type falls back to the
-// first catalog value still valid under the row's other filters.
-// Aggregable fields (plan, model, region) pass through untouched.
+// the other from the catalog. Plan and tier are also pinned because the R2
+// cells cannot be aggregated across subscription plans. Defaults pick the
+// highest monthly plan for the active provider, so the unfiltered dashboard
+// lands on the max option for both Anthropic and OpenAI.
 export type ResolvedRow = CatalogFilters & {
   provider: Provider;
   harness: Harness;
-  tier?: Tier;
+  plan: Plan;
+  tier: Tier;
   limit_type: LimitType;
 };
 
 export function resolveRow(filters: CatalogFilters): ResolvedRow {
   let next: CatalogFilters = { ...filters };
+
+  if (next.plan) {
+    next = applyPlanChange(next, next.plan);
+  } else if (!next.provider && next.model) {
+    next = { ...next, provider: providerOfModel(next.model) };
+  } else if (!next.provider && next.harness) {
+    next = { ...next, provider: providerOfHarness(next.harness) };
+  }
 
   if (next.provider && !next.harness) {
     next = { ...next, harness: harnessForProvider(next.provider) };
@@ -557,18 +588,30 @@ export function resolveRow(filters: CatalogFilters): ResolvedRow {
 
   next = { ...next, provider, harness };
 
-  // Drop tier entirely when the provider has no tier aliases (OpenAI).
-  // Plan→tier is 1:1 in the catalog, so a set plan always wins.
-  if (providerHasTierAliases(next)) {
-    const planTier = next.plan ? tierForPlan(next.plan) : null;
-    const fallbackTier =
-      next.tier && tierIsAvailable(next.tier, next)
-        ? next.tier
-        : firstAvailableTier(next);
-    next = { ...next, tier: planTier ?? fallbackTier ?? undefined };
-  } else {
-    next = { ...next, tier: undefined };
+  let plan = next.plan ? planInfo(next.plan) : null;
+  if (
+    !plan ||
+    plan.provider !== provider ||
+    !plan.harnesses.includes(harness)
+  ) {
+    plan = defaultPlanFor(next);
   }
+  if (!plan) {
+    throw new Error(
+      `no catalog plan for provider ${provider} and harness ${harness}`,
+    );
+  }
+
+  if (next.model && !plan.models.includes(next.model)) {
+    next = { ...next, model: undefined };
+  }
+
+  const tier =
+    plan.tier_alias ?? firstAvailableTier({ ...next, plan: plan.plan });
+  if (!tier) {
+    throw new Error(`plan ${plan.plan} has no resolvable tier`);
+  }
+  next = { ...next, plan: plan.plan, tier };
 
   // "weekly" is the dashboard's default surface (matches the dominant
   // user pain point); fall back if the catalog ever drops it.
