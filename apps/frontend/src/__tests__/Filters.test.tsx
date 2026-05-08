@@ -79,6 +79,29 @@ beforeEach(() => {
 });
 
 describe("Filters", () => {
+  it("defaults the plan selector to max and does not offer all", async () => {
+    const { container, cleanup } = await renderDashboard(
+      <Filters />,
+      "/dashboard",
+    );
+
+    try {
+      const trigger = container.querySelector('[aria-label="Plan"]');
+      expect(trigger?.textContent).toContain("Claude Max 20");
+      trigger?.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }),
+      );
+      await settle();
+
+      const optionLabels = Array.from(
+        document.body.querySelectorAll('[role="option"]'),
+      ).map((item) => item.textContent?.trim());
+      expect(optionLabels).not.toContain("all");
+    } finally {
+      cleanup();
+    }
+  });
+
   it("reads model and plan selections from dashboard search params", async () => {
     const { container, cleanup } = await renderDashboard(
       <Filters />,

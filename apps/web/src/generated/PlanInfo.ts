@@ -13,7 +13,6 @@ import type { Tier } from "./Tier";
 export type PlanInfo = { plan: Plan, provider: Provider, display_name: string, monthly_cost_usd: number, harnesses: Array<Harness>, models: Array<Model>, limit_types: Array<LimitType>, 
 /**
  * Mapping back to the wire `Tier` field so the dashboard can resolve a
- * plan selection into an R2 cell filter. `None` for plans that do not
- * (yet) appear in the published aggregates.
+ * plan selection into an R2 cell filter.
  */
 tier_alias: Tier | null, };

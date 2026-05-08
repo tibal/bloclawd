@@ -16,7 +16,6 @@ import {
   cascade,
   decodeProviderHarness,
   encodeProviderHarness,
-  harnessForProvider,
   limitTypeOptions,
   modelOptions,
   planOptions,
@@ -46,23 +45,19 @@ export function FilterRowFields({
 
   const apply = useCallback(
     (patch: CatalogFilters) => {
+      const resolved = resolveRow(patch);
       const next: FilterRow = {
-        provider: patch.provider,
-        plan: patch.plan,
-        model: patch.model,
-        tier: patch.tier,
-        // Provider→harness is 1:1 in the catalog today: pin harness from
-        // provider whenever cascade left it dangling, so the row never
-        // holds an inconsistent pair.
-        harness:
-          patch.harness ??
-          (patch.provider ? harnessForProvider(patch.provider) : undefined),
-        region: patch.region ?? row.region,
-        limit_type: patch.limit_type ?? row.limit_type,
+        provider: resolved.provider,
+        plan: resolved.plan,
+        model: resolved.model,
+        tier: resolved.tier,
+        harness: resolved.harness,
+        region: resolved.region ?? row.region,
+        limit_type: resolved.limit_type,
       };
       onChange(prune(next) as FilterRow);
     },
-    [onChange, row.region, row.limit_type],
+    [onChange, row.region],
   );
 
   const onProviderHarness = (value: string) => {
@@ -80,7 +75,7 @@ export function FilterRowFields({
   const onModel = (value: string) =>
     apply(cascade(row, { model: optionalValue<Model>(value) }));
   const onPlan = (value: string) =>
-    apply(cascade(row, { plan: optionalValue<Plan>(value) }));
+    apply(cascade(row, { plan: value as Plan }));
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -121,8 +116,7 @@ export function FilterRowFields({
             label="Plan"
             onChange={onPlan}
             options={planOptions(resolved)}
-            value={row.plan ?? "all"}
-            withAll
+            value={resolved.plan}
           />
         </>
       )}

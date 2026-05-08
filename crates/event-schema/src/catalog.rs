@@ -86,8 +86,7 @@ pub struct PlanInfo {
     pub models: &'static [Model],
     pub limit_types: &'static [LimitType],
     /// Mapping back to the wire `Tier` field so the dashboard can resolve a
-    /// plan selection into an R2 cell filter. `None` for plans that do not
-    /// (yet) appear in the published aggregates.
+    /// plan selection into an R2 cell filter.
     pub tier_alias: Option<Tier>,
 }
 
@@ -224,8 +223,9 @@ const ANTHROPIC_MAX5_MODELS: &[Model] = &[
 const ANTHROPIC_MAX20_MODELS: &[Model] = ANTHROPIC_MAX5_MODELS;
 
 // OpenAI plans: Plus and Pro currently include Codex CLI access. Plus gates
-// to GPT-5 only; Pro adds GPT-5.5 and GPT-5-Codex. Refresh when OpenAI
-// updates plan inclusions.
+// to GPT-5 only; Pro adds GPT-5.5 and GPT-5-Codex. The public event tier is
+// the provider-neutral price bucket: Plus → pro, $100 Pro → max5, $200 Pro →
+// max20. Refresh when OpenAI updates plan inclusions.
 const OPENAI_PLUS_MODELS: &[Model] = &[Model::Gpt5];
 const OPENAI_PRO_MODELS: &[Model] = &[Model::Gpt5, Model::Gpt55, Model::Gpt5Codex];
 
@@ -278,7 +278,7 @@ pub const PLANS: &[PlanInfo] = &[
         harnesses: OPENAI_HARNESSES,
         models: OPENAI_PLUS_MODELS,
         limit_types: STANDARD_LIMITS,
-        tier_alias: None,
+        tier_alias: Some(Tier::Pro),
     },
     PlanInfo {
         plan: Plan::OpenAIPro100,
@@ -289,7 +289,7 @@ pub const PLANS: &[PlanInfo] = &[
         // Same model suite as the $200 ceiling per OpenAI launch notes.
         models: OPENAI_PRO_MODELS,
         limit_types: STANDARD_LIMITS,
-        tier_alias: None,
+        tier_alias: Some(Tier::Max5),
     },
     PlanInfo {
         plan: Plan::OpenAIPro,
@@ -299,7 +299,7 @@ pub const PLANS: &[PlanInfo] = &[
         harnesses: OPENAI_HARNESSES,
         models: OPENAI_PRO_MODELS,
         limit_types: STANDARD_LIMITS,
-        tier_alias: None,
+        tier_alias: Some(Tier::Max20),
     },
 ];
 
@@ -659,10 +659,10 @@ mod tests {
     }
 
     #[test]
-    fn openai_plans_have_no_wire_tier_yet() {
-        assert!(Plan::OpenAIPlus.info().tier_alias.is_none());
-        assert!(Plan::OpenAIPro100.info().tier_alias.is_none());
-        assert!(Plan::OpenAIPro.info().tier_alias.is_none());
+    fn openai_plans_alias_to_wire_tier() {
+        assert_eq!(Plan::OpenAIPlus.info().tier_alias, Some(Tier::Pro));
+        assert_eq!(Plan::OpenAIPro100.info().tier_alias, Some(Tier::Max5));
+        assert_eq!(Plan::OpenAIPro.info().tier_alias, Some(Tier::Max20));
     }
 
     #[test]

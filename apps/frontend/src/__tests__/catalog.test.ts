@@ -3,9 +3,11 @@ import { describe, expect, it } from "vitest";
 import {
   CATALOG,
   cascade,
+  defaultPlanFor,
   modelOptions,
   planOptions,
   providerOptions,
+  resolveRow,
   tierOptions,
 } from "@/lib/catalog";
 
@@ -24,13 +26,9 @@ describe("catalog", () => {
     }
   });
 
-  it("anthropic plans alias to wire tier and openai plans do not", () => {
+  it("provider plans alias to wire tiers", () => {
     for (const plan of CATALOG.plans) {
-      if (plan.provider === "anthropic") {
-        expect(plan.tier_alias).not.toBeNull();
-      } else {
-        expect(plan.tier_alias).toBeNull();
-      }
+      expect(plan.tier_alias).not.toBeNull();
     }
   });
 
@@ -116,6 +114,15 @@ describe("filter options", () => {
     );
   });
 
+  it("plan options do not narrow to the currently resolved tier", () => {
+    const options = planOptions({
+      provider: "anthropic",
+      model: "claude-opus-4-7",
+      tier: "max20",
+    }).map((o) => o.value);
+    expect(options).toEqual(["anthropic-max5", "anthropic-max20"]);
+  });
+
   it("model options narrow when plan is set", () => {
     const proOnly = modelOptions({ plan: "anthropic-pro" });
     expect(proOnly.map((o) => o.value)).not.toContain("claude-opus-4-7");
@@ -127,5 +134,32 @@ describe("filter options", () => {
       "max5",
       "pro",
     ]);
+  });
+
+  it("defaults unresolved rows to the highest monthly plan", () => {
+    expect(defaultPlanFor({ provider: "anthropic" })?.plan).toBe(
+      "anthropic-max20",
+    );
+    expect(defaultPlanFor({ provider: "openai" })?.plan).toBe("openai-pro");
+  });
+
+  it("resolves an empty dashboard row to Anthropic max20", () => {
+    expect(resolveRow({})).toMatchObject({
+      provider: "anthropic",
+      plan: "anthropic-max20",
+      tier: "max20",
+      harness: "claude-code",
+      limit_type: "weekly",
+    });
+  });
+
+  it("resolves OpenAI provider rows to ChatGPT Pro max20 by default", () => {
+    expect(resolveRow({ provider: "openai" })).toMatchObject({
+      provider: "openai",
+      plan: "openai-pro",
+      tier: "max20",
+      harness: "codex",
+      limit_type: "weekly",
+    });
   });
 });
