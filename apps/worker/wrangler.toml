@@ -63,7 +63,9 @@ name = "RL_EVENT"
 namespace_id = "1002"
 
   [env.staging.ratelimits.simple]
-  limit = 3
+  # One CLI submission posts one event per observed model. Keep this above the
+  # current max supported model count while still blocking tight loops.
+  limit = 10
   period = 60
 
 # Custom-domain attach for staging. Pre-existing CNAME for
@@ -107,7 +109,9 @@ name = "RL_EVENT"
 namespace_id = "2002"
 
   [env.production.ratelimits.simple]
-  limit = 3
+  # One CLI submission posts one event per observed model. Keep this above the
+  # current max supported model count while still blocking tight loops.
+  limit = 10
   period = 60
 
 # Custom-domain attach (DIST-07). Cloudflare auto-creates the proxied
