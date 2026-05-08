@@ -29,34 +29,25 @@ necessary but not sufficient. The combination
 > don't store IP" is necessary but **not sufficient**. The combination
 > `(model, tier, harness, region, tz_offset, token_5min)` is a fingerprint
 > (Sweeney-style re-identification). Defense layer cake at *materialization*
-> (cron, not ingest): k-anonymity suppression of any cell with n<5; publish
-> only aggregate API-cost percentiles and average retained token mix; **drop
+> (cron, not ingest): publish rounded aggregate API-cost percentiles and
+> privacy-processed retained token mix for small cells; **drop
 > `tz_offset` entirely** (or coarsen to {Americas, EMEA, APAC, Other});
 > never write `event_id`, `submission_group_id`, or `nonce` to public R2
 > files; never log per-event solve-time anywhere persistent.
 
 Operational consequences enforced in the codebase:
 
-- **k-anonymity floor `n ≥ 5` per public-R2 cell.** Quoting
-  `.planning/phases/04-aggregation-dashboard/04-CONTEXT.md` D-87 (AGGR-05
-  amendment):
+- **Rounded public-R2 cells with exact retained counts.** Cron emits every
+  non-empty cohort cell, including low-count cells. API-cost percentiles are
+  rounded to one significant digit. `n_retained` is the count of distinct
+  `submission_group_id`s contributing to the retained cell, NOT raw event
+  count. Cohort = `(tier, harness, region)` plus `limit_type`.
 
-  > k-anonymity enforced at materialization: cells (cohort × limit_type)
-  > with `n_distinct_submission_groups < 5` carry `insufficient_data: true`
-  > and emit no percentile / model data. n is the count of distinct
-  > `submission_group_id`s contributing to the cell, NOT raw event count.
-
-  Cohort = `(tier, harness, region)` (Phase 4 D-80; `model` was dropped to
-  improve cohort fill-rates).
-
-- **Token counts NEVER published as raw integers.** Quoting
-  `.planning/phases/04-aggregation-dashboard/04-CONTEXT.md` D-87 (AGGR-06
-  amendment):
-
-  > Token counts NEVER published as raw integers. The windowed L-estimator
-  > emits a smoothed mean of ≥5 trimmed neighbors; the powers-of-2 bin
-  > fallback emits a bin index. Both encodings preserve the
-  > no-individual-value-recoverable property.
+- **Small-cell token mix is redacted before aggregation.** For cells with
+  fewer than 5 retained submissions, token mix is processed per submission:
+  token fields are rounded to one significant digit, fields below 10k tokens
+  become zero, and per-submission model totals below 100k tokens are dropped
+  before averaging.
 
 - **`tz_offset` dropped from public R2.** TZ is collected on the wire to
   validate window alignment but never persisted into the public dataset.
@@ -277,7 +268,7 @@ Each promise above is automated-tested or grep-gated in CI:
 
 | Promise | Enforcement surface |
 |---------|---------------------|
-| k-anonymity n ≥ 5 | `apps/worker/src/cron/aggregate.rs` (cron k-anon filter); Phase 4 verification harness |
+| Rounded percentiles and small-cell token redaction | `apps/worker/src/cron/aggregate.rs`; worker aggregation tests |
 | Public aggregates only | Cron materialization emits API-cost percentiles and average retained token mix, never raw event rows; `apps/worker/src/cron/aggregate.rs` |
 | `tz_offset` / SGID / nonce / per-event timing stripped | Strip-at-cron (Phase 3 D-56, Phase 4 D-103); release-pipeline anonymity grep gate |
 | UUIDv4 only | `crates/event-schema` JCS conformance test; `crates/cli` integration round-trip |

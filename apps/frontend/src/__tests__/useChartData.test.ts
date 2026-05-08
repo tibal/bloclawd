@@ -204,7 +204,6 @@ function cell(
     limit_type: "5h",
     n_dropped: 0,
     n_retained: 12,
-    insufficient_data: false,
     api_cost_usd: percentiles(apiCost),
     typical_mix: model
       ? [

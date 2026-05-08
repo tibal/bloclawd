@@ -95,7 +95,6 @@ describe("rank analysis", () => {
       n_dropped: 0,
       n_retained: 10,
       typical_mix: report.models,
-      insufficient_data: false,
       cell_count: 1,
     });
 

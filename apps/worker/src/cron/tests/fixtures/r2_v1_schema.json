@@ -30,19 +30,23 @@
             "reasoning_output_tokens": 0.0
           }
         }
-      ],
-      "insufficient_data": false
+      ]
     },
     {
       "subscription_tier": "max5",
       "harness": "codex",
       "region": "EU",
       "limit_type": "weekly",
-      "api_cost_usd": null,
+      "api_cost_usd": {
+        "p10": 9.0,
+        "p25": 9.0,
+        "p50": 10.0,
+        "p75": 10.0,
+        "p90": 20.0
+      },
       "n_dropped": 0,
       "n_retained": 3,
-      "typical_mix": [],
-      "insufficient_data": true
+      "typical_mix": []
     }
   ]
 }

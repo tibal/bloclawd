@@ -104,8 +104,8 @@ The aggregation cron writes a derived form of the payload to R2:
 - `event_id` and `nonce` are dropped before R2 write.
 - `submission_group_id` is used only to group rows into one submission before R2 write.
 - Each submission is priced with catalog-backed per-model/per-token-type API prices.
-- Public cells emit `api_cost_usd` percentiles (`p10`, `p25`, `p50`, `p75`, `p90`), `n_dropped`, `n_retained`, and `typical_mix` averaged over retained submissions.
-- Cells with `n < 5` are suppressed for k-anonymity.
+- Public cells emit `api_cost_usd` percentiles (`p10`, `p25`, `p50`, `p75`, `p90`) rounded to one significant digit, `n_dropped`, exact `n_retained`, and `typical_mix` averaged over retained submissions.
+- Low-count cells are emitted. For cells with fewer than 5 retained submissions, token mix is privacy-processed per submission before averaging: token fields are rounded to one significant digit, fields below 10k tokens become zero, and per-submission model totals below 100k tokens are dropped.
 - Enum sets for filters come from `apps/web/src/generated/`, not an R2 enum manifest.
 
 These properties are enforced at materialization, not at ingest. The DB rows retain the precise private form for re-aggregation; only R2 is public.

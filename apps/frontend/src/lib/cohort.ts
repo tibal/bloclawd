@@ -17,15 +17,22 @@ import type {
 
 export type AggregatedCohortCell = {
   subscription_tier?: Tier;
-  harness: BucketCell["harness"];
+  harness?: BucketCell["harness"];
   region?: Region;
   limit_type: BucketCell["limit_type"];
   api_cost_usd: Percentiles | null;
   n_dropped: number;
   n_retained: number;
   typical_mix: ModelTokenMix[];
-  insufficient_data: false;
   cell_count: number;
+};
+
+export type CohortCellFilter = {
+  tier?: Tier;
+  harness?: BucketCell["harness"];
+  region?: Region;
+  limit_type?: BucketCell["limit_type"];
+  model?: Model;
 };
 
 export function cellsForRow(
@@ -36,12 +43,18 @@ export function cellsForRow(
 }
 
 export function cellMatchesRow(cell: BucketCell, row: ResolvedRow): boolean {
-  if (cell.insufficient_data) return false;
-  if (row.tier && cell.subscription_tier !== row.tier) return false;
-  if (cell.harness !== row.harness) return false;
-  if (cell.limit_type !== row.limit_type) return false;
-  if (row.region && cell.region !== row.region) return false;
-  if (row.model && !cellHasModel(cell, row.model)) return false;
+  return cellMatchesFilter(cell, row);
+}
+
+export function cellMatchesFilter(
+  cell: BucketCell,
+  filter: CohortCellFilter,
+): boolean {
+  if (filter.tier && cell.subscription_tier !== filter.tier) return false;
+  if (filter.harness && cell.harness !== filter.harness) return false;
+  if (filter.limit_type && cell.limit_type !== filter.limit_type) return false;
+  if (filter.region && cell.region !== filter.region) return false;
+  if (filter.model && !cellHasModel(cell, filter.model)) return false;
   return true;
 }
 
@@ -59,19 +72,24 @@ export function aggregateCohortCell(
   bucket: BucketEnvelope,
   row: ResolvedRow,
 ): AggregatedCohortCell | null {
-  const cells = cellsForRow(bucket, row);
+  return aggregateCohortCells(cellsForRow(bucket, row), row);
+}
+
+export function aggregateCohortCells(
+  cells: readonly BucketCell[],
+  filter: CohortCellFilter,
+): AggregatedCohortCell | null {
   if (cells.length === 0) return null;
 
   return {
-    subscription_tier: row.tier,
-    harness: row.harness,
-    region: row.region,
-    limit_type: row.limit_type,
+    subscription_tier: filter.tier,
+    harness: filter.harness,
+    region: filter.region,
+    limit_type: filter.limit_type ?? cells[0]!.limit_type,
     api_cost_usd: percentilesForCells(cells),
     n_dropped: cells.reduce((sum, cell) => sum + cell.n_dropped, 0),
     n_retained: cells.reduce((sum, cell) => sum + cell.n_retained, 0),
-    typical_mix: aggregateTypicalMix(cells, row.model),
-    insufficient_data: false,
+    typical_mix: aggregateTypicalMix(cells, filter.model),
     cell_count: cells.length,
   };
 }

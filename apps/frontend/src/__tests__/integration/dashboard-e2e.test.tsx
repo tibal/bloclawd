@@ -147,7 +147,6 @@ function bucketEnvelope(path: string, idx: number): BucketEnvelope {
         limit_type: "5h",
         n_dropped: 1,
         n_retained: 30 + idx,
-        insufficient_data: false,
         api_cost_usd: {
           p10: 1 + idx,
           p25: 2 + idx,
@@ -164,8 +163,13 @@ function bucketEnvelope(path: string, idx: number): BucketEnvelope {
         limit_type: "5h",
         n_dropped: 0,
         n_retained: 4,
-        insufficient_data: true,
-        api_cost_usd: null,
+        api_cost_usd: {
+          p10: 0.1,
+          p25: 0.2,
+          p50: 0.3,
+          p75: 0.4,
+          p90: 0.5,
+        },
         typical_mix: [],
       },
     ],

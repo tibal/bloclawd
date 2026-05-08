@@ -13,7 +13,7 @@ mod secret;
 #[cfg(feature = "staging-smoke")]
 pub use cron::health::{COUNT_DISTINCT_CONTRIBUTORS_30D_SQL, COUNT_LIFETIME_EVENTS_SQL};
 #[cfg(feature = "staging-smoke")]
-pub use cron::state::{CLAIM_SQL, EAGER_INSERT_SQL, FINISH_SQL, REVERT_SQL, SWEEP_SQL};
+pub use cron::state::{CLAIM_TIER_SQL, EAGER_INSERT_SQL, FINISH_SQL, REVERT_SQL, SWEEP_SQL};
 
 #[event(start)]
 fn start() {

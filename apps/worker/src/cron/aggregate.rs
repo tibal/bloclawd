@@ -13,7 +13,9 @@ use bloclawd_schema::{
 };
 use uuid::Uuid;
 
-const K_ANON: usize = 5;
+const SMALL_N_TOKEN_PRIVACY: usize = 5;
+const TOKEN_FIELD_FLOOR: f64 = 10_000.0;
+const MODEL_TOTAL_FLOOR: f64 = 100_000.0;
 
 #[derive(Debug, Clone)]
 pub struct EventRow {
@@ -81,9 +83,6 @@ pub fn two_sigma_trim(values: &[f64]) -> (Vec<f64>, usize) {
 fn compute_cell(key: CellKey, cell_rows: &[&EventRow]) -> Cell {
     let submissions = aggregate_submissions(cell_rows);
     let submission_count = submissions.len();
-    if submission_count < K_ANON {
-        return insufficient_cell(key, 0, submission_count as u32);
-    }
 
     let costs: Vec<f64> = submissions.iter().map(|s| s.api_cost_usd).collect();
     let keep_mask = two_sigma_keep_mask(&costs);
@@ -94,37 +93,19 @@ fn compute_cell(key: CellKey, cell_rows: &[&EventRow]) -> Cell {
         .collect();
     let n_dropped = submission_count - retained.len();
 
-    if retained.len() < K_ANON {
-        return insufficient_cell(key, n_dropped as u32, retained.len() as u32);
-    }
-
     let mut retained_costs: Vec<f64> = retained.iter().map(|s| s.api_cost_usd).collect();
     retained_costs.sort_by(f64::total_cmp);
+    let retained_count = retained.len();
 
     Cell {
         subscription_tier: key.subscription_tier,
         harness: key.harness,
         region: key.region,
         limit_type: key.limit_type,
-        api_cost_usd: Some(percentiles(&retained_costs)),
+        api_cost_usd: rounded_percentiles(&retained_costs),
         n_dropped: n_dropped as u32,
-        n_retained: retained.len() as u32,
+        n_retained: retained_count as u32,
         typical_mix: average_mix(&retained),
-        insufficient_data: false,
-    }
-}
-
-fn insufficient_cell(key: CellKey, n_dropped: u32, n_retained: u32) -> Cell {
-    Cell {
-        subscription_tier: key.subscription_tier,
-        harness: key.harness,
-        region: key.region,
-        limit_type: key.limit_type,
-        api_cost_usd: None,
-        n_dropped,
-        n_retained,
-        typical_mix: Vec::new(),
-        insufficient_data: true,
     }
 }
 
@@ -200,6 +181,10 @@ fn cost_part(model: Model, token_type: TokenType, count: u64) -> f64 {
 }
 
 fn average_mix(retained: &[&SubmissionAggregate]) -> Vec<ModelTokenMix> {
+    if retained.len() < SMALL_N_TOKEN_PRIVACY {
+        return average_small_n_mix(retained);
+    }
+
     let mut totals: BTreeMap<Model, TokenMixTotals> = BTreeMap::new();
     for submission in retained {
         for (model, tokens) in &submission.tokens_by_model {
@@ -219,6 +204,61 @@ fn average_mix(retained: &[&SubmissionAggregate]) -> Vec<ModelTokenMix> {
         .collect()
 }
 
+fn average_small_n_mix(retained: &[&SubmissionAggregate]) -> Vec<ModelTokenMix> {
+    let mut totals: BTreeMap<Model, TokenMixTotals> = BTreeMap::new();
+    for submission in retained {
+        for (model, tokens) in &submission.tokens_by_model {
+            let Some(masked) = small_n_submission_tokens(*tokens) else {
+                continue;
+            };
+            let entry = totals.entry(*model).or_default();
+            add_totals(entry, &masked);
+        }
+    }
+
+    let denom = retained.len().max(1) as f64;
+    totals
+        .into_iter()
+        .map(|(model, mut tokens)| {
+            scale_totals(&mut tokens, 1.0 / denom);
+            ModelTokenMix { model, tokens }
+        })
+        .filter(|entry| !is_zero(&entry.tokens))
+        .collect()
+}
+
+fn small_n_submission_tokens(mut tokens: TokenMixTotals) -> Option<TokenMixTotals> {
+    mask_token_field(&mut tokens.input_tokens);
+    mask_token_field(&mut tokens.output_tokens);
+    mask_token_field(&mut tokens.cache_read_input_tokens);
+    mask_token_field(&mut tokens.ephemeral_5m_input_tokens);
+    mask_token_field(&mut tokens.ephemeral_1h_input_tokens);
+    mask_token_field(&mut tokens.cached_input_tokens);
+    mask_token_field(&mut tokens.reasoning_output_tokens);
+
+    if token_total(&tokens) < MODEL_TOTAL_FLOOR {
+        return None;
+    }
+    Some(tokens)
+}
+
+fn mask_token_field(value: &mut f64) {
+    *value = round_sig_figs(*value, 1);
+    if *value < TOKEN_FIELD_FLOOR {
+        *value = 0.0;
+    }
+}
+
+fn token_total(total: &TokenMixTotals) -> f64 {
+    total.input_tokens
+        + total.output_tokens
+        + total.cache_read_input_tokens
+        + total.ephemeral_5m_input_tokens
+        + total.ephemeral_1h_input_tokens
+        + total.cached_input_tokens
+        + total.reasoning_output_tokens
+}
+
 fn percentiles(sorted_values: &[f64]) -> Percentiles {
     Percentiles {
         p10: percentile_value(sorted_values, 0.10),
@@ -229,12 +269,31 @@ fn percentiles(sorted_values: &[f64]) -> Percentiles {
     }
 }
 
+fn rounded_percentiles(sorted_values: &[f64]) -> Percentiles {
+    let p = percentiles(sorted_values);
+    Percentiles {
+        p10: round_sig_figs(p.p10, 1),
+        p25: round_sig_figs(p.p25, 1),
+        p50: round_sig_figs(p.p50, 1),
+        p75: round_sig_figs(p.p75, 1),
+        p90: round_sig_figs(p.p90, 1),
+    }
+}
+
 fn percentile_value(sorted_values: &[f64], percentile: f64) -> f64 {
     if sorted_values.is_empty() {
         return 0.0;
     }
     let idx = ((sorted_values.len() - 1) as f64 * percentile).round() as usize;
     sorted_values[idx.min(sorted_values.len() - 1)]
+}
+
+fn round_sig_figs(value: f64, digits: i32) -> f64 {
+    if !value.is_finite() || value == 0.0 {
+        return value;
+    }
+    let scale = 10_f64.powf(digits as f64 - 1.0 - value.abs().log10().floor());
+    (value * scale).round() / scale
 }
 
 fn two_sigma_keep_mask(values: &[f64]) -> Vec<bool> {
@@ -401,13 +460,19 @@ mod tests {
     }
 
     #[test]
-    fn compute_cells_enforces_k_anonymity() {
-        let rows = rows_for_inputs(&[10, 20, 30, 40]);
+    fn compute_cells_emits_low_n_percentiles() {
+        let rows = rows_for_inputs(&[10]);
         let cells = compute_cells(&rows);
 
         assert_eq!(cells.len(), 1);
-        assert!(cells[0].insufficient_data);
-        assert!(cells[0].api_cost_usd.is_none());
+        assert_eq!(cells[0].n_retained, 1);
+        assert_eq!(cells[0].n_dropped, 0);
+        let cost = cells[0].api_cost_usd;
+        assert!(cost.p10 > 0.0);
+        assert_eq!(cost.p10, cost.p25);
+        assert_eq!(cost.p25, cost.p50);
+        assert_eq!(cost.p50, cost.p75);
+        assert_eq!(cost.p75, cost.p90);
         assert!(cells[0].typical_mix.is_empty());
     }
 
@@ -416,7 +481,7 @@ mod tests {
         let rows = rows_for_inputs(&[10, 20, 30, 40, 50, 60, 70]);
         let cells = compute_cells(&rows);
 
-        let cost = cells[0].api_cost_usd.unwrap();
+        let cost = cells[0].api_cost_usd;
         assert!(cost.p10 > 0.0);
         assert!(cost.p10 <= cost.p50);
         assert!(cost.p50 <= cost.p90);
@@ -455,6 +520,37 @@ mod tests {
                     .unwrap();
 
         assert_eq!(cost, expected);
+    }
+
+    #[test]
+    fn small_n_token_mix_rounds_clips_and_drops_per_submission_model() {
+        let mut rows = vec![row(
+            1,
+            Model::ClaudeSonnet45,
+            Tier::Pro,
+            Harness::ClaudeCode,
+            Region::Na,
+            LimitType::FiveH,
+            95_000,
+        )];
+        rows[0].payload.tokens.output_tokens = 9_400;
+        rows.push(row(
+            1,
+            Model::ClaudeOpus47,
+            Tier::Pro,
+            Harness::ClaudeCode,
+            Region::Na,
+            LimitType::FiveH,
+            94_000,
+        ));
+
+        let cell = &compute_cells(&rows)[0];
+
+        assert_eq!(cell.n_retained, 1);
+        assert_eq!(cell.typical_mix.len(), 1);
+        assert_eq!(cell.typical_mix[0].model, Model::ClaudeSonnet45);
+        assert_eq!(cell.typical_mix[0].tokens.input_tokens, 100_000.0);
+        assert_eq!(cell.typical_mix[0].tokens.output_tokens, 0.0);
     }
 
     #[test]

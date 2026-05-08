@@ -90,11 +90,10 @@ pub struct BucketCell {
     pub harness: Harness,
     pub region: Region,
     pub limit_type: LimitType,
-    pub api_cost_usd: Option<Percentiles>,
+    pub api_cost_usd: Percentiles,
     pub n_dropped: u32,
     pub n_retained: u32,
     pub typical_mix: Vec<ModelTokenMix>,
-    pub insufficient_data: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, TS)]

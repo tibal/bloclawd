@@ -14,7 +14,7 @@
 
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use bloclawd_worker::{CLAIM_SQL, FINISH_SQL, REVERT_SQL, SWEEP_SQL};
+use bloclawd_worker::{CLAIM_TIER_SQL, FINISH_SQL, REVERT_SQL, SWEEP_SQL};
 use tokio_postgres_native::types::Type;
 
 fn require_env(key: &str) -> String {
@@ -69,10 +69,11 @@ async fn cron_state_staging() {
 
     let claimed = client
         .query_typed_opt(
-            CLAIM_SQL,
+            CLAIM_TIER_SQL,
             &[
                 (&"cron-state-smoke", Type::TEXT),
                 (&"75 minutes", Type::TEXT),
+                (&"q15", Type::TEXT),
             ],
         )
         .await
@@ -87,10 +88,11 @@ async fn cron_state_staging() {
 
     let second_claim = client
         .query_typed_opt(
-            CLAIM_SQL,
+            CLAIM_TIER_SQL,
             &[
                 (&"cron-state-smoke-2", Type::TEXT),
                 (&"75 minutes", Type::TEXT),
+                (&"q15", Type::TEXT),
             ],
         )
         .await

@@ -59,18 +59,17 @@ const sections: Section[] = [
     ),
   },
   {
-    id: "kanon",
+    id: "privacy",
     n: "03",
-    title: "k-anonymity floor",
+    title: "Rounded public cells",
     body: (
       <p>
-        Any cohort and limit-type cell with fewer than 5 distinct submission
-        groups is suppressed at materialization. Suppressed cells carry{" "}
-        <code className="font-mono text-foreground">
-          insufficient_data: true
-        </code>{" "}
-        and emit no percentile or token-mix breakdown. The k≥5 floor is a hard
-        public-data boundary.
+        Every non-empty cohort cell is published with exact retained counts
+        and API-cost percentiles rounded to one significant digit. For small
+        cells, token mix is privacy-processed per submission before averaging:
+        token fields are rounded to one significant digit, fields below 10k
+        tokens become zero, and per-submission model totals below 100k tokens
+        are dropped.
       </p>
     ),
   },
@@ -80,9 +79,9 @@ const sections: Section[] = [
     title: "API-cost percentiles",
     body: (
       <p>
-        When a trimmed cohort has enough contributors, the public R2 cell
-        emits p10, p25, p50, p75, and p90 for API-equivalent cost in USD.
-        These values are computed from retained submissions only.
+        Every public R2 cell emits p10, p25, p50, p75, and p90 for
+        API-equivalent cost in USD. These rounded values are computed from
+        retained submissions only.
       </p>
     ),
   },
@@ -96,6 +95,7 @@ const sections: Section[] = [
         submissions, grouped by model and token type: input, output,
         cached-read, and cached-write. This shows what the typical
         rate-limit-hitting workload looked like without publishing raw events.
+        Small cells use the additional per-submission redaction described above.
       </p>
     ),
   },
@@ -118,9 +118,9 @@ const sections: Section[] = [
     title: "Aggregation cadence",
     body: (
       <p>
-        The v1 cron worker runs daily by default. Cadence is config-driven,
-        and q15, h1, and d1 file paths remain stable when cadence changes
-        so the public R2 contract can evolve without breaking consumers.
+        The v1 cron worker runs every 15 minutes. It writes q15 buckets for
+        the live feed and rolls up h1 and d1 buckets from raw database events
+        when those larger windows close.
       </p>
     ),
   },

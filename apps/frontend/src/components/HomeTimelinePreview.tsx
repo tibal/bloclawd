@@ -99,8 +99,7 @@ function buildAlignedFromBuckets(
       (c) =>
         c.subscription_tier === "max20" &&
         c.harness === "claude-code" &&
-        c.limit_type === "5h" &&
-        !c.insufficient_data,
+        c.limit_type === "5h",
     );
     const pcts = cell?.api_cost_usd ?? null;
     if (!pcts) continue;

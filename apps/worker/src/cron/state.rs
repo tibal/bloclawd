@@ -28,27 +28,61 @@ fn tier_interval(tier: &str) -> &'static str {
 }
 
 pub const EAGER_INSERT_SQL: &str = r#"
-    WITH inserted AS (
+    WITH event_bounds AS (
+        SELECT MIN(events.bucket_ts) AS first_event_ts FROM events
+    ),
+    bounds AS (
+        SELECT
+            CASE
+                WHEN first_event_ts IS NULL THEN NULL
+                ELSE date_bin(
+                    $2::interval,
+                    GREATEST(first_event_ts, now() - $4::interval),
+                    '1970-01-01 00:00:00+00'::timestamptz
+                )
+            END AS start_ts,
+            date_bin(
+                $2::interval,
+                now() - $3::interval,
+                '1970-01-01 00:00:00+00'::timestamptz
+            ) AS end_ts
+        FROM event_bounds
+    ),
+    candidate AS (
+        SELECT generate_series(start_ts, end_ts, $2::interval) AS bucket_ts
+        FROM bounds
+        WHERE start_ts IS NOT NULL AND end_ts >= start_ts
+    ),
+    eventful AS (
+        SELECT candidate.bucket_ts
+        FROM candidate
+        WHERE EXISTS (
+            SELECT 1 FROM events
+            WHERE events.bucket_ts >= candidate.bucket_ts
+              AND events.bucket_ts < candidate.bucket_ts + $2::interval
+            LIMIT 1
+        )
+    ),
+    inserted AS (
         INSERT INTO cron_state (tier, bucket_ts, state)
-        SELECT $1::text, generate_series(
-            COALESCE((SELECT MAX(bucket_ts) FROM cron_state WHERE tier = $1::text),
-                     date_bin($2::interval, now() - $4::interval, '1970-01-01 00:00:00+00'::timestamptz)),
-            date_bin($2::interval, now() - $3::interval, '1970-01-01 00:00:00+00'::timestamptz),
-            $2::interval
-        ), 'not_processed'
+        SELECT $1::text, bucket_ts, 'not_processed'
+        FROM eventful
         ON CONFLICT (tier, bucket_ts) DO NOTHING
         RETURNING 1
     )
     SELECT count(*)::int8 FROM inserted
 "#;
 
-pub const CLAIM_SQL: &str = r#"
+pub const CLAIM_TIER_SQL: &str = r#"
     UPDATE cron_state
     SET state = 'processing', claimed_at = now(), worker_id = $1::text
     WHERE (tier, bucket_ts) = (
         SELECT tier, bucket_ts FROM cron_state candidate
-        WHERE state = 'not_processed'
-           OR (state = 'processing' AND claimed_at < now() - $2::interval)
+        WHERE candidate.tier = $3::text
+          AND (
+            state = 'not_processed'
+            OR (state = 'processing' AND claimed_at < now() - $2::interval)
+          )
         ORDER BY
             EXISTS (
                 SELECT 1 FROM events
@@ -61,12 +95,6 @@ pub const CLAIM_SQL: &str = r#"
                   END
                 LIMIT 1
             ) DESC,
-            CASE candidate.tier
-                WHEN 'q15' THEN 0
-                WHEN 'h1' THEN 1
-                WHEN 'd1' THEN 2
-                ELSE 3
-            END,
             candidate.bucket_ts DESC
         FOR UPDATE SKIP LOCKED
         LIMIT 1
@@ -142,25 +170,33 @@ pub async fn eager_fill(env: &Env, tier: &str, lateness_min: i64) -> Result<u64>
     Ok(n as u64)
 }
 
-pub async fn claim_one(
+pub async fn claim_one_for_tier(
     env: &Env,
     worker_id: &str,
     stale_threshold: &str,
+    tier: &str,
 ) -> Result<Option<(String, SystemTime)>> {
     let client = open_client(env).await?;
     let row_opt = client
         .query_typed_opt(
-            CLAIM_SQL,
-            &[(&worker_id, Type::TEXT), (&stale_threshold, Type::TEXT)],
+            CLAIM_TIER_SQL,
+            &[
+                (&worker_id, Type::TEXT),
+                (&stale_threshold, Type::TEXT),
+                (&tier, Type::TEXT),
+            ],
         )
         .await
-        .map_err(|e| worker::Error::RustError(format!("claim_one: {e}")))?;
+        .map_err(|e| worker::Error::RustError(format!("claim_one_for_tier: {e}")))?;
     let result = row_opt.map(|row| {
         let tier: String = row.get(0);
         let bucket_ts: SystemTime = row.get(1);
         (tier, bucket_ts)
     });
-    console_log!("cron::state::claim_one claimed={}", result.is_some());
+    console_log!(
+        "cron::state::claim_one_for_tier claimed={}",
+        result.is_some()
+    );
     drop(client);
     Ok(result)
 }
@@ -218,21 +254,23 @@ mod tests {
     fn eager_insert_sql_targets_cron_state() {
         assert!(EAGER_INSERT_SQL.contains("INSERT INTO cron_state"));
         assert!(EAGER_INSERT_SQL.contains("ON CONFLICT (tier, bucket_ts) DO NOTHING"));
+        assert!(EAGER_INSERT_SQL.contains("MIN(events.bucket_ts)"));
+        assert!(EAGER_INSERT_SQL.contains("EXISTS"));
     }
 
     #[test]
     fn claim_sql_uses_skip_locked() {
-        assert!(CLAIM_SQL.contains("FOR UPDATE SKIP LOCKED"));
-        assert!(CLAIM_SQL.contains("LIMIT 1"));
-        assert!(CLAIM_SQL.contains("RETURNING tier, bucket_ts"));
+        assert!(CLAIM_TIER_SQL.contains("FOR UPDATE SKIP LOCKED"));
+        assert!(CLAIM_TIER_SQL.contains("LIMIT 1"));
+        assert!(CLAIM_TIER_SQL.contains("RETURNING tier, bucket_ts"));
+        assert!(CLAIM_TIER_SQL.contains("candidate.tier = $3::text"));
     }
 
     #[test]
-    fn claim_sql_prioritizes_eventful_recent_q15_work() {
-        assert!(CLAIM_SQL.contains("EXISTS"));
-        assert!(CLAIM_SQL.contains("events.bucket_ts"));
-        assert!(CLAIM_SQL.contains("WHEN 'q15' THEN 0"));
-        assert!(CLAIM_SQL.contains("candidate.bucket_ts DESC"));
+    fn claim_sql_prioritizes_eventful_recent_work_for_one_tier() {
+        assert!(CLAIM_TIER_SQL.contains("EXISTS"));
+        assert!(CLAIM_TIER_SQL.contains("events.bucket_ts"));
+        assert!(CLAIM_TIER_SQL.contains("candidate.bucket_ts DESC"));
     }
 
     #[test]
