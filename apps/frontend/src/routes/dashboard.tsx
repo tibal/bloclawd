@@ -15,7 +15,7 @@ import { PercentilePicker } from "@/components/PercentilePicker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Toggle } from "@/components/ui/toggle";
 import { TokenMixPanel } from "@/components/TokenMixPanel";
-import { resolveRow, type ResolvedRow } from "@/lib/catalog";
+import { resolveRow } from "@/lib/catalog";
 import {
   EMPTY_ALIGNED_DATA,
   alignedDataHasValues,
@@ -24,7 +24,7 @@ import {
   type Series,
 } from "@/lib/chart-data";
 import { PERCENTILE_INDEX } from "@/lib/chart-tokens";
-import { aggregateCohortCell } from "@/lib/cohort";
+import { aggregateCohortCells, cellsMatching } from "@/lib/cohort";
 import {
   alignedHasValues,
   rowLabel,
@@ -41,13 +41,11 @@ import {
 import { formatUsd } from "@/lib/format";
 import {
   isR2NotFound,
-  useBucket,
-  useManifest,
   useStatus,
+  type BucketEnvelope,
   type StatusJson,
 } from "@/lib/r2";
 import { routeHead } from "@/lib/route-head";
-import { pickTier } from "@/lib/tier-picker";
 
 export type { DashboardSearch };
 export { dashboardSearchSchema };
@@ -66,6 +64,7 @@ function DashboardPage() {
   const status = useStatus();
   const {
     curves,
+    buckets,
     meta,
     loading,
     error,
@@ -187,98 +186,40 @@ function DashboardPage() {
         </div>
       </div>
 
-      <CohortPanels search={search} />
+      <CohortPanels buckets={buckets} search={search} />
     </section>
   );
 }
 
-function CohortPanels({ search }: { search: DashboardSearch }) {
-  // Cohort cards mirror the primary filter row and pin to the latest bucket
-  // inside the user's selected range, so changing range/filters refreshes
-  // the panels alongside the chart.
-  const manifest = useManifest();
-  const nowMs = Date.now();
-  const { startMs, endMs, days } = rangeWindow(search, nowMs);
-  const resolution = pickTier(days);
-  const tierPaths = manifest.data?.tiers ?? null;
-  const latestPath = pickLatestPathInRange(
-    tierPaths,
-    resolution,
-    startMs,
-    endMs,
-  );
-  const bucketQuery = useBucket(latestPath?.tier ?? "h1", latestPath?.path ?? "");
-  const bucket = latestPath ? bucketQuery.data : undefined;
-
-  const resolved: ResolvedRow = useMemo(
+function CohortPanels({
+  buckets,
+  search,
+}: {
+  buckets: BucketEnvelope[];
+  search: DashboardSearch;
+}) {
+  // Aggregate across every loaded bucket — k≥5 redaction can blank a
+  // narrow slice in the latest bucket while older buckets still have data.
+  const resolved = useMemo(
     () => resolveRow(primaryRowFromSearch(search)),
     [search],
   );
-  const cell = useMemo(
-    () => (bucket ? aggregateCohortCell(bucket, resolved) : null),
-    [bucket, resolved],
-  );
+  const cells = buckets.flatMap((bucket) => bucket.cells);
+  const cell = aggregateCohortCells(cellsMatching(cells, resolved), resolved);
 
-  if (!bucket || !cell) return null;
+  if (!cell) return null;
 
   return (
     <div className="grid gap-3 lg:grid-cols-[1.4fr_1fr_1fr]">
       <BreakdownTable cell={cell} />
       <TokenMixPanel cell={cell} />
       <CostEquivalentPanel
-        bucket={bucket}
+        cells={cells}
         filters={resolved}
         primary={search.primary}
       />
     </div>
   );
-}
-
-function pickLatestPathInRange(
-  tiers: { q15: string[]; h1: string[]; d1: string[] } | null,
-  preferredTier: "q15" | "h1" | "d1",
-  startMs: number,
-  endMs: number,
-): { tier: "q15" | "h1" | "d1"; path: string } | null {
-  if (!tiers) return null;
-  // Mirror the chart resolution first, then fall back if that tier has no
-  // bucket in the selected range.
-  const orderedTiers = [
-    preferredTier,
-    ...(["q15", "h1", "d1"] as const).filter((tier) => tier !== preferredTier),
-  ];
-  for (const tier of orderedTiers) {
-    const candidates = tiers[tier];
-    if (!candidates.length) continue;
-    let best: { ts: number; path: string } | null = null;
-    for (const path of candidates) {
-      const ts = parsePathTimestampMs(path, tier);
-      if (ts == null) continue;
-      if (ts < startMs || ts > endMs) continue;
-      if (!best || ts > best.ts) best = { ts, path };
-    }
-    if (best) return { tier, path: best.path };
-  }
-  // Fallback: most recent of any resolution.
-  for (const tier of ["h1", "d1", "q15"] as const) {
-    const last = tiers[tier].at(-1);
-    if (last) return { tier, path: last };
-  }
-  return null;
-}
-
-function parsePathTimestampMs(
-  path: string,
-  tier: "q15" | "h1" | "d1",
-): number | null {
-  const parts = path.replace(/\.json$/, "").replace(/^\/+/, "").split("/");
-  const relative = parts[0] === tier ? parts.slice(1) : parts;
-  const [year, month, day, time] = relative;
-  const y = Number(year), m = Number(month), d = Number(day);
-  if (!y || !m || !d) return null;
-  if (tier === "d1") return Date.UTC(y, m - 1, d);
-  const [h = "0", mi = "0"] = (time ?? "").split("-");
-  return Date.UTC(y, m - 1, d, Number(h), Number(mi));
 }
 
 interface ChartAreaProps {

@@ -8,15 +8,15 @@ import {
   tierLabel,
   type ResolvedRow,
 } from "@/lib/catalog";
-import { percentilesForCells, cellsForRow } from "@/lib/cohort";
+import { cellsMatching, percentilesForCells } from "@/lib/cohort";
 import { formatUsd } from "@/lib/format";
 import type {
-  BucketEnvelope,
+  BucketCell,
   Percentiles,
 } from "@/lib/r2";
 
 interface CostEquivalentPanelProps {
-  bucket: BucketEnvelope;
+  cells: readonly BucketCell[];
   filters: ResolvedRow;
   primary: keyof Percentiles;
 }
@@ -24,7 +24,7 @@ interface CostEquivalentPanelProps {
 const TIERS: readonly Tier[] = TIER_VALUES;
 
 export function CostEquivalentPanel({
-  bucket,
+  cells,
   filters,
   primary,
 }: CostEquivalentPanelProps) {
@@ -34,10 +34,7 @@ export function CostEquivalentPanel({
 
   const rows = TIERS.map((tier) => {
     const pcts = percentilesForCells(
-      cellsForRow(bucket, {
-        ...filters,
-        tier,
-      }),
+      cellsMatching(cells, { ...filters, tier }),
     );
     const apiUsd = pcts ? pcts[primary] : null;
     const subUsd = subscriptionPerWindow(tier);

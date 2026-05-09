@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   aggregateCohortCells,
-  cellMatchesFilter,
+  cellsMatching,
   type AggregatedCohortCell,
   type CohortCellFilter,
 } from "@/lib/cohort";
@@ -792,7 +792,7 @@ function aggregateRankBuckets(
   const selected: BucketEnvelope["cells"] = [];
   let retained = 0;
   for (const bucket of buckets) {
-    const matches = bucket.cells.filter((cell) => cellMatchesFilter(cell, filter));
+    const matches = cellsMatching(bucket.cells, filter);
     if (matches.length === 0) continue;
     selected.push(...matches);
     retained += matches.reduce((sum, cell) => sum + cell.n_retained, 0);

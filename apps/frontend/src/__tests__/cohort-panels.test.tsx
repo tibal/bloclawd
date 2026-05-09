@@ -29,7 +29,7 @@ describe("cohort panels", () => {
   it("renders OpenAI plan labels and Codex costs in cost-equivalent rows", () => {
     const { container, cleanup } = render(
       <CostEquivalentPanel
-        bucket={bucket()}
+        cells={bucket().cells}
         filters={CODEX_FILTERS}
         primary="p50"
       />,
@@ -43,6 +43,37 @@ describe("cohort panels", () => {
       expect(container.textContent).toContain("$10.00");
       expect(container.textContent).toContain("$20.00");
       expect(container.textContent).toContain("$30.00");
+      expect(container.textContent).not.toContain("$999.00");
+    } finally {
+      cleanup();
+    }
+  });
+
+  it("weights cost-equivalent rows across loaded buckets without leaking other models", () => {
+    const otherModelCell: BucketCell = {
+      ...codexCell("max20", "NA", 999, 100, 999),
+      typical_mix: [
+        {
+          model: "gpt-5",
+          tokens: tokens(999),
+        },
+      ],
+    };
+    const { container, cleanup } = render(
+      <CostEquivalentPanel
+        cells={[
+          ...bucket().cells,
+          codexCell("max20", "NA", 90, 30, 900),
+          otherModelCell,
+        ]}
+        filters={CODEX_FILTERS}
+        primary="p50"
+      />,
+    );
+
+    try {
+      expect(container.textContent).toContain("$60.00");
+      expect(container.textContent).not.toContain("$90.00");
       expect(container.textContent).not.toContain("$999.00");
     } finally {
       cleanup();
