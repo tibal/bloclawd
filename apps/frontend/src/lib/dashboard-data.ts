@@ -35,6 +35,7 @@ export type CurveResult = {
 
 export type ChartDataResult = {
   curves: CurveResult[];
+  buckets: BucketEnvelope[];
   meta: ChartMeta | null;
   loading: boolean;
   error: Error | null;
@@ -71,6 +72,7 @@ export function useChartData(search: DashboardSearch): ChartDataResult {
   if (error) {
     return {
       curves: [],
+      buckets: [],
       meta: null,
       loading: false,
       error,
@@ -95,6 +97,7 @@ export function useChartData(search: DashboardSearch): ChartDataResult {
 
   return {
     curves,
+    buckets,
     meta,
     loading,
     error: null,

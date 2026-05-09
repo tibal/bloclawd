@@ -42,6 +42,13 @@ export function cellsForRow(
   return bucket.cells.filter((cell) => cellMatchesRow(cell, row));
 }
 
+export function cellsMatching(
+  cells: readonly BucketCell[],
+  filter: CohortCellFilter,
+): BucketCell[] {
+  return cells.filter((cell) => cellMatchesFilter(cell, filter));
+}
+
 export function cellMatchesRow(cell: BucketCell, row: ResolvedRow): boolean {
   return cellMatchesFilter(cell, row);
 }

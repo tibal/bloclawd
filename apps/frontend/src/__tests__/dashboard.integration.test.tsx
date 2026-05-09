@@ -14,7 +14,9 @@ import {
   useBucket,
   useManifest,
   useStatus,
+  type BucketEnvelope,
   type Manifest,
+  type Percentiles,
   type StatusJson,
 } from "@/lib/r2";
 import type { AlignedData } from "@/lib/chart-data";
@@ -188,6 +190,44 @@ describe("/dashboard assembly", () => {
       cleanup();
     }
   });
+
+  it("renders cohort panels from earlier loaded buckets when the latest slice is redacted", async () => {
+    mockStatus();
+    mockChartData({
+      curves: [makeCurve("primary", SAMPLE_DATA)],
+      buckets: [
+        dashboardBucket("2026-05-02T20:00:00Z", [
+          dashboardCell({
+            model: "claude-sonnet-4-5",
+            p50: 42,
+            tokensIn: 3_000,
+          }),
+        ]),
+        dashboardBucket("2026-05-02T21:00:00Z", [
+          dashboardCell({
+            model: "claude-opus-4-7",
+            p50: 999,
+            tokensIn: 9_999,
+          }),
+        ]),
+      ],
+    });
+
+    const { container, cleanup } = await renderDashboard(
+      "/dashboard?tier=max20&harness=claude-code&region=EU&limit_type=5h&model=claude-sonnet-4-5",
+    );
+
+    try {
+      expect(container.textContent).toContain("Typical token mix");
+      expect(container.textContent).toContain("Cost-equivalent per window");
+      expect(container.textContent).toContain("1 cell");
+      expect(container.textContent).toContain("claude-sonnet-4-5");
+      expect(container.textContent).toContain("$42.00");
+      expect(container.textContent).not.toContain("$999.00");
+    } finally {
+      cleanup();
+    }
+  });
 });
 
 async function renderDashboard(path: string) {
@@ -215,6 +255,7 @@ async function renderDashboard(path: string) {
 }
 
 function mockChartData({
+  buckets = [],
   curves = [],
   error = null,
   loading = false,
@@ -222,6 +263,7 @@ function mockChartData({
 }: Partial<ReturnType<typeof useChartData>> = {}) {
   vi.mocked(useChartData).mockReturnValue({
     curves,
+    buckets,
     meta,
     loading,
     error,
@@ -260,4 +302,60 @@ function mockStatus(overrides: Partial<StatusJson> = {}) {
     isLoading: false,
     error: null,
   } as ReturnType<typeof useStatus>);
+}
+
+function dashboardBucket(
+  bucketTs: string,
+  cells: BucketEnvelope["cells"],
+): BucketEnvelope {
+  return {
+    schema_version: "v1",
+    bucket_ts: bucketTs,
+    tier_resolution: "h1",
+    cells,
+  };
+}
+
+function dashboardCell({
+  model,
+  p50,
+  tokensIn,
+}: {
+  model: BucketEnvelope["cells"][number]["typical_mix"][number]["model"];
+  p50: number;
+  tokensIn: number;
+}): BucketEnvelope["cells"][number] {
+  return {
+    subscription_tier: "max20",
+    harness: "claude-code",
+    region: "EU",
+    limit_type: "5h",
+    n_dropped: 0,
+    n_retained: 8,
+    api_cost_usd: percentiles(p50),
+    typical_mix: [
+      {
+        model,
+        tokens: {
+          input_tokens: tokensIn,
+          output_tokens: tokensIn / 2,
+          cache_read_input_tokens: 0,
+          ephemeral_5m_input_tokens: 0,
+          ephemeral_1h_input_tokens: 0,
+          cached_input_tokens: 0,
+          reasoning_output_tokens: 0,
+        },
+      },
+    ],
+  };
+}
+
+function percentiles(p50: number): Percentiles {
+  return {
+    p10: p50 - 4,
+    p25: p50 - 2,
+    p50,
+    p75: p50 + 2,
+    p90: p50 + 4,
+  };
 }

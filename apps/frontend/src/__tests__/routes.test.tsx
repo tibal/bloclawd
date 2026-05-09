@@ -12,6 +12,7 @@ vi.mock("@/lib/dashboard-data", async (importOriginal) => {
     ...actual,
     useChartData: () => ({
       curves: [],
+      buckets: [],
       meta: null,
       loading: false,
       error: null,
